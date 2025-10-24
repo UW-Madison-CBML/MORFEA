@@ -6,7 +6,7 @@ import os
 from natsort import natsorted
 from torchsummary import summary
 from model import Model
-
+import sys
 
 model = Model()
 if os.path.exists("model_weights.pth"):
@@ -19,6 +19,8 @@ loss_fn = torch.nn.MSELoss(reduction='mean')
 learning_rate = 1e-3
 optimizer = torch.optim.RMSprop(model.parameters(), lr=learning_rate)
 #go through a random selection of images and run model on each in order, reset directory and lstm hidden state vectors after
+if len(sys.argv) > 1 and os.path.exists(sys.argv[1]):
+    os.chdir(sys.argv[1])
 os.chdir("embryo_dataset")
 
 embryo_vids = os.listdir()
