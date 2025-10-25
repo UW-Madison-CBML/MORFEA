@@ -6,7 +6,9 @@ pip install -r requirements.txt
 
 curl https://zenodo.org/records/7912264/files/embryo_dataset.tar.gz?download=1 -o embryo_dataset.tar.gz
 gzip -d embryo_dataset.tar.gz
-tar -xf embryo_dataset.tar -C ./embryo_dataset
+ls -a
+tar -xf embryo_dataset.tar
+ls -a
 
 python train.py 
 
