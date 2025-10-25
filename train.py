@@ -15,13 +15,13 @@ print(device)
 model = Model().to(device)
 if os.path.exists("model_weights.pth"):
     model.load_state_dict(torch.load("model_weights.pth",weights_only = True))
-#print(summary(model, input_size = (1,500,500), batch_size = -1))
+print(summary(model, input_size = (1,500,500), batch_size = -1))
 # encoder: convo, downsample (maxpool), convo, downsample..., flatten 
 # rnn: lstm
 # decoder: reshape to 2d img, upsample, convo, upsample, 
 loss_fn = torch.nn.MSELoss(reduction='mean')
 learning_rate = 1e-3
-optimizer = torch.optim.RMSprop(model.parameters(), lr=learning_rate).to(device)
+optimizer = torch.optim.RMSprop(model.parameters(), lr=learning_rate)
 #go through a random selection of images and run model on each in order, reset directory and lstm hidden state vectors after
 if len(sys.argv) > 1 and os.path.exists(sys.argv[1]):
     os.chdir(sys.argv[1])
@@ -29,7 +29,7 @@ os.chdir("embryo_dataset")
 
 embryo_vids = os.listdir()
 np.random.shuffle(embryo_vids)
-select_amount = 0.4
+select_amount = 1
 batch_size = 50
 embryo_vids = embryo_vids[:int(len(embryo_vids)*select_amount)]
 for i in embryo_vids:
