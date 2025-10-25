@@ -7,10 +7,12 @@ class Model(torch.nn.Module):
         self.conv2 = torch.nn.Conv2d(8, 8, 3)
         self.pool2 = torch.nn.MaxPool2d(5)
         self.conv3 = torch.nn.Conv2d(8, 8, 5)
-        self.pool3 = torch.nn.MaxPool2d(5)
         self.flatten = torch.nn.Flatten()
-        self.linear = torch.nn.Linear(200, 200)
-        self.lstm = torch.nn.LSTM(200,200,1)
+
+        self.lstm1 = torch.nn.LSTM(200,200,1)
+        self.linear1 = torch.nn.Linear(200, 200)
+        self.linear2 = torch.nn.Linear(200, 200)
+        self.lstm2 = torch.nn.LSTM(200,200,1)
         self.unflatten = torch.nn.Unflatten(1,(8,5,5))
         self.upsample1 = torch.nn.UpsamplingBilinear2d(scale_factor=2)
         self.conv4 = torch.nn.Conv2d(8,16,3)
@@ -20,33 +22,49 @@ class Model(torch.nn.Module):
         self.conv8 = torch.nn.Conv2d(8,8,3, padding = 1)
         self.conv9 = torch.nn.Conv2d(8,4,3, padding = 1)
         self.conv10 = torch.nn.Conv2d(4,1,13)
-        self.activation = torch.nn.Sigmoid()
+        self.activation = torch.nn.Relu()
     def forward(self, x):
         x = self.conv1(x)
+        x = self.activation(x)
         x = self.pool1(x)
         x = self.conv2(x)
+        x = self.activation(x)
         x = self.pool2(x)
         x = self.conv3(x)
+        x = self.activation(x)
         x = self.pool3(x)
         x = self.flatten(x)
-        x = self.linear(x)
+        x,(h,c) = self.lstm1(x, (torch.zeros(1,200),torch.zeros(1,200))) 
         x = self.activation(x)
-        x,(h,c) = self.lstm(x, (torch.zeros(1,200),torch.zeros(1,200))) 
+        x = self.linear1(x)
+        x = self.activation(x)
+        # end encoder start decoder
+        x = self.linear2(x)
+        x = self.activation(x)
+        x,(h,c) = self.lstm2(x, (torch.zeros(1,200),torch.zeros(1,200))) 
+        x = self.activation(x)
         x = self.unflatten(x)
         x = self.upsample1(x)
         x = self.conv4(x)
+        x = self.activation(x)
         x = self.upsample1(x)
         x = self.conv5(x)
+        x = self.activation(x)
         x = self.upsample1(x)
         x = self.conv6(x)
+        x = self.activation(x)
         x = self.upsample1(x)
         x = self.conv7(x)
+        x = self.activation(x)
         x = self.upsample1(x)
         x = self.conv8(x)
+        x = self.activation(x)
         x = self.upsample1(x)
         x = self.conv9(x)
+        x = self.activation(x)
         x = self.upsample1(x)
         x = self.conv10(x)
+        x = self.activation(x)
         return x
 class Enc_Model(torch.nn.Module):
     def __init__(self,model = Model()):
@@ -58,18 +76,24 @@ class Enc_Model(torch.nn.Module):
         self.conv3 = model.conv3
         self.pool3 = model.pool3
         self.flatten = model.flatten
-        self.linear = model.linear
+        self.linear1 = model.linear1
         self.activation = model.activation
+        self.lstm1 = model.lstm1
     def forward(self,x):
         x = self.conv1(x)
+        x = self.activation(x)
         x = self.pool1(x)
         x = self.conv2(x)
+        x = self.activation(x)
         x = self.pool2(x)
         x = self.conv3(x)
+        x = self.activation(x)
         x = self.pool3(x)
         x = self.flatten(x)
-        x = self.linear(x)
+        x,(h,c) = self.lstm1(x, (torch.zeros(1,200),torch.zeros(1,200))) 
         x = self.activation(x)
+        x = self.linear1(x)
+        x = self.activation(x) = self.activation(x)
         return x
    #define model
 """

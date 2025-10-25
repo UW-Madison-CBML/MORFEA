@@ -8,3 +8,6 @@ embryo_dataset_grades.csv
 .venv/*
 .venv
 __pycache__
+*.log
+*.err
+*.out
