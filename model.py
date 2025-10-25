@@ -22,7 +22,7 @@ class Model(torch.nn.Module):
         self.conv8 = torch.nn.Conv2d(8,8,3, padding = 1)
         self.conv9 = torch.nn.Conv2d(8,4,3, padding = 1)
         self.conv10 = torch.nn.Conv2d(4,1,13)
-        self.activation = torch.nn.Relu()
+        self.activation = torch.nn.ReLU()
     def forward(self, x):
         x = self.conv1(x)
         x = self.activation(x)
@@ -32,7 +32,7 @@ class Model(torch.nn.Module):
         x = self.pool2(x)
         x = self.conv3(x)
         x = self.activation(x)
-        x = self.pool3(x)
+        x = self.pool2(x)
         x = self.flatten(x)
         x,(h,c) = self.lstm1(x, (torch.zeros(1,200),torch.zeros(1,200))) 
         x = self.activation(x)
@@ -74,7 +74,6 @@ class Enc_Model(torch.nn.Module):
         self.conv2 = model.conv2
         self.pool2 = model.pool2
         self.conv3 = model.conv3
-        self.pool3 = model.pool3
         self.flatten = model.flatten
         self.linear1 = model.linear1
         self.activation = model.activation
@@ -88,12 +87,12 @@ class Enc_Model(torch.nn.Module):
         x = self.pool2(x)
         x = self.conv3(x)
         x = self.activation(x)
-        x = self.pool3(x)
+        x = self.pool2(x)
         x = self.flatten(x)
         x,(h,c) = self.lstm1(x, (torch.zeros(1,200),torch.zeros(1,200))) 
         x = self.activation(x)
         x = self.linear1(x)
-        x = self.activation(x) = self.activation(x)
+        x = self.activation(x) 
         return x
    #define model
 """

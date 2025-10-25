@@ -29,6 +29,7 @@ select_amount = 0.01
 batch_size = 50
 embryo_vids = embryo_vids[:int(len(embryo_vids)*select_amount)]
 for i in embryo_vids:
+    print(os.getcwd())
     PATH = "./../model_weights.pth"
     torch.save(model.state_dict(), PATH)
     print(os.getcwd())
@@ -40,13 +41,17 @@ for i in embryo_vids:
         np.array([Image.open(img) for img in images])
     except OSError:
         with open('./../../bad_imgs.txt', 'w') as f:
-            f.write(embryo +'\n')
+            f.write(i +'\n')
         os.chdir("./..")
         continue
     images = natsorted(images)
     images = [img for img in images if not os.path.isdir(img)]
-    for k in range(1+ (len(images)//batch_size) ):
-        x = torch.tensor(np.array([Image.open(img) for img in images[k*batch_size:min(len(images)-1,(k+1)*batch_size)]]), dtype=torch.float32).reshape((-1,1,500,500))
+    for k in range(2 * (1+ (len(images)//batch_size)) ):
+        x = torch.tensor(np.array([Image.open(img) for img in images[
+            k*batch_size - ((k & 1) * (batch_size // 2)) : min(len(images)-1,(k+1)*batch_size - ((k & 1) * (batch_size // 2)))
+            ]]), dtype=torch.float32).reshape((-1,1,500,500))
+        if(len(x)) == 0:
+            continue
         y = x.clone()
         print(x.shape)
         y_pred = model(x)
