@@ -15,8 +15,7 @@ output = train_model_$(Cluster)_$(Process).out
 should_transfer_files = YES
 when_to_transfer_output = ON_EXIT 
 # Transfer our executable script
-transfer_input_files = train_model.sh, train.py, model.py, requirements.txt, model_weights.pth
-#, ../../../staging/groups/bhaskar-group/ivf
+transfer_input_files = train_model.sh, train.py, model.py, requirements.txt, model_weights.pth, bad_imgs.txt
 +WantGPULab = true
 +GPUJobLength = "short"
 
@@ -25,7 +24,7 @@ transfer_input_files = train_model.sh, train.py, model.py, requirements.txt, mod
 # compute resources each job will need on the computer where it runs.
 request_cpus = 1
 request_memory = 16GB
-request_disk = 20GB
+request_disk = 80GB
 request_gpus = 8 
 
 

@@ -3,6 +3,11 @@ python -m venv .venv
 
 source .venv/bin/activate
 pip install -r requirements.txt
-pwd
-ls
-#python train.py $(realpath ./../../../staging/groups/bhaskar_group/ivf-data)
+
+curl https://zenodo.org/records/7912264/files/embryo_dataset.tar.gz?download=1 -o embryo_dataset.tar.gz
+gzip -d embryo_dataset.tar.gz
+tar -xf embryo_dataset.tar -C ./embryo_dataset
+
+python train.py 
+
+cp model_weights.pth /home/jlundsgaard/ivf
