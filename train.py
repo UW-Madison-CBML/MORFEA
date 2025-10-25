@@ -8,7 +8,11 @@ from torchsummary import summary
 from model import Model
 import sys
 
-model = Model()
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device)
+
+model = Model().to(device)
 if os.path.exists("model_weights.pth"):
     model.load_state_dict(torch.load("model_weights.pth",weights_only = True))
 #print(summary(model, input_size = (1,500,500), batch_size = -1))
@@ -17,7 +21,7 @@ if os.path.exists("model_weights.pth"):
 # decoder: reshape to 2d img, upsample, convo, upsample, 
 loss_fn = torch.nn.MSELoss(reduction='mean')
 learning_rate = 1e-3
-optimizer = torch.optim.RMSprop(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.RMSprop(model.parameters(), lr=learning_rate).to(device)
 #go through a random selection of images and run model on each in order, reset directory and lstm hidden state vectors after
 if len(sys.argv) > 1 and os.path.exists(sys.argv[1]):
     os.chdir(sys.argv[1])
@@ -25,14 +29,12 @@ os.chdir("embryo_dataset")
 
 embryo_vids = os.listdir()
 np.random.shuffle(embryo_vids)
-select_amount = 0.01
+select_amount = 0.4
 batch_size = 50
 embryo_vids = embryo_vids[:int(len(embryo_vids)*select_amount)]
 for i in embryo_vids:
-    print(os.getcwd())
     PATH = "./../model_weights.pth"
     torch.save(model.state_dict(), PATH)
-    print(os.getcwd())
     os.chdir("./"+i)
 
     print(os.getcwd())
@@ -49,10 +51,10 @@ for i in embryo_vids:
     for k in range(2 * (1+ (len(images)//batch_size)) ):
         x = torch.tensor(np.array([Image.open(img) for img in images[
             k*batch_size - ((k & 1) * (batch_size // 2)) : min(len(images)-1,(k+1)*batch_size - ((k & 1) * (batch_size // 2)))
-            ]]), dtype=torch.float32).reshape((-1,1,500,500))
+            ]]), dtype=torch.float32).reshape((-1,1,500,500)).to(device)
         if(len(x)) == 0:
             continue
-        y = x.clone()
+        y = x.clone().to(device)
         print(x.shape)
         y_pred = model(x)
 
