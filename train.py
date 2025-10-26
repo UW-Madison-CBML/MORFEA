@@ -8,8 +8,8 @@ from torchsummary import summary
 from model import Model
 import sys
 from torch.utils.data import DataLoader
-
-
+from dataset_ivf import IVFSequenceDataset
+from tqdm import tqdm
 
 batch_size = 50
 
@@ -29,8 +29,7 @@ def train():
     loss_fn = torch.nn.MSELoss(reduction='mean')
     learning_rate = 1e-3
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,weight_decay = 1e-5 )
-    os.chdir("embryo_dataset")
-    ds = IVFSequenceDataset("index.csv", resize=500, norm="minmax01")
+    ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
     loader = DataLoader(ds, batch_size=50, shuffle=True, num_workers=4, pin_memory=True)
     for epoch in range(20):
         model.train()
@@ -47,6 +46,9 @@ def train():
             pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", sm=f"{smooth.item():.4f}")
         print(f"epoch {epoch} avg loss={total/len(loader):.4f}")
         torch.save(model.state_dict(), f"ae_epoch{epoch}.pth")
+
+if __name__ == "__main__":
+    train()
 """
     embryo_vids = os.listdir()
     np.random.shuffle(embryo_vids)
