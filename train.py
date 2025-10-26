@@ -15,7 +15,7 @@ print(device)
 model = Model().to(device)
 if os.path.exists("model_weights.pth"):
     model.load_state_dict(torch.load("model_weights.pth",weights_only = True))
-print(summary(model, input_size = (1,500,500), batch_size = -1))
+#print(summary(model, input_size = (1,500,500), batch_size = -1))
 # encoder: convo, downsample (maxpool), convo, downsample..., flatten 
 # rnn: lstm
 # decoder: reshape to 2d img, upsample, convo, upsample, 

@@ -92,7 +92,7 @@ class Enc_Model(torch.nn.Module):
         x,(h,c) = self.lstm1(x, (torch.zeros(1,200),torch.zeros(1,200))) 
         x = self.activation(x)
         x = self.linear1(x)
-        x = self.activation(x) 
+        x = self.activation(x)
         return x
    #define model
 """
