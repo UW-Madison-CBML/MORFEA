@@ -3,7 +3,7 @@ import cv2, numpy as np, pandas as pd, torch
 from torch.utils.data import Dataset
 
 class IVFSequenceDataset(Dataset):
-    def __init__(self, index_csv, resize=128, norm="minmax01"):
+    def __init__(self, index_csv, resize=500, norm="minmax01"):
         self.df = pd.read_csv(index_csv)
         self.resize = resize
         self.norm = norm

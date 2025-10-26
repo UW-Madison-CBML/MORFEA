@@ -37,9 +37,9 @@ class Model(torch.nn.Module):
         x,(h,c) = self.lstm1(x, (torch.zeros(1,200),torch.zeros(1,200))) 
         x = self.activation(x)
         x = self.linear1(x)
-        x = self.activation(x)
+        lat_vec = self.activation(x)
         # end encoder start decoder
-        x = self.linear2(x)
+        x = self.linear2(lat_vec)
         x = self.activation(x)
         x,(h,c) = self.lstm2(x, (torch.zeros(1,200),torch.zeros(1,200))) 
         x = self.activation(x)
@@ -65,7 +65,7 @@ class Model(torch.nn.Module):
         x = self.upsample1(x)
         x = self.conv10(x)
         x = self.activation(x)
-        return x
+        return x,lat_vec
 class Enc_Model(torch.nn.Module):
     def __init__(self,model = Model()):
         super().__init__() # Call the constructor of the parent class

@@ -2,10 +2,10 @@ import re, os, glob, csv
 from pathlib import Path
 from tqdm import tqdm
 
-DATASET_ROOT = "/Users/grnho/Desktop/Project IVF/embryo_dataset"  # ← 改這裡
+DATASET_ROOT = "./embryo_dataset"  # ← 改這裡
 OUT_CSV = "index.csv"
-T = 16                 # 序列長度（幀）
-SUBSAMPLE = 3          # 每3幀取1幀
+T = 50                 # 序列長度（幀）
+SUBSAMPLE = 1          # 每3幀取1幀
 WINDOW_STRIDE = T//2   # 50% 重疊
 
 run_pat = re.compile(r'RUN[_\- ]?(\d+)', re.I)
