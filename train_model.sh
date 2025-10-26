@@ -9,7 +9,7 @@ gzip -d embryo_dataset.tar.gz
 ls -a
 tar -xf embryo_dataset.tar
 ls -a
-
+python build_index.py
 python train.py 
 
 cp model_weights.pth /home/jlundsgaard/ivf

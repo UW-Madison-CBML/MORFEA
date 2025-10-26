@@ -1,6 +1,7 @@
 # dataset_ivf.py
 import cv2, numpy as np, pandas as pd, torch
 from torch.utils.data import Dataset
+from PIL import Image
 
 class IVFSequenceDataset(Dataset):
     def __init__(self, index_csv, resize=500, norm="minmax01"):
@@ -9,7 +10,8 @@ class IVFSequenceDataset(Dataset):
         self.norm = norm
 
     def _read_gray(self, path):
-        img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        #img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        img = np.array(Image.open(path), dtype = "float32")
         if img is None: 
             raise FileNotFoundError(path)
         img = cv2.resize(img, (self.resize, self.resize), interpolation=cv2.INTER_AREA)
