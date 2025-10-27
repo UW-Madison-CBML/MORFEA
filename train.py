@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import math
 from PIL import Image
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 import os
 from natsort import natsorted
 from torchsummary import summary
@@ -14,14 +16,14 @@ from tqdm import tqdm
 batch_size = 50
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
 def train():
     model = Model()
     if os.path.exists("model_weights.pth"):
         model.load_state_dict(torch.load("model_weights.pth",weights_only = True))
-    model = model.to(device)
+    model = model.to(DEVICE)
     #print(summary(model, input_size = (1,500,500), batch_size = -1))
     # encoder: convo, downsample (maxpool), convo, downsample..., flatten 
     # rnn: lstm

@@ -1,9 +1,17 @@
 annotations.tar  
 dataset.tar  
+*.tar
 embryo_dataset  
 embryo_dataset_annotations
 embryo_dataset/*  
 embryo_dataset_annotations/*
+
+embryo_dataset
+embryo_dataset_annotations
+embryo_dataset_annotations.tar
+embryo_dataset_grades.csv
+embryo_dataset.tar
+embryo_dataset_time_elapsed
 embryo_dataset_grades.csv
 .venv/*
 .venv
@@ -11,3 +19,4 @@ __pycache__
 *.log
 *.err
 *.out
+index.csv
