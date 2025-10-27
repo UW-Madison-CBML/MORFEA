@@ -17,7 +17,7 @@ batch_size = 50
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(device)
+print(DEVICE)
 
 def train():
     model = Model()
