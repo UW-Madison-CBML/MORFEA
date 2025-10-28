@@ -5,8 +5,7 @@ from PIL import Image
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 import os
-from natsort import natsorted
-from torchsummary import summary
+#from torchsummary import summary
 from model import Model
 import sys
 from torch.utils.data import DataLoader
