@@ -1,5 +1,5 @@
 # dataset_ivf.py
-import cv2, numpy as np, pandas as pd, torch
+import numpy as np, pandas as pd, torch
 from torch.utils.data import Dataset
 from PIL import Image
 
