@@ -15,7 +15,8 @@ embryo_dataset_grades.csv
 * Also make sure you run `chmod +x SCRIPT.sh` so that bash has permission to run the script
 * (note so I don't forget) If you want to connect git to github (i.e. only have access to a command line), you create a ssh key, add the public key to github, and set up remotes for the repo as `git remote add origin git@github.com:JensLundsgaard/ivf.git`. To find where git looks for the private key run `ssh -vT git@github.com`
 # TODO:
-* Figure out `OSError: image file is truncated (1 bytes not processed)` error
+* Fix python dependency compatability issues. Currenly `pip freeze > requirements.txt` and `pip install -r requirements.txt` is a bit annoying as workflow since compatability is not taken into account. Would like to switch to something that will install all necessary versions when you build it.
+* Get docker workin
 * Mess with the model a ton, try different activiation functions, different RNN models, different models entirely,
 * Incorporate grading\ timestamps of embryos into both model and visualization.
 * Start to incorporate TDA 
