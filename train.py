@@ -24,7 +24,7 @@ def train():
     if os.path.exists("model_weights.pth"):
         try:
             model.load_state_dict(torch.load("model_weights.pth",weights_only = True))
-        except Error: 
+        except Exception:
             torch.save(model.state_dict(), f"model_weights.pth")
     model = model.to(DEVICE)
     #print(summary(model, input_size = (1,500,500), batch_size = -1))

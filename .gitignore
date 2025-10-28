@@ -5,6 +5,9 @@ embryo_dataset
 embryo_dataset_annotations
 embryo_dataset/*  
 embryo_dataset_annotations/*
+opencv_venv
+tphate_venv
+train_venv
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
