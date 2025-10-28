@@ -22,7 +22,10 @@ print(DEVICE)
 def train():
     model = Model()
     if os.path.exists("model_weights.pth"):
-        model.load_state_dict(torch.load("model_weights.pth",weights_only = True))
+        try:
+            model.load_state_dict(torch.load("model_weights.pth",weights_only = True))
+        except Error: 
+            torch.save(model.state_dict(), f"model_weights.pth")
     model = model.to(DEVICE)
     #print(summary(model, input_size = (1,500,500), batch_size = -1))
     # encoder: convo, downsample (maxpool), convo, downsample..., flatten 
@@ -47,7 +50,7 @@ def train():
             total += loss.item()
             pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", sm=f"{smooth.item():.4f}")
         print(f"epoch {epoch} avg loss={total/len(loader):.4f}")
-        torch.save(model.state_dict(), f"ae_epoch{epoch}.pth")
+        torch.save(model.state_dict(), f"model_weights.pth")
 
 if __name__ == "__main__":
     train()

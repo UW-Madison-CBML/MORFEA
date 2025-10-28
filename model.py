@@ -2,17 +2,17 @@ import torch
 class Model(torch.nn.Module):
     def __init__(self):
         super().__init__() # Call the constructor of the parent class
-        self.conv1 = torch.nn.Conv2d(1, 8, 3)
+        self.conv1 = torch.nn.Conv2d(1, 16, 3)
         self.pool1 = torch.nn.MaxPool2d(3)
-        self.conv2 = torch.nn.Conv2d(8, 8, 3)
+        self.conv2 = torch.nn.Conv2d(16, 16, 3)
         self.pool2 = torch.nn.MaxPool2d(5)
-        self.conv3 = torch.nn.Conv2d(8, 8, 5)
+        self.conv3 = torch.nn.Conv2d(16, 8, 5)
         self.flatten = torch.nn.Flatten()
 
-        self.lstm1 = torch.nn.LSTM(200,200,1)
+        self.lstm1 = torch.nn.LSTM(200,200,1, batch_first = True)
         self.linear1 = torch.nn.Linear(200, 200)
         self.linear2 = torch.nn.Linear(200, 200)
-        self.lstm2 = torch.nn.LSTM(200,200,1)
+        self.lstm2 = torch.nn.LSTM(200,200,1, batch_first = True)
         self.unflatten = torch.nn.Unflatten(1,(8,5,5))
         self.upsample1 = torch.nn.UpsamplingBilinear2d(scale_factor=2)
         self.conv4 = torch.nn.Conv2d(8,16,3)
