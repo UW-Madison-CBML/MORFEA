@@ -34,18 +34,19 @@ def train():
     learning_rate = 1e-3
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,weight_decay = 1e-5 )
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
-    loader = DataLoader(ds, batch_size=50, shuffle=True, num_workers=4, pin_memory=True)
+    loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=4, pin_memory=True)
     for epoch in range(20):
         model.train()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
         for vol, _ in pbar:
             vol = vol.to(DEVICE)                         # [B,T,1,128,128]
+            print(vol.shape)
             recon, lat = model(vol)
             rec_loss = loss_fn(recon, vol)
             smooth = ((lat[:,1:]-lat[:,:-1])**2).mean()  # temporal smooth
             loss = rec_loss + 0.1 * smooth # play with this coefficient
-            opt.zero_grad(); loss.backward(); opt.step()
+            optimizer.zero_grad(); loss.backward(); optimizer.step()
             total += loss.item()
             pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", sm=f"{smooth.item():.4f}")
         print(f"epoch {epoch} avg loss={total/len(loader):.4f}")

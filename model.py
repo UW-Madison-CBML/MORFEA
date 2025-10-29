@@ -24,7 +24,8 @@ class Model(torch.nn.Module):
         self.conv10 = torch.nn.Conv2d(4,1,13)
         self.activation = torch.nn.ReLU()
     def forward(self, x):
-        x = self.conv1(x)
+        b,t,_,_,_ = x.shape
+        x = self.conv1(x.view(b*t,1,500,500))
         x = self.activation(x)
         x = self.pool1(x)
         x = self.conv2(x)
@@ -34,15 +35,19 @@ class Model(torch.nn.Module):
         x = self.activation(x)
         x = self.pool2(x)
         x = self.flatten(x)
-        x,(h,c) = self.lstm1(x, (torch.zeros(1,200),torch.zeros(1,200))) 
+        x = x.view(b,t,200)
+        x,_ = self.lstm1(x) 
         x = self.activation(x)
+        x = x.view(b*t,200)
         x = self.linear1(x)
-        lat_vec = self.activation(x)
+        lat_vec = self.activation(x).view(b,t,200)
         # end encoder start decoder
         x = self.linear2(lat_vec)
         x = self.activation(x)
-        x,(h,c) = self.lstm2(x, (torch.zeros(1,200),torch.zeros(1,200))) 
+        x = x.view(b,t,200)
+        x, _ = self.lstm2(x) 
         x = self.activation(x)
+        x = x.view(b*t,200)
         x = self.unflatten(x)
         x = self.upsample1(x)
         x = self.conv4(x)
@@ -65,7 +70,7 @@ class Model(torch.nn.Module):
         x = self.upsample1(x)
         x = self.conv10(x)
         x = self.activation(x)
-        return x,lat_vec
+        return x.view(b,t,1,500,500),lat_vec
 class Enc_Model(torch.nn.Module):
     def __init__(self,model = Model()):
         super().__init__() # Call the constructor of the parent class

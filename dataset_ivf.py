@@ -36,7 +36,7 @@ class IVFSequenceDataset(Dataset):
         frames = [self._read_gray(p) for p in paths]
         vol = np.stack(frames, axis=0)  # [T,H,W]
         vol = self._normalize_video(vol)
-        vol = vol[:, :, :]        # [T,1,128,128]
+        vol = vol[:,None, :, :]        # [T,1,128,128]
         return torch.from_numpy(vol), self.df.iloc[idx]["cell_id"]
 
     def __len__(self):
