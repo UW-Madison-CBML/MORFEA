@@ -13,7 +13,7 @@ from dataset_ivf import IVFSequenceDataset
 from tqdm import tqdm
 
 batch_size = 50
-
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(DEVICE)
