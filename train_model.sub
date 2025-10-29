@@ -29,7 +29,7 @@ transfer_output_files = model_weights.pth
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
 request_cpus = 4
-request_memory = 16GB
+request_memory = 64GB
 request_disk = 80GB
 request_gpus = 8 
 

@@ -1,5 +1,6 @@
 # dataset_ivf.py
-import numpy as np, pandas as pd, torch, cv2
+import numpy as np, pandas as pd, torch 
+# import cv2
 from torch.utils.data import Dataset
 from PIL import Image
 
@@ -14,9 +15,9 @@ class IVFSequenceDataset(Dataset):
         img = np.array(Image.open(path), dtype = "float32")
         if img is None: 
             raise FileNotFoundError(path)
-        img = cv2.resize(img, (self.resize, self.resize), interpolation=cv2.INTER_AREA)
+        #img = cv2.resize(img, (self.resize, self.resize), interpolation=cv2.INTER_AREA)
         # 輕量去雜訊（可選）
-        img = cv2.GaussianBlur(img, (3,3), 1.0)
+        #img = cv2.GaussianBlur(img, (3,3), 1.0)
         return img.astype(np.float32)
 
     def _normalize_video(self, vol):  # vol: [T,H,W]
@@ -35,7 +36,7 @@ class IVFSequenceDataset(Dataset):
         frames = [self._read_gray(p) for p in paths]
         vol = np.stack(frames, axis=0)  # [T,H,W]
         vol = self._normalize_video(vol)
-        vol = vol[:, None, :, :]        # [T,1,128,128]
+        vol = vol[:, :, :]        # [T,1,128,128]
         return torch.from_numpy(vol), self.df.iloc[idx]["cell_id"]
 
     def __len__(self):

@@ -3,9 +3,9 @@ python -m venv venv
 
 source train_venv/bin/activate
 pip install -r train_requirements.txt
+cat train_requirements.txt
+pip freeze 
 tar -zxf embryo_dataset.tar.gz
-ls -a
-pip freeze
 python build_index.py
 python train.py 
 
