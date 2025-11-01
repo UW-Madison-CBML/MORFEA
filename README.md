@@ -8,7 +8,7 @@ embryo_dataset/*
 embryo_dataset_annotations/*
 embryo_dataset_grades.csv 
 ```
-* If you just cloned the repo to linux run `chmod +x add_venvs.sh` and then `./add_venvs`. This will create 3 different venvs for different use cases. `train_venv` is for training/ building the data index etc. `opencv_venv` is for using the `opencv-python` library. `tphate_venv` is for visualization and results purposes. I set this up to help deal with dependency conflicts. This is likely to change cause we're using docker soon.
+*  If you just cloned the repo to linux run `chmod +x add_venvs.sh` and then `./add_venvs`. This will create 3 different venvs for different use cases. `train_venv` is for training/ building the data index etc. `opencv_venv` is for using the `opencv-python` library. `tphate_venv` is for visualization and results purposes. I set this up to help deal with dependency conflicts. This is likely to change cause we're using docker soon.
 * If you add any other dependencies please run `pip freeze > $VENV_requirements.txt` where `$VENV` is the virtual environment name.
 * Make sure you have `alias python=python3` in your .bashrc file.
 * Also make sure you run `chmod +x SCRIPT.sh` so that bash has permission to run the script
