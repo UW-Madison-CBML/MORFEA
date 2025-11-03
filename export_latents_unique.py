@@ -5,7 +5,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from dataset_ivf import IVFSequenceDataset
-from model_conv_lstm_ae import ConvLSTMAE
+from model import Model
 from sklearn.decomposition import PCA
 from pathlib import Path
 
@@ -13,7 +13,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 def export_and_plot_unique(checkpoint="ae_epoch17.pt", n_unique_cells=50):
     print(f"載入資料集...")
-    ds = IVFSequenceDataset("index.csv", resize=128, norm="minmax01")
+    ds = IVFSequenceDataset("index.csv", resize=500, norm="minmax01")
     loader = DataLoader(ds, batch_size=1, shuffle=False)
     
     print(f"載入模型: {checkpoint}")

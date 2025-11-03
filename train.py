@@ -24,7 +24,9 @@ def train():
         try:
             model.load_state_dict(torch.load("model_weights.pth",weights_only = True))
         except Exception:
-            torch.save(model.state_dict(), f"model_weights.pth")
+            #torch.save(model.state_dict(), f"model_weights.pth")
+            print("model has wrong shape")
+            return 
     model = model.to(DEVICE)
     #print(summary(model, input_size = (1,500,500), batch_size = -1))
     # encoder: convo, downsample (maxpool), convo, downsample..., flatten 
