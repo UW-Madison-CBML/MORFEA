@@ -5,7 +5,6 @@ from PIL import Image
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 import os
-#from torchsummary import summary
 from model import Model
 import sys
 from torch.utils.data import DataLoader
@@ -28,7 +27,7 @@ def train():
             print("model has wrong shape")
             return 
     model = model.to(DEVICE)
-    #print(summary(model, input_size = (1,500,500), batch_size = -1))
+    #print(summary(model, input_size = (50,50,1,500,500)))
     # encoder: convo, downsample (maxpool), convo, downsample..., flatten 
     # rnn: lstm
     # decoder: reshape to 2d img, upsample, convo, upsample, 
