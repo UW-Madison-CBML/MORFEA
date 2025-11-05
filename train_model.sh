@@ -1,6 +1,6 @@
 #!/bin/bash
 python -m venv venv
-
+echo "Hello CHTC from Job $1 running on `whoami`@`hostname`"
 source train_venv/bin/activate
 pip install -r train_requirements.txt
 cat train_requirements.txt

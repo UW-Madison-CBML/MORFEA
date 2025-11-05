@@ -18,13 +18,15 @@ output = train_model_$(Cluster)_$(Process).out
 should_transfer_files = YES
 when_to_transfer_output = ON_EXIT 
 Requirements = (Target.HasCHTCStaging == true)
-require_gpus = (DriverVersion >= 10.1)
+#require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
 transfer_output_remaps = "model_weights.pth =  file:///staging/groups/bhaskar_group/ivf/model_weights.pth;"
 transfer_input_files = train_model.sh, train.py, model.py, train_requirements.txt, model_weights.pth, bad_imgs.txt, build_index.py, dataset_ivf.py, embryo_dataset.tar.gz, Dockerfile, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz
 +WantGPULab = true
 +GPUJobLength = "short"
-
+Requirements = (Machine == "bhaskargpu4000.chtc.wisc.edu") && (DriverVersion == "12.8") && (DeviceName == "NVIDIA H200")
+ 
++GPUModel = "NVIDIA H200"
 transfer_output_files = model_weights.pth 
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
