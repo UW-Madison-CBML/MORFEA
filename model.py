@@ -3,11 +3,11 @@ from torchinfo import summary
 class Model(torch.nn.Module):
     def __init__(self):
         super().__init__() # Call the constructor of the parent class
-        self.conv1 = torch.nn.Conv2d(1, 16, 3)
+        self.conv1 = torch.nn.Conv2d(1, 32, 3)
         self.pool1 = torch.nn.MaxPool2d(3)
-        self.conv2 = torch.nn.Conv2d(16, 16, 3)
+        self.conv2 = torch.nn.Conv2d(32, 32, 3)
         self.pool2 = torch.nn.MaxPool2d(5)
-        self.conv3 = torch.nn.Conv2d(16, 8, 5)
+        self.conv3 = torch.nn.Conv2d(32, 8, 5)
         self.flatten = torch.nn.Flatten()
 
         self.lstm1 = torch.nn.LSTM(200,200,1, batch_first = True)
@@ -16,13 +16,13 @@ class Model(torch.nn.Module):
         self.lstm2 = torch.nn.LSTM(200,200,1, batch_first = True)
         self.unflatten = torch.nn.Unflatten(1,(8,5,5))
         self.upsample1 = torch.nn.UpsamplingBilinear2d(scale_factor=2)
-        self.conv4 = torch.nn.Conv2d(8,16,3)
-        self.conv5 = torch.nn.Conv2d(16,16,3,padding = 1)
-        self.conv6 = torch.nn.Conv2d(16,16,3, padding = 1)
-        self.conv7 = torch.nn.Conv2d(16,8,3, padding = 1)
-        self.conv8 = torch.nn.Conv2d(8,8,3, padding = 1)
-        self.conv9 = torch.nn.Conv2d(8,4,3, padding = 1)
-        self.conv10 = torch.nn.Conv2d(4,1,13)
+        self.conv4 = torch.nn.Conv2d(8,32,3)
+        self.conv5 = torch.nn.Conv2d(32,32,3,padding = 1)
+        self.conv6 = torch.nn.Conv2d(32,32,3, padding = 1)
+        self.conv7 = torch.nn.Conv2d(32,32,3, padding = 1)
+        self.conv8 = torch.nn.Conv2d(32,32,3, padding = 1)
+        self.conv9 = torch.nn.Conv2d(32,16,3, padding = 1)
+        self.conv10 = torch.nn.Conv2d(16,1,13)
         self.activation = torch.nn.ReLU()
     def forward(self, x):
         b,t,_,_,_ = x.shape
