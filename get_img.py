@@ -24,8 +24,8 @@ def main():
         model.eval()
         vol = vol.to(DEVICE)
         recon, _ = model(vol)
-        vol = vol[-1,-1,-1].detach().numpy() * 255
-        recon = recon[-1,-1,-1].detach().numpy() * 255
+        vol = vol[-1,-1,-1].cpu().detach().numpy() * 255
+        recon = recon[-1,-1,-1].cpu().detach().numpy() * 255
         comparison = np.concatenate((vol, recon), axis=1).astype(np.uint8)
         plt.imsave("./imgs/"+str(x[0])+".png", comparison, cmap='gray') 
         plt.close()

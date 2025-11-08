@@ -1,5 +1,7 @@
 import torch
 from torchinfo import summary
+import sys
+import os
 class Model(torch.nn.Module):
     def __init__(self):
         super().__init__() # Call the constructor of the parent class
@@ -111,8 +113,17 @@ class Enc_Model(torch.nn.Module):
 def main():
     model = Model()
     print("convlstmae: ", summary(model, input_size = (1,50,1,500,500)))
-    enc_model = Enc_Model(model)
+    enc_model = Enc_Model(model = model)
     print("encoder: ", summary(enc_model, input_size = (1,50,1,500,500)))
+    if len(sys.argv) > 1:
+        if os.path.exists(sys.argv[1]):
+            try:
+                model.load_state_dict(torch.load(sys.argv[1],weights_only = True))
+                print("model loaded successfully!!!")
+            except Exception:
+                print("model has wrong shape")
+    else:
+        print("model not found")
 if __name__ == "__main__":
     main()
    #define model
