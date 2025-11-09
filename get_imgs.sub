@@ -1,6 +1,7 @@
 # get_imgs.sub
    
-docker_image = pytorch/pytorch:2.9.0-cuda12.8-cudnn9-runtime
+docker_image = jenslundsgaard/ivf-training:first
+#docker_image = pytorch/pytorch:2.9.0-cuda12.8-cudnn9-runtime
 #docker_image = pytorch/pytorch:1.1.0-cuda10.0-cudnn7.5-runtime
 universe = docker
 # Specify your executable (single binary or a script that runs several
@@ -24,6 +25,7 @@ transfer_output_remaps = "imgs.tar.gz =  file:///staging/groups/bhaskar_group/iv
 transfer_input_files = get_imgs.sh, get_img.py, model.py, train_requirements.txt, bad_imgs.txt, build_index.py, dataset_ivf.py, Dockerfile, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz,file:///staging/groups/bhaskar_group/ivf/model_weights.pth
 +WantGPULab = true
 +GPUJobLength = "short"
+gpus_minimum_capability = 7.0
 #Requirements = (Machine == "bhaskargpu4000.chtc.wisc.edu") && (DriverVersion == "12.8") && (DeviceName == "NVIDIA H200")
  
 #+GPUModel = "NVIDIA H200"
