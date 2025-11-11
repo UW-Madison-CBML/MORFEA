@@ -11,13 +11,12 @@ from pathlib import Path
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-def export_and_plot_unique(checkpoint="ae_epoch17.pt", n_unique_cells=50):
-    print(f"載入資料集...")
+def export_and_plot_unique(checkpoint="model_weights.pth", n_unique_cells=50):
     ds = IVFSequenceDataset("index.csv", resize=500, norm="minmax01")
     loader = DataLoader(ds, batch_size=1, shuffle=False)
     
     print(f"載入模型: {checkpoint}")
-    model = ConvLSTMAE()
+    model = Model()
     model.load_state_dict(torch.load(checkpoint, map_location=DEVICE))
     model.to(DEVICE)
     model.eval()
@@ -27,7 +26,6 @@ def export_and_plot_unique(checkpoint="ae_epoch17.pt", n_unique_cells=50):
     seen_cells = set()
     
     for vol, cell_id in loader:
-        # 跳過已經處理過的胚胎
         if cell_id[0] in seen_cells:
             continue
         
