@@ -62,7 +62,7 @@ def apply_tphate(data, n_jobs=-1):
     return tphate_data
 
 
-def plot_tphate_scatter(tphate_data, df, output_file="tphate_scatter.png"):
+def plot_tphate_scatter(df, output_file="tphate_scatter"):
     """Create a simple scatter plot of TPHATE projection.
 
     Args:
@@ -70,19 +70,19 @@ def plot_tphate_scatter(tphate_data, df, output_file="tphate_scatter.png"):
         df: Original dataframe for metadata
         output_file: Output filename for the plot
     """
-    print(f"Creating scatter plot...")
-    fig, ax = plt.subplots(figsize=(10, 8))
+    for cell_id, group_df in df.groupby('cell_id'):
+        fig, ax = plt.subplots(figsize=(10, 8))
 
-    ax.scatter(tphate_data[:, 0], tphate_data[:, 1], alpha=0.6, s=30)
-    ax.set_xlabel("TPHATE Dimension 1", fontsize=12)
-    ax.set_ylabel("TPHATE Dimension 2", fontsize=12)
-    ax.set_title("TPHATE Projection of Latent Embeddings", fontsize=14)
-    ax.grid(True, alpha=0.3)
+        ax.scatter(group_df['t_0'].to_numpy(), group_df["t_1"].to_numpy(), alpha=0.6, s=30)
+        ax.set_xlabel("TPHATE Dimension 1", fontsize=12)
+        ax.set_ylabel("TPHATE Dimension 2", fontsize=12)
+        ax.set_title("TPHATE Projection of Latent Embeddings", fontsize=14)
+        ax.grid(True, alpha=0.3)
 
-    plt.tight_layout()
-    plt.savefig(output_file, dpi=300, bbox_inches='tight')
-    print(f"  Saved to: {output_file}")
-    plt.close()
+        plt.tight_layout()
+        plt.savefig(output_file+cell_id +".png", dpi=300, bbox_inches='tight')
+        print(f"  Saved to: {output_file}")
+        plt.close()
 
 
 def plot_tphate_by_cell_id(tphate_data, df, output_file="tphate_by_cell_id.png"):
@@ -180,13 +180,11 @@ def main():
 
     # Apply TPHATE
     tphate_data = apply_tphate(data)
+    merged_df = pd.concat([df.reset_index(drop=True), pd.DataFrame({"t_0": tphate_data[:, 0], "t_1": tphate_data[:,1]}).reset_index(drop=True)], axis=1)
 
     # Create visualizations
-    plot_tphate_scatter(tphate_data, df, os.path.join(output_dir, "tphate_scatter.png"))
-    #plot_tphate_by_cell_id(tphate_data, df, os.path.join(output_dir, "tphate_by_cell_id.png"))
-    #plot_tphate_by_time_step(tphate_data, df, os.path.join(output_dir, "tphate_by_time_step.png"))
+    plot_tphate_scatter(merged_df, "tphate_scatter")
 
-    print(f"\nVisualization complete! Check the '{output_dir}' directory for output files.")
 
 
 if __name__ == "__main__":
