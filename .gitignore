@@ -80,3 +80,5 @@ plots
 plots.tar.gz
 test_cell_groups.txt
 test_latents.csv
+docker_stderror
+docker_stdout

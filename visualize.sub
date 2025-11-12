@@ -8,7 +8,7 @@ universe = docker
 #  $(Process) will be a integer number for each job, starting with "0"
 #  and increasing for the relevant number of jobs.
 executable = /bin/bash
-arguments = visualize.py latents.csv $(cell_group)
+arguments = visualize.py latents.csv $(cell_group) --output plots
 	
 # Specify the name of the log, standard error, and standard output (or
 # "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
@@ -24,7 +24,7 @@ transfer_output_remaps = "plots.tar.gz = file:///staging/groups/bhaskar_group/iv
 transfer_output_files = plots.tar.gz
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
-request_cpus = 8
+request_cpus = 1
 request_memory = 80GB
 request_disk = 32GB
 

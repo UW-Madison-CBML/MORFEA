@@ -1,15 +1,15 @@
-"""
-TPHATE Visualization Script
-
-Processes a batch of cell_ids and creates TPHATE scatter plots and
-trajectory path plots for each cell_id in the batch.
-
-Usage:
-    python visualize.py <latents_csv> <cell_line>
-    python visualize.py latents.csv "cell_id_1,cell_id_2,cell_id_3"
-
-Where cell_line is a comma-separated list of cell_ids.
-"""
+#"""
+#TPHATE Visualization Script
+#
+#Processes a batch of cell_ids and creates TPHATE scatter plots and
+#trajectory path plots for each cell_id in the batch.
+#
+#Usage:
+    #python visualize.py <latents_csv> <cell_line>
+    #python visualize.py latents.csv "cell_id_1,cell_id_2,cell_id_3"
+#
+#Where cell_line is a comma-separated list of cell_ids.
+#"""
 
 import sys
 import os
