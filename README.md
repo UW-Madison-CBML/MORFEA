@@ -18,4 +18,4 @@
 * **Train the model**: `./run.sh` or `condor_submit train_model.sub`
 * **Get model latents as csv (stored in group staging)**: `condor_submit export_latents.sub` 
 * **Get model latent csv batchs**: `condor_submit get_cell_groups.sub`
-* **Get model TPHATE plots (in group storage `ivf/plots.tar.gz`)**: `condor_submit visualize.sub`
+* **Get model TPHATE plots (in group storage `ivf/plots.tar.gz`)**: `condor_submit visualize.sub`. The log files will be hidden, run `ls -a` to see them.

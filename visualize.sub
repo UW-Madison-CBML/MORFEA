@@ -8,16 +8,16 @@ universe = docker
 #  $(Process) will be a integer number for each job, starting with "0"
 #  and increasing for the relevant number of jobs.
 executable = /bin/bash
-arguments = visualize.py latents.csv $(cell_group) --output plots
+arguments = visualize.sh latents.csv $(cell_group) 
 	
 # Specify the name of the log, standard error, and standard output (or
 # "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
 #  queue number assigned to this set of jobs at the time of submission.
-log = visualize_$(Cluster)_$(Process).log
-error = visualize_$(Cluster)_$(Process).err
-output = visualize_$(Cluster)_$(Process).out
+log = .visualize_$(Cluster)_$(Process).log
+error = .visualize_$(Cluster)_$(Process).err
+output = .visualize_$(Cluster)_$(Process).out
 # Transfer our executable script
-transfer_input_files = visualize.sh, visualize.py, file:///staging/groups/bhaskar_group/ivf/latents.csv, cell_groups.txt
+transfer_input_files = visualize.sh, visualize.py, file:///staging/groups/bhaskar_group/ivf/latents.csv, cell_groups.txt, file:///staging/groups/bhaskar_group/ivf/plots.tar.gz
  
 transfer_output_remaps = "plots.tar.gz = file:///staging/groups/bhaskar_group/ivf/plots.tar.gz;"
 
