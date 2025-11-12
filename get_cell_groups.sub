@@ -1,5 +1,5 @@
 
-# visualize.sub
+# get_cell_groups.sub
    
 docker_image = jenslundsgaard/tphate:latest
 universe = docker
@@ -8,25 +8,22 @@ universe = docker
 #  $(Process) will be a integer number for each job, starting with "0"
 #  and increasing for the relevant number of jobs.
 executable = /bin/bash
-arguments = visualize.sh latents.csv $(cell_group)
+arguments = python get_cell_groups.py --output cell_groups.txt --max-rows 1000 latents.txt
 	
 # Specify the name of the log, standard error, and standard output (or
 # "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
 #  queue number assigned to this set of jobs at the time of submission.
-log = visualize_$(Cluster)_$(Process).log
-error = visualize_$(Cluster)_$(Process).err
-output = visualize_$(Cluster)_$(Process).out
+log = get_cell_groups_$(Cluster)_$(Process).log
+error =  get_cell_groups_$(Cluster)_$(Process).err
+output =  get_cell_groups_$(Cluster)_$(Process).out
 # Transfer our executable script
-transfer_input_files = visualize.sh, visualize.py, file:///staging/groups/bhaskar_group/ivf/latents.csv, cell_groups.txt
- 
-transfer_output_remaps = "plots.tar.gz = file:///staging/groups/bhaskar_group/ivf/plots.tar.gz;"
-
-transfer_output_files = plots.tar.gz
+transfer_input_files = get_cell_groups.py, file:///staging/groups/bhaskar_group/ivf/latents.csv
+transfer_output_files = cell_groups.txt
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
-request_cpus = 8
-request_memory = 80GB
-request_disk = 32GB
+request_cpus = 1
+request_memory = 8GB
+request_disk = 8GB
 
 
-queue cell_group from cell_groups.txt
+queue 1
