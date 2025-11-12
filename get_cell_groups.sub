@@ -8,7 +8,7 @@ universe = docker
 #  $(Process) will be a integer number for each job, starting with "0"
 #  and increasing for the relevant number of jobs.
 executable = /bin/bash
-arguments = python get_cell_groups.py --output cell_groups.txt --max-rows 1000 latents.txt
+arguments = get_cell_groups.sh
 	
 # Specify the name of the log, standard error, and standard output (or
 # "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
@@ -17,7 +17,7 @@ log = get_cell_groups_$(Cluster)_$(Process).log
 error =  get_cell_groups_$(Cluster)_$(Process).err
 output =  get_cell_groups_$(Cluster)_$(Process).out
 # Transfer our executable script
-transfer_input_files = get_cell_groups.py, file:///staging/groups/bhaskar_group/ivf/latents.csv
+transfer_input_files = get_cell_groups.sh, get_cell_groups.py, file:///staging/groups/bhaskar_group/ivf/latents.csv
 transfer_output_files = cell_groups.txt
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.

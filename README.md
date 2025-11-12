@@ -13,3 +13,8 @@
 * Mess with the model a ton, try different activiation functions, different RNN models, different models entirely,
 * Incorporate grading\ timestamps of embryos into both model and visualization.
 * Start to incorporate TDA 
+# Workflows
+* **Train the model**: `./run.sh` or `condor_submit train_model.sub`
+* **Get model latents as csv (stored in group staging)**: `condor_submit export_latents.sub` 
+* **Get model latent csv batchs**: `condor_submit get_cell_groups.sub`
+* **Get model TPHATE plots (in group storage `ivf/plots.tar.gz`)**: `condor_submit visualize.sub`
