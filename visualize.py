@@ -80,7 +80,7 @@ def plot_tphate_scatter(df, output_file="tphate_scatter"):
         ax.grid(True, alpha=0.3)
 
         plt.tight_layout()
-        plt.savefig(output_file+cell_id +".png", dpi=300, bbox_inches='tight')
+        plt.savefig("plots/"+output_file+cell_id +".png", dpi=300, bbox_inches='tight')
         print(f"  Saved to: {output_file}")
         plt.close()
 
