@@ -1,6 +1,6 @@
 # detect_empty_wells.sub
 
-docker_image = jenslundsgaard/ivf-training:first
+docker_image = jenslundsgaard/ivf-training:latest
 universe = docker
 
 # Script that runs the detection
