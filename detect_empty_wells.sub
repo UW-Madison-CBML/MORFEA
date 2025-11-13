@@ -27,11 +27,11 @@ transfer_output_files = empty_wells.csv, index.csv
 +WantGPULab = true
 +GPUJobLength = "short"
 gpus_minimum_capability = 7.0
-request_gpus = 1
+request_gpus = 4
 
 # Compute resources
-request_cpus = 2
-request_memory = 16GB
-request_disk = 20GB
+request_cpus = 4
+request_memory = 32GB
+request_disk = 80GB
 
 queue 1
