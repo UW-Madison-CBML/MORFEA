@@ -13,45 +13,46 @@ Model                                    [1, 50, 1, 500, 500]      --
 ├─Conv2d: 1-4                            [50, 32, 164, 164]        9,248
 ├─ReLU: 1-5                              [50, 32, 164, 164]        --
 ├─MaxPool2d: 1-6                         [50, 32, 32, 32]          --
-├─Conv2d: 1-7                            [50, 8, 28, 28]           6,408
-├─ReLU: 1-8                              [50, 8, 28, 28]           --
-├─MaxPool2d: 1-9                         [50, 8, 5, 5]             --
-├─Flatten: 1-10                          [50, 200]                 --
-├─LSTM: 1-11                             [1, 50, 200]              321,600
-├─ReLU: 1-12                             [1, 50, 200]              --
-├─Linear: 1-13                           [50, 200]                 40,200
-├─ReLU: 1-14                             [50, 200]                 --
-├─Linear: 1-15                           [1, 50, 200]              40,200
-├─ReLU: 1-16                             [1, 50, 200]              --
-├─LSTM: 1-17                             [1, 50, 200]              321,600
-├─ReLU: 1-18                             [1, 50, 200]              --
-├─Unflatten: 1-19                        [50, 8, 5, 5]             --
-├─UpsamplingBilinear2d: 1-20             [50, 8, 10, 10]           --
-├─Conv2d: 1-21                           [50, 32, 8, 8]            2,336
-├─ReLU: 1-22                             [50, 32, 8, 8]            --
-├─UpsamplingBilinear2d: 1-23             [50, 32, 16, 16]          --
-├─Conv2d: 1-24                           [50, 32, 16, 16]          9,248
-├─ReLU: 1-25                             [50, 32, 16, 16]          --
-├─UpsamplingBilinear2d: 1-26             [50, 32, 32, 32]          --
-├─Conv2d: 1-27                           [50, 32, 32, 32]          9,248
-├─ReLU: 1-28                             [50, 32, 32, 32]          --
-├─UpsamplingBilinear2d: 1-29             [50, 32, 64, 64]          --
-├─Conv2d: 1-30                           [50, 32, 64, 64]          9,248
-├─ReLU: 1-31                             [50, 32, 64, 64]          --
-├─UpsamplingBilinear2d: 1-32             [50, 32, 128, 128]        --
-├─Conv2d: 1-33                           [50, 32, 128, 128]        9,248
-├─ReLU: 1-34                             [50, 32, 128, 128]        --
-├─UpsamplingBilinear2d: 1-35             [50, 32, 256, 256]        --
-├─Conv2d: 1-36                           [50, 16, 256, 256]        4,624
-├─ReLU: 1-37                             [50, 16, 256, 256]        --
-├─UpsamplingBilinear2d: 1-38             [50, 16, 512, 512]        --
-├─Conv2d: 1-39                           [50, 1, 500, 500]         2,705
-├─ReLU: 1-40                             [50, 1, 500, 500]         --
+├─Conv2d: 1-7                            [50, 8, 30, 30]           2,312
+├─ReLU: 1-8                              [50, 8, 30, 30]           --
+├─MaxPool2d: 1-9                         [50, 8, 6, 6]             --
+├─Flatten: 1-10                          [50, 288]                 --
+├─LSTM: 1-11                             [1, 50, 288]              665,856
+├─ReLU: 1-12                             [1, 50, 288]              --
+├─Linear: 1-13                           [50, 288]                 83,232
+├─ReLU: 1-14                             [50, 288]                 --
+├─Linear: 1-15                           [50, 200]                 17,800
+├─Linear: 1-16                           [50, 200]                 40,200
+├─ReLU: 1-17                             [50, 200]                 --
+├─LSTM: 1-18                             [1, 50, 200]              321,600
+├─ReLU: 1-19                             [1, 50, 200]              --
+├─Unflatten: 1-20                        [50, 8, 5, 5]             --
+├─UpsamplingBilinear2d: 1-21             [50, 8, 10, 10]           --
+├─Conv2d: 1-22                           [50, 32, 8, 8]            2,336
+├─ReLU: 1-23                             [50, 32, 8, 8]            --
+├─UpsamplingBilinear2d: 1-24             [50, 32, 16, 16]          --
+├─Conv2d: 1-25                           [50, 32, 16, 16]          9,248
+├─ReLU: 1-26                             [50, 32, 16, 16]          --
+├─UpsamplingBilinear2d: 1-27             [50, 32, 32, 32]          --
+├─Conv2d: 1-28                           [50, 32, 32, 32]          9,248
+├─ReLU: 1-29                             [50, 32, 32, 32]          --
+├─UpsamplingBilinear2d: 1-30             [50, 32, 64, 64]          --
+├─Conv2d: 1-31                           [50, 32, 64, 64]          9,248
+├─ReLU: 1-32                             [50, 32, 64, 64]          --
+├─UpsamplingBilinear2d: 1-33             [50, 32, 128, 128]        --
+├─Conv2d: 1-34                           [50, 32, 128, 128]        9,248
+├─ReLU: 1-35                             [50, 32, 128, 128]        --
+├─UpsamplingBilinear2d: 1-36             [50, 32, 256, 256]        --
+├─Conv2d: 1-37                           [50, 16, 256, 256]        4,624
+├─ReLU: 1-38                             [50, 16, 256, 256]        --
+├─UpsamplingBilinear2d: 1-39             [50, 16, 512, 512]        --
+├─Conv2d: 1-40                           [50, 1, 500, 500]         2,705
+├─ReLU: 1-41                             [50, 1, 500, 500]         --
 ==========================================================================================
-Total params: 786,233
-Trainable params: 786,233
+Total params: 1,187,225
+Trainable params: 1,187,225
 Non-trainable params: 0
-Total mult-adds (Units.GIGABYTES): 75.72
+Total mult-adds (Units.GIGABYTES): 75.60
 """
 class Model(torch.nn.Module):
     def __init__(self):
@@ -60,11 +61,12 @@ class Model(torch.nn.Module):
         self.pool1 = torch.nn.MaxPool2d(3)
         self.conv2 = torch.nn.Conv2d(32, 32, 3)
         self.pool2 = torch.nn.MaxPool2d(5)
-        self.conv3 = torch.nn.Conv2d(32, 8, 5)
+        self.conv3 = torch.nn.Conv2d(32, 8, 3)
         self.flatten = torch.nn.Flatten()
 
-        self.lstm1 = torch.nn.LSTM(200,200,1, batch_first = True)
-        self.linear1 = torch.nn.Linear(200, 200)
+        self.lstm1 = torch.nn.LSTM(288,288,1, batch_first = True)
+        self.linear1 = torch.nn.Linear(288, 288)
+        self.empty_well_resize_linear = torch.nn.Linear(88, 200)
         self.linear2 = torch.nn.Linear(200, 200)
         self.lstm2 = torch.nn.LSTM(200,200,1, batch_first = True)
         self.unflatten = torch.nn.Unflatten(1,(8,5,5))
@@ -89,14 +91,19 @@ class Model(torch.nn.Module):
         x = self.activation(x)
         x = self.pool2(x)
         x = self.flatten(x)
-        x = x.view(b,t,200)
+        x = x.view(b,t,288)
         x,_ = self.lstm1(x) 
         x = self.activation(x)
-        x = x.view(b*t,200)
+        x = x.view(b*t,288)
         x = self.linear1(x)
-        lat_vec = self.activation(x).view(b,t,200)
+        lat_vec = self.activation(x).view(b,t,288)
         # end encoder start decoder
-        x = self.linear2(lat_vec)
+        if (empty_well):
+            x = self.empty_well_resize_linear(lat_vec.view(b*t,288)[:,200:]).view(b*t,200)
+        else:
+            x = lat_vec[:,:,:200].view(b*t, 200)
+        lat_vec = lat_vec[:,:,:200]
+        x = self.linear2(x)
         x = self.activation(x)
         x = x.view(b,t,200)
         x, _ = self.lstm2(x) 
@@ -149,21 +156,21 @@ class Enc_Model(torch.nn.Module):
         x = self.activation(x)
         x = self.pool2(x)
         x = self.flatten(x)
-        x = x.view(b,t,200)
+        x = x.view(b,t,288)
         x,_ = self.lstm1(x) 
         x = self.activation(x)
-        x = x.view(b*t,200)
+        x = x.view(b*t,288)
         x = self.linear1(x)
-        lat_vec = self.activation(x).view(b,t,200)
+        lat_vec = self.activation(x).view(b,t,288)
 
-        return lat_vec
+        return lat_vec[:,:,:200]
 
 
 
 
 def main():
     model = Model()
-    print("convlstmae: ", summary(model, input_size = (1,50,1,500,500)))
+    print("convlstmae: ", summary(model, input_size = (1,50,1,500,500), empty_well = True))
     enc_model = Enc_Model(model = model)
     print("encoder: ", summary(enc_model, input_size = (1,50,1,500,500)))
     if len(sys.argv) > 1:
