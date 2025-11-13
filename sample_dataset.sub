@@ -1,7 +1,6 @@
 # sample_dataset.sub
 # HTCondor submission file for sampling 5% of embryo dataset
 
-universe = vanilla
 shell = ./sample_dataset.sh
 
 # Logging
