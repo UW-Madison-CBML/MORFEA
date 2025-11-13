@@ -6,10 +6,9 @@ from detect_empty_wells import EmptyWellDetector
 DATASET_ROOT = "./embryo_dataset"  # ← 改這裡
 OUT_CSV = "index.csv"
 T = 50                 # 序列長度（幀）
-SUBSAMPLE = 1          # 每3幀取1幀
 WINDOW_STRIDE = T//2   # 50% 重疊
 DETECT_EMPTY_WELLS = True  # Enable empty well detection
-EMPTY_WELL_THRESHOLD = 0.6  # Probability threshold for empty classification
+EMPTY_WELL_THRESHOLD = 0.75  # Probability threshold for empty classification
 EMPTY_WELL_MODEL = None    # Path to trained model (optional)
 
 run_pat = re.compile(r'RUN[_\- ]?(\d+)', re.I)
@@ -51,24 +50,23 @@ def main():
         if not frames:
             continue
         # 下採樣（時間）
-        frames = frames[::SUBSAMPLE]
         if len(frames) < T:
             continue
 
         # Detect empty well status (cache per sequence since frames are same)
         empty_well = False
-        if detector and frames:
-            try:
-                # Use first frame to determine if well is empty
-                prob = detector.predict(frames[0])
-                empty_well = prob >= EMPTY_WELL_THRESHOLD
-            except Exception as e:
-                print(f"Warning: empty well detection failed for {cell.name}: {e}")
-                empty_well = False
-
+        
         # 滑動視窗
         for start in range(0, len(frames)-T+1, WINDOW_STRIDE):
             seq = frames[start:start+T]
+            if detector and frames:
+                try:
+                    # Use first frame to determine if well is empty
+                    prob = min(detector.predict(seq[0]), detector.predict(seq[T//2]),detector.predict(seq[T-1]))
+                    empty_well = prob >= EMPTY_WELL_THRESHOLD
+                except Exception as e:
+                    print(f"Warning: empty well detection failed for {cell.name}: {e}")
+                    empty_well = False
             rows.append({
                 "cell_id": cell.name,
                 "start_idx": start,
