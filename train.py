@@ -45,7 +45,7 @@ def train():
         for vol, _, empty_well in pbar:
             vol = vol.to(DEVICE)                         # [B,T,1,128,128]
             #print(vol.shape)
-            recon, lat = model(vol)
+            recon, lat = model(vol, empty_well = empty_well)
             rec_loss = loss_fn(recon, vol)
             smooth = ((lat[:,1:]-lat[:,:-1])**2).mean()  # temporal smooth
             loss = rec_loss + 0.03 * smooth # play with this coefficient

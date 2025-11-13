@@ -1,6 +1,6 @@
 # train_model.sub
    
-docker_image = jenslundsgaard/ivf-training:first
+docker_image = jenslundsgaard/ivf-training:latest
 #docker_image = pytorch/pytorch:2.9.0-cuda12.8-cudnn9-runtime
 #docker_image = pytorch/pytorch:1.1.0-cuda10.0-cudnn7.5-runtime
 universe = docker
@@ -22,7 +22,7 @@ Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
 transfer_output_remaps = "model_weights.pth =  file:///staging/groups/bhaskar_group/ivf/model_weights.pth;"
-transfer_input_files = train_model.sh, train.py, model.py, train_requirements.txt, model_weights.pth, bad_imgs.txt, dataset_ivf.py, embryo_dataset.tar.gz, Dockerfile, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, file:///staging/groups/bhaskar_group/ivf/empty_wells.csv
+transfer_input_files = train_model.sh, train.py, model.py, train_requirements.txt, model_weights.pth, bad_imgs.txt, dataset_ivf.py, embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv
 +WantGPULab = true
 +GPUJobLength = "short"
 gpus_minimum_capability = 7.0
