@@ -77,7 +77,7 @@ class Model(torch.nn.Module):
         self.conv9 = torch.nn.Conv2d(32,16,3, padding = 1)
         self.conv10 = torch.nn.Conv2d(16,1,13)
         self.activation = torch.nn.ReLU()
-    def forward(self, x):
+    def forward(self, x, empty_well = False):
         b,t,_,_,_ = x.shape
         x = self.conv1(x.view(b*t,1,500,500))
         x = self.activation(x)

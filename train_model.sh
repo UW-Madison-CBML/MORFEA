@@ -1,6 +1,5 @@
 #!/bin/bash
 tar -zxf embryo_dataset.tar.gz
-python build_index.py
 
 python train.py 
 
