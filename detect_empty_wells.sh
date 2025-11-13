@@ -1,7 +1,5 @@
 #!/bin/bash
 # detect_empty_wells.sh
-pip uninstall opencv-python-headless
-pip install opencv-python-headless
 set -e
 
 echo "Starting empty well detection and indexing..."

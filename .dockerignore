@@ -78,3 +78,6 @@ __pycache__
 index.csv
 .git
 .git/*
+*.sub 
+*.sh
+*.py

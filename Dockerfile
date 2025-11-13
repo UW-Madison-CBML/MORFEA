@@ -6,6 +6,11 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
     git \
     wget \
     curl \
@@ -24,5 +29,3 @@ COPY . .
 # Set Python environment variables for GPU memory management
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# Default command to run training
-#CMD ["python", "train.py"]
