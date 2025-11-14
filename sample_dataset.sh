@@ -9,7 +9,7 @@ total_size=$(du -sb embryo_dataset | awk '{print $1}')
 echo "Total dataset size: $(numfmt --to=iec-i --suffix=B $total_size 2>/dev/null || echo $total_size bytes)"
 
 # Calculate 5% of the total size in bytes
-target_size=$(echo "$total_size * 0.05" | bc)
+target_size=$(echo "scale=2;  $total_size * 0.05" | bc)
 echo "Target sample size (5%): $(numfmt --to=iec-i --suffix=B $target_size 2>/dev/null || echo $target_size bytes)"
 
 # Create a temporary directory for the sample
