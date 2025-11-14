@@ -85,7 +85,7 @@ class Model(torch.nn.Module):
         # flatten to 7 * 7 * 128
         self.linear1 = torch.nn.Linear(6272, 4000)
         # reshape to (b,t...)
-        self.lstm1 = torch.nn.LSTM(4000,1000,1, batch_first = True)
+        self.lstm1 = torch.nn.LSTM(4000,4000,1, batch_first = True)
         # reshape to (b*t...)
         self.linear2 = torch.nn.Linear(4000, 4000)
         self.empty_well_resize_linear = torch.nn.Linear(500, 3500)
@@ -94,15 +94,15 @@ class Model(torch.nn.Module):
         # start decoder
         self.linear3 = torch.nn.Linear(3500, 4000)
         #reshape to (b,t,...)
-        self.lstm2 = torch.nn.LSTM(4000,1000,1, batch_first = True)
+        self.lstm2 = torch.nn.LSTM(4000,4000,1, batch_first = True)
         # reshape to (b*t....) 
         self.linear4 = torch.nn.Linear(4000, 6272)
         # unflatten
         self.conv1dec = torch.nn.Conv2d(128, 128, 3, padding =1)
-        self.bn1dec = torch.nn.BatchNorm2d(32)
+        self.bn1dec = torch.nn.BatchNorm2d(128)
 
         self.conv2dec = torch.nn.Conv2d(128, 128, 3, padding = 1)
-        self.bn2dec = torch.nn.BatchNorm2d(64)
+        self.bn2dec = torch.nn.BatchNorm2d(128)
 
         self.conv3dec = torch.nn.Conv2d(128, 128, 3, padding = 1)
         self.bn3dec = torch.nn.BatchNorm2d(128)
@@ -136,7 +136,7 @@ class Model(torch.nn.Module):
         x = x.view(b*t,4000)
         x = F.relu(self.linear2(x))
         lat_vec = x.view(b,t,4000)
-        lat_vec = dropout(lat_vec)
+        lat_vec = self.dropout(lat_vec)
         # end encoder start decoder
         if (empty_well):
             x = F.relu(self.empty_well_resize_linear(lat_vec.view(b*t,4000)[:,3500:]).view(b*t,3500))
@@ -149,6 +149,14 @@ class Model(torch.nn.Module):
         x = x.view(b*t,4000)
         x = F.relu(self.linear4(x))
         x = x.view(b*t, 128, 7, 7)
+
+        x = F.relu(F.interpolate(self.bn1dec(self.conv1dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
+                   
+        x = F.relu(F.interpolate(self.bn2dec(self.conv2dec(x)), scale_factor= 2,mode='bilinear', align_corners=True))
+        x = F.relu(F.interpolate(self.bn3dec(self.conv3dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
+        x = F.relu(F.interpolate(self.bn5dec(self.conv5dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
+        x = F.relu(F.interpolate(self.bn6dec(self.conv6dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
+        x = F.sigmoid(F.interpolate(self.conv7dec(x), scale_factor= 2, mode='bilinear', align_corners=True))
         return x
         return x.view(b,t,1,500,500),lat_vec
 class Enc_Model(torch.nn.Module):
@@ -189,9 +197,9 @@ class Enc_Model(torch.nn.Module):
 
 def main():
     model = Model()
-    print("convlstmae: ", summary(model, input_size = (1,50,1,500,500), empty_well = True))
+    print("convlstmae: ", summary(model, input_size = (1,1,1,500,500), empty_well = True))
     enc_model = Enc_Model(model = model)
-    print("encoder: ", summary(enc_model, input_size = (1,50,1,500,500)))
+    print("encoder: ", summary(enc_model, input_size = (1,1,1,500,500)))
     if len(sys.argv) > 1:
         if os.path.exists(sys.argv[1]):
             try:
