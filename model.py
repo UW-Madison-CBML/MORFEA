@@ -154,12 +154,12 @@ class Model(torch.nn.Module):
                    
         x = F.relu(F.interpolate(self.bn2dec(self.conv2dec(x)), scale_factor= 2,mode='bilinear', align_corners=True))
         x = F.relu(F.interpolate(self.bn3dec(self.conv3dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
+        x = F.relu(F.interpolate(self.bn4dec(self.conv4dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
         x = F.relu(F.interpolate(self.bn5dec(self.conv5dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
         x = F.relu(F.interpolate(self.bn6dec(self.conv6dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
-        x = F.sigmoid(F.interpolate(self.conv7dec(x), scale_factor= 2, mode='bilinear', align_corners=True))
-        return x
+        x = F.sigmoid(F.interpolate(self.conv7dec(x), size=(500,500), mode='bilinear', align_corners=True))
         return x.view(b,t,1,500,500),lat_vec
-class Enc_Model(torch.nn.Module):
+"""class Enc_Model(torch.nn.Module):
     def __init__(self,model = Model()):
         super().__init__() # Call the constructor of the parent class
         self.conv1 = model.conv1
@@ -192,14 +192,14 @@ class Enc_Model(torch.nn.Module):
 
         return lat_vec[:,:,:200]
 
-
+"""
 
 
 def main():
     model = Model()
     print("convlstmae: ", summary(model, input_size = (1,1,1,500,500), empty_well = True))
-    enc_model = Enc_Model(model = model)
-    print("encoder: ", summary(enc_model, input_size = (1,1,1,500,500)))
+    #enc_model = Enc_Model(model = model)
+    #print("encoder: ", summary(enc_model, input_size = (1,1,1,500,500)))
     if len(sys.argv) > 1:
         if os.path.exists(sys.argv[1]):
             try:
