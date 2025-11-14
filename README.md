@@ -11,13 +11,13 @@
 * (note so I don't forget) If you want to connect git to github (i.e. only have access to a command line), you create a ssh key, add the public key to github, and set up remotes for the repo as `git remote add origin git@github.com:JensLundsgaard/ivf.git`. To find where git looks for the private key run `ssh -vT git@github.com`
 # TODO:
 * Mess with the model a ton, try different activiation functions, different RNN models, different models entirely,
+    * 3D Convs or attention mechanism instead of LSTM (ask Prof Jay of course)
+    * Use a learning rate scheduler (Call scheduler.step() at end of each epoch)
 * Incorporate grading\ timestamps of embryos into both model and visualization.
-* Make a testing job i.e. with a small dataset that tests the whole pipeline or probably two for each docker image
-* Ok here's what I need to do right now:
-    * Get a more reliable labler for empty wells: make a server that serves a web page where I can esily label each or manually go in and try to engineer the cv2 script to work better
-    * Remove temporal smoothness loss: more harm than good, will become a burden later
-    * Rework model hella, only do 8 epochs, 20 is way too much and the model is hitting a big local minimum that is hindering it greatly. 
-    * Ensure that `export_latents.py` is labeling each vector correctly `(cell_id, sequence_idx, ...)` those first two should act as primary key for the latent vector. It is making the tphate jobs messed up. 
+* Make a testing job i.e. with a small dataset that tests the whole pipeline or probably two for each docker image. This would be a good task for learning the CHTC scripting process and would help me out alot.
+* Remove temporal smoothness loss: more harm than good, will become a burden later
+* Rework model hella, only do 8 epochs, 20 is way too much and the model is hitting a big local minimum that is hindering it greatly. 
+* Ensure that `export_latents.py` is labeling each vector correctly `(cell_id, sequence_idx, ...)` those first two should act as primary key for the latent vector. It is making the tphate jobs messed up. 
 # Workflows
 * **Clear CHTC log, out and err files**: `./clear.sh`
 * **Train the model**: `./run.sh` or `condor_submit train_model.sub`

@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from torch.optim.lr_scheduler import CosineAnnealingLR, CosineAnnealingWarmRestarts
 import math
 from PIL import Image
 from PIL import ImageFile
@@ -34,11 +35,12 @@ def train():
     # rnn: lstm
     # decoder: reshape to 2d img, upsample, convo, upsample, 
     loss_fn = torch.nn.MSELoss(reduction='mean')
-    learning_rate = 1e-3
+    learning_rate = 0.1
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,weight_decay = 1e-5 )
+    scheduler = CosineAnnealingLR(optimizer, T_max=8)
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
-    loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=4, pin_memory=True)
-    for epoch in range(20):
+    loader = DataLoader(ds, batch_size=10, shuffle=True, num_workers=4, pin_memory=True)
+    for epoch in range(8):
         model.train()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
@@ -48,10 +50,11 @@ def train():
             recon, lat = model(vol, empty_well = empty_well)
             rec_loss = loss_fn(recon, vol)
             smooth = ((lat[:,1:]-lat[:,:-1])**2).mean()  # temporal smooth
-            loss = rec_loss + 0.03 * smooth # play with this coefficient
+            loss = rec_loss + 0.005 * smooth # play with this coefficient
             optimizer.zero_grad(); loss.backward(); optimizer.step()
             total += loss.item()
             pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", sm=f"{smooth.item():.4f}")
+        scheduler.step()
         print(f"epoch {epoch} avg loss={total/len(loader):.4f}")
         torch.save(model.state_dict(), f"model_weights.pth")
 

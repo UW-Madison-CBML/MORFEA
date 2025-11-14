@@ -11,7 +11,7 @@ Usage:
     Or batch process:
     probs = detector.predict_batch(image_paths, batch_size=32)
 """
-
+from torchinfo import summary
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -30,31 +30,51 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 class EmptyWellClassifier(nn.Module):
     """Lightweight CNN for classifying empty vs. non-empty wells"""
 
-    def __init__(self, input_size: int = 128):
+    def __init__(self):
         super().__init__()
-        self.input_size = input_size
+        self.input_size = 500
 
         # Lightweight conv layers
+        # (-1, 1, 500, 500)
         self.conv1 = nn.Conv2d(1, 32, 3, padding=1)
         self.bn1 = nn.BatchNorm2d(32)
+        # (-1, 32, 500, 500)
         self.pool1 = nn.MaxPool2d(2)
-
+        # (-1, 32, 250, 250)
         self.conv2 = nn.Conv2d(32, 64, 3, padding=1)
         self.bn2 = nn.BatchNorm2d(64)
+        # (-1, 64, 250, 250)
         self.pool2 = nn.MaxPool2d(2)
-
+        # (-1, 64, 125, 125)
         self.conv3 = nn.Conv2d(64, 128, 3, padding=1)
         self.bn3 = nn.BatchNorm2d(128)
+        # (-1, 128, 125, 125)
         self.pool3 = nn.MaxPool2d(2)
+        # (-1, 128, 62, 62)
+        self.conv4 = nn.Conv2d(128, 128, 3, padding=1)
+        self.bn4 = nn.BatchNorm2d(128)
+        # (-1, 128, 62, 62)
+        self.pool4 = nn.MaxPool2d(2)
+        # (-1, 128, 31, 31)
+        self.conv5 = nn.Conv2d(128, 128, 3, padding=1)
+        self.bn5 = nn.BatchNorm2d(128)
+        # (-1, 128, 31, 31)
+        self.pool5 = nn.MaxPool2d(2)
+        # (-1, 128, 15, 15)
+        self.conv6 = nn.Conv2d(128, 128, 3, padding=1)
+        self.bn6 = nn.BatchNorm2d(128)
 
-        # Calculate flattened size
-        self.flat_size = 128 * (input_size // 8) * (input_size // 8)
+        # (-1, 128, 15, 15)
+        self.pool6 = nn.MaxPool2d(2)
+        # (-1, 128, 7, 7)
+
+        self.flat_size = 128 * 7 * 7
 
         # Classifier head
-        self.fc1 = nn.Linear(self.flat_size, 256)
+        self.fc1 = nn.Linear(self.flat_size, 512)
         self.dropout = nn.Dropout(0.3)
-        self.fc2 = nn.Linear(256, 128)
-        self.fc3 = nn.Linear(128, 1)  # Binary classification
+        self.fc2 = nn.Linear(512, 256)
+        self.fc3 = nn.Linear(256, 1)  # Binary classification
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass returning logit for empty well probability"""
@@ -66,6 +86,14 @@ class EmptyWellClassifier(nn.Module):
 
         x = F.relu(self.bn3(self.conv3(x)))
         x = self.pool3(x)
+
+        x = F.relu(self.bn4(self.conv4(x)))
+        x = self.pool4(x)
+        x = F.relu(self.bn5(self.conv5(x)))
+        x = self.pool5(x)
+        x = F.relu(self.bn6(self.conv6(x)))
+        x = self.pool6(x)
+
 
         x = x.view(x.size(0), -1)
         x = F.relu(self.fc1(x))
@@ -386,6 +414,8 @@ def create_training_dataset(
 
 
 if __name__ == "__main__":
+    model = EmptyWellClassifier()
+    print(summary(model, input = (1, 128, 128)))
     import sys
 
     if len(sys.argv) < 2:
