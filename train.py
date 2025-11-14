@@ -44,13 +44,13 @@ def train():
         model.train()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
-        for vol, _, empty_well, _ in pbar:
+        for vol, _, _, _ in pbar: # fix empty well
             vol = vol.to(DEVICE)                         # [B,T,1,128,128]
             #print(vol.shape)
-            recon, lat = model(vol, empty_well = empty_well)
+            recon, lat = model(vol) #, empty_well = empty_well)
             rec_loss = loss_fn(recon, vol)
             smooth = ((lat[:,1:]-lat[:,:-1])**2).mean()  # temporal smooth
-            loss = rec_loss + 0.005 * smooth # play with this coefficient
+            loss = rec_loss # + 0.005 * smooth maybe add this back
             optimizer.zero_grad(); loss.backward(); optimizer.step()
             total += loss.item()
             pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", sm=f"{smooth.item():.4f}")
