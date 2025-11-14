@@ -45,6 +45,11 @@ for i in "${!folders[@]}"; do
     if [[ $accumulated_size -gt $target_size ]]; then
         break
     fi
+    if [[ "$accumulated_size" =~ ^[0-9]+$ && "$target_size" =~ ^[0-9]+$ ]]; then
+	if (( accumulated_size > target_size )); then
+		break
+	fi
+    fi
 done
 
 # Report final statistics
