@@ -42,7 +42,7 @@ def export_latents_to_csv(checkpoint="model_weights.pth", output_csv="latents.cs
     time_steps = []
 
     print(f"\nExtracting latent embeddings from {len(ds)} sequences...")
-    for idx, (vol, cell_id) in enumerate(loader):
+    for idx, (vol, cell_id, _) in enumerate(loader):
         if (idx + 1) % 10 == 0:
             print(f"  Processed {idx + 1}/{len(ds)} sequences")
 
