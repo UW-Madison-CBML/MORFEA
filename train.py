@@ -42,7 +42,7 @@ def train():
         model.train()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
-        for vol, _, empty_well in pbar:
+        for vol, _, empty_well, _ in pbar:
             vol = vol.to(DEVICE)                         # [B,T,1,128,128]
             #print(vol.shape)
             recon, lat = model(vol, empty_well = empty_well)

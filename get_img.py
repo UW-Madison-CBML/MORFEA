@@ -20,7 +20,7 @@ def main():
             print("model has wrong shape")
             return 
     model = model.to(DEVICE)
-    for vol, x, _ in loader:
+    for vol, x, _, _ in loader:
         model.eval()
         vol = vol.to(DEVICE)
         recon, _ = model(vol)
