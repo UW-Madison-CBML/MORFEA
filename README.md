@@ -12,7 +12,7 @@
 # TODO:
 * Mess with the model a ton, try different activiation functions, different RNN models, different models entirely,
 * Incorporate grading\ timestamps of embryos into both model and visualization.
-* Start to incorporate TDA 
+* Make a testing job i.e. with a small dataset that tests the whole pipeline or probably two for each docker image
 # Workflows
 * **Clear CHTC log, out and err files**: `./clear.sh`
 * **Train the model**: `./run.sh` or `condor_submit train_model.sub`

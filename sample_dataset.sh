@@ -4,31 +4,59 @@
 echo "Extracting embryo_dataset.tar.gz..."
 tar -zxf embryo_dataset.tar.gz
 
-# Get the total number of files
-total_files=$(find embryo_dataset -type f | wc -l)
-echo "Total files in dataset: $total_files"
+# Get the total size of the dataset in bytes
+total_size=$(du -sb embryo_dataset | awk '{print $1}')
+echo "Total dataset size: $(numfmt --to=iec-i --suffix=B $total_size 2>/dev/null || echo $total_size bytes)"
 
-# Calculate 5% of files
-sample_size=$(echo "$total_files * 0.05" | bc | awk '{printf "%d", $1}')
-echo "Sampling 5% ($sample_size files)..."
+# Calculate 5% of the total size in bytes
+target_size=$(echo "$total_size * 0.05" | bc)
+echo "Target sample size (5%): $(numfmt --to=iec-i --suffix=B $target_size 2>/dev/null || echo $target_size bytes)"
 
 # Create a temporary directory for the sample
 mkdir -p embryo_dataset_sample
 
-# Get a random 5% sample of files and copy them
-find embryo_dataset -type f | shuf | head -n $sample_size | while read file; do
-    # Preserve directory structure
-    relative_path=${file#embryo_dataset/}
-    mkdir -p "embryo_dataset_sample/$(dirname "$relative_path")"
-    cp "$file" "embryo_dataset_sample/$relative_path"
+# Get list of all folders with their sizes and shuffle
+# Format: size folder_name
+declare -a folders
+declare -a folder_sizes
+
+while IFS=' ' read -r size folder; do
+    folders+=("$folder")
+    folder_sizes+=("$size")
+done < <(du -sb embryo_dataset/*/ | awk '{print $1, $2}' | sed 's|embryo_dataset/||g' | sed 's|/||g' | shuf)
+
+# Accumulate folders until we reach ~5% of total size
+accumulated_size=0
+selected_count=0
+
+echo "Selecting folders to reach target size..."
+for i in "${!folders[@]}"; do
+    folder="${folders[$i]}"
+    size="${folder_sizes[$i]}"
+
+    # Add this folder to the sample
+    echo "  Adding $folder ($(numfmt --to=iec-i --suffix=B $size 2>/dev/null || echo $size bytes))"
+    cp -r "embryo_dataset/$folder" "embryo_dataset_sample/"
+
+    accumulated_size=$((accumulated_size + size))
+    selected_count=$((selected_count + 1))
+
+    # Stop if we've reached or exceeded the target
+    if (( accumulated_size >= target_size )); then
+        break
+    fi
 done
 
+# Report final statistics
+final_size=$(du -sb embryo_dataset_sample | awk '{print $1}')
+percentage=$(echo "scale=2; $final_size * 100 / $total_size" | bc)
+echo ""
+echo "Selected $selected_count folders"
+echo "Final sample size: $(numfmt --to=iec-i --suffix=B $final_size 2>/dev/null || echo $final_size bytes) ($percentage%)"
+rm -r embryo_dataset
+mv embryo_dataset_sample embryo_dataset
 # Create compressed archive of the sample
 echo "Creating embryo_dataset_sample.tar.gz..."
-tar -czf embryo_dataset_sample.tar.gz embryo_dataset_sample
+tar -czf embryo_dataset_sample.tar.gz embryo_dataset
 
-# Cleanup
-echo "Cleaning up..."
-rm -rf embryo_dataset embryo_dataset_sample
 
-echo "Done! Created embryo_dataset_sample.tar.gz"
