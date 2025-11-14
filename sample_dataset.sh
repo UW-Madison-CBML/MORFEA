@@ -42,7 +42,7 @@ for i in "${!folders[@]}"; do
     selected_count=$((selected_count + 1))
 
     # Stop if we've reached or exceeded the target
-    if (( accumulated_size >= target_size )); then
+    if [[ accumulated_size -gt target_size ]]; then
         break
     fi
 done
