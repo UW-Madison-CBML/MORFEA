@@ -133,7 +133,7 @@ class Model(torch.nn.Module):
         x = F.relu(self.linear1(x))
         x = x.view(b,t,4000)
         x,_ = self.lstm1(x); x = F.relu(x)
-        x = x.view(b*t,4000)
+        x = x.reshape(b*t,4000)
         x = F.relu(self.linear2(x))
         lat_vec = x.view(b,t,4000)
         lat_vec = self.dropout(lat_vec)
@@ -197,7 +197,7 @@ class Model(torch.nn.Module):
 
 def main():
     model = Model()
-    print("convlstmae: ", summary(model, input_size = (1,1,1,500,500), empty_well = True))
+    print("convlstmae: ", summary(model, input_size = (1,1,1,500,500), empty_well = False))
     #enc_model = Enc_Model(model = model)
     #print("encoder: ", summary(enc_model, input_size = (1,1,1,500,500)))
     if len(sys.argv) > 1:
