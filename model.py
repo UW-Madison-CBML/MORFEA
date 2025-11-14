@@ -146,7 +146,7 @@ class Model(torch.nn.Module):
         x = F.relu(self.linear3(x))
         x = x.view(b,t,4000)
         x, _ = self.lstm2(x); x = F.relu(x)
-        x = x.view(b*t,4000)
+        x = x.reshape(b*t,4000)
         x = F.relu(self.linear4(x))
         x = x.view(b*t, 128, 7, 7)
 
