@@ -57,7 +57,7 @@ def export_latents_to_csv(checkpoint="model_weights.pth", output_csv="latents.cs
         for t in range(z.shape[0]):
             all_latents.append(z[t])
             cell_ids.append(cell_id[0])
-            time_steps.append(t + start_idx)
+            time_steps.append(int(t + start_idx))
 
     # Create DataFrame
     print(f"\nCreating CSV with {len(all_latents)} samples...")
