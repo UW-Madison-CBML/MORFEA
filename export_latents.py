@@ -46,6 +46,7 @@ def export_latents_to_csv(checkpoint="model_weights.pth", output_csv="latents.cs
         if (idx + 1) % 10 == 0:
             print(f"  Processed {idx + 1}/{len(ds)} sequences")
 
+        model.eval()
         vol = vol.to(DEVICE)
         with torch.no_grad():
             _, z_seq = model(vol)

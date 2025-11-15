@@ -11,7 +11,9 @@ import sys
 from torch.utils.data import DataLoader
 from dataset_ivf import IVFSequenceDataset
 from tqdm import tqdm
-
+torch.backends.cuda.enable_mem_efficient_sdp(False)
+torch.backends.cuda.enable_flash_sdp(False)
+torch.backends.cuda.enable_math_sdp(True)
 batch_size = 50
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
