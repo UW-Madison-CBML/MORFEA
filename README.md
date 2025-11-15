@@ -10,9 +10,9 @@
 * Also make sure you run `chmod +x *.sh`
 * (note so I don't forget) If you want to connect git to github (i.e. only have access to a command line), you create a ssh key, add the public key to github, and set up remotes for the repo as `git remote add origin git@github.com:JensLundsgaard/ivf.git`. To find where git looks for the private key run `ssh -vT git@github.com`
 # TODO:
+* Upload model backups to HuggingFace with the python HuggingFace api, (will probably need to rebuild the docker image).
 * Mess with the model a ton, try different activiation functions, different RNN models, different models entirely,
-    * 3D Convs or attention mechanism instead of LSTM (ask Prof Jay of course)
-    * Use a learning rate scheduler (Call scheduler.step() at end of each epoch)
+    * 3D Convs or attention mechanism instead of LSTM? (ask Prof Jay of course)
 * Incorporate grading\ timestamps of embryos into both model and visualization.
 * Make a testing job i.e. with a small dataset that tests the whole pipeline or probably two for each docker image. This would be a good task for learning the CHTC scripting process and would help me out alot.
 * Remove temporal smoothness loss: more harm than good, will become a burden later

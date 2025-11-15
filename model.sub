@@ -1,4 +1,4 @@
-# train_model.sub
+# model.sub
    
 docker_image = jenslundsgaard/ivf-training:latest
 universe = docker
@@ -21,11 +21,11 @@ output = model_$(Cluster)_$(Process).out
 transfer_input_files = model.py, model.sh
 +WantGPULab = true
 +GPUJobLength = "short"
-gpus_minimum_capability = 7.0
+#gpus_minimum_capability = 7.0
 #Requirements = (Machine == "bhaskargpu4000.chtc.wisc.edu") && (DriverVersion == "12.8") && (DeviceName == "NVIDIA H200")
  
 #+GPUModel = "NVIDIA H200"
-transfer_output_files = model_weights.pth 
+#transfer_output_files = model_weights.pth 
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
 request_cpus = 4

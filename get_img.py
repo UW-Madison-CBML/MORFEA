@@ -1,5 +1,5 @@
 import torch
-from model import Model, Enc_Model
+from model import Model
 from torch.utils.data import DataLoader
 from dataset_ivf import IVFSequenceDataset
 import matplotlib.pyplot as plt
