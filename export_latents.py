@@ -62,7 +62,7 @@ def export_latents_to_csv(checkpoint="model_weights.pth", output_csv="latents.cs
 
     # Create DataFrame
     print(f"\nCreating CSV with {len(all_latents)} samples...")
-    latent_columns = [f"z_{i}" for i in range(200)]
+    latent_columns = [f"z_{i}" for i in range(3500)]
 
     latents_array = np.array(all_latents)  # Shape: (num_samples, 200)
     df = pd.DataFrame(latents_array, columns=latent_columns)
