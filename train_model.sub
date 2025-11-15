@@ -17,7 +17,7 @@ log = train_model_$(Cluster)_$(Process).log
 error = train_model_$(Cluster)_$(Process).err
 output = train_model_$(Cluster)_$(Process).out
 should_transfer_files = YES
-when_to_transfer_output = ON_EXIT 
+when_to_transfer_output = ON_EXIT_OR_EVICT
 Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script

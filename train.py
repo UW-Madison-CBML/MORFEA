@@ -41,7 +41,7 @@ def train():
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,weight_decay = 1e-5 )
     scheduler = CosineAnnealingLR(optimizer, T_max=8)
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
-    loader = DataLoader(ds, batch_size=10, shuffle=True, num_workers=4, pin_memory=True)
+    loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=4, pin_memory=True)
     for epoch in range(8):
         model.train()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
@@ -52,8 +52,8 @@ def train():
             recon, lat = model(vol) #, empty_well = empty_well)
             rec_loss = loss_fn(recon, vol)
             smooth = ((lat[:,1:]-lat[:,:-1])**2).mean()  # temporal smooth
-            #loss = rec_loss # + 0.005 * smooth maybe add this back
-            optimizer.zero_grad(); rec_loss.backward(); optimizer.step()
+            loss = rec_loss # + 0.005 * smooth maybe add this back
+            optimizer.zero_grad(); loss.backward(); optimizer.step()
             total += loss.item()
             pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", sm=f"{smooth.item():.4f}")
         scheduler.step()
