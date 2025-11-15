@@ -5,9 +5,6 @@ import sys
 import os;
 
 
-
-
-
 class Model(torch.nn.Module):
     def __init__(self):
         super().__init__() # Call the constructor of the parent class
@@ -112,41 +109,6 @@ class Model(torch.nn.Module):
         x = F.relu(F.interpolate(self.bn6dec(self.conv6dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
         x = F.sigmoid(F.interpolate(self.conv7dec(x), size=(500,500), mode='bilinear', align_corners=True))
         return x.view(b,t,1,500,500),lat_vec
-"""class Enc_Model(torch.nn.Module):
-    def __init__(self,model = Model()):
-        super().__init__() # Call the constructor of the parent class
-        self.conv1 = model.conv1
-        self.pool1 = model.pool1
-        self.conv2 = model.conv2
-        self.pool2 = model.pool2
-        self.conv3 = model.conv3
-        self.flatten = model.flatten
-        self.linear1 = model.linear1
-        self.activation = model.activation
-        self.lstm1 = model.lstm1
-    def forward(self,x):
-        b,t,_,_,_ = x.shape
-        x = self.conv1(x.view(b*t,1,500,500))
-        x = self.activation(x)
-        x = self.pool1(x)
-        x = self.conv2(x)
-        x = self.activation(x)
-        x = self.pool2(x)
-        x = self.conv3(x)
-        x = self.activation(x)
-        x = self.pool2(x)
-        x = self.flatten(x)
-        x = x.view(b,t,288)
-        x,_ = self.lstm1(x) 
-        x = self.activation(x)
-        x = x.view(b*t,288)
-        x = self.linear1(x)
-        lat_vec = self.activation(x).view(b,t,288)
-
-        return lat_vec[:,:,:200]
-
-"""
-
 
 def main():
     model = Model()
@@ -164,36 +126,4 @@ def main():
         print("model not found")
 if __name__ == "__main__":
     main()
-   #define model
-"""
-model1 = torch.nn.Sequential(
-    torch.nn.Conv2d(1, 8, 3),
-    torch.nn.MaxPool2d(3),
-    torch.nn.Conv2d(8, 8, 3),
-    torch.nn.MaxPool2d(5),
-    torch.nn.Conv2d(8, 8, 5),
-    torch.nn.MaxPool2d(5),
-    torch.nn.Flatten(),
-    torch.nn.Linear(200, 200),
-    torch.nn.LSTM(200,300,1),
-    torch.nn.Flatten(),
-    torch.nn.Unflatten(1,(8,5,5)),
-    torch.nn.UpsamplingBilinear2d(scale_factor=2),
-    torch.nn.Conv2d(8,16,3),
-    torch.nn.UpsamplingBilinear2d(scale_factor=2),
-    torch.nn.Conv2d(16,16,3,padding = 1),
-    torch.nn.UpsamplingBilinear2d(scale_factor=2),
-    torch.nn.Conv2d(16,16,3, padding = 1),
-    torch.nn.UpsamplingBilinear2d(scale_factor=2),
-    torch.nn.Conv2d(16,8,3, padding = 1),
-    torch.nn.UpsamplingBilinear2d(scale_factor=2),
-    torch.nn.Conv2d(8,8,3, padding = 1),
-    torch.nn.UpsamplingBilinear2d(scale_factor=2),
-    torch.nn.Conv2d(8,4,3, padding = 1),
-    torch.nn.UpsamplingBilinear2d(scale_factor=2),
-    torch.nn.Conv2d(4,1,13)
-    #torch.nn.Conv2d(4,1,71),
-    #torch.nn.Conv2d(1,1,71),
-    )
 
- """

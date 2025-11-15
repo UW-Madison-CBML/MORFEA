@@ -50,8 +50,8 @@ def train():
             recon, lat = model(vol) #, empty_well = empty_well)
             rec_loss = loss_fn(recon, vol)
             smooth = ((lat[:,1:]-lat[:,:-1])**2).mean()  # temporal smooth
-            loss = rec_loss # + 0.005 * smooth maybe add this back
-            optimizer.zero_grad(); loss.backward(); optimizer.step()
+            #loss = rec_loss # + 0.005 * smooth maybe add this back
+            optimizer.zero_grad(); rec_loss.backward(); optimizer.step()
             total += loss.item()
             pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", sm=f"{smooth.item():.4f}")
         scheduler.step()

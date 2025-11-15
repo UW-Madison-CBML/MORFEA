@@ -7,7 +7,7 @@ universe = docker
 #  $(Process) will be a integer number for each job, starting with "0"
 #  and increasing for the relevant number of jobs.
    		
-executable = model.py
+executable = ./model.sh
 #arguments = model.py
 # Specify the name of the log, standard error, and standard output (or
 # "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
@@ -18,7 +18,7 @@ output = model_$(Cluster)_$(Process).out
 #
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
-transfer_input_files = model.py
+transfer_input_files = model.py, model.sh
 +WantGPULab = true
 +GPUJobLength = "short"
 gpus_minimum_capability = 7.0
