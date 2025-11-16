@@ -15,7 +15,7 @@ def export_latents_to_csv(checkpoint="model_weights.pth", output_csv="latents.cs
     """
     Export latent embeddings from the model to a CSV file.
 
-    Each row contains: cell_id, time_step, and 200 latent dimensions (z_0, z_1, ..., z_199)
+    Each row contains: cell_id, time_step, and 3500 latent dimensions
 
     Args:
         checkpoint: Path to model weights file
@@ -51,8 +51,8 @@ def export_latents_to_csv(checkpoint="model_weights.pth", output_csv="latents.cs
         with torch.no_grad():
             _, z_seq = model(vol)
 
-        # z_seq shape: (1, T, 200)
-        z = z_seq.squeeze(0).cpu().numpy()  # Shape: (T, 200)
+        # z_seq shape: (1, T, 3500)
+        z = z_seq.squeeze(0).cpu().numpy()  # Shape: (T, 3500)
 
         # Add one row per time step
         for t in range(z.shape[0]):
@@ -69,9 +69,10 @@ def export_latents_to_csv(checkpoint="model_weights.pth", output_csv="latents.cs
     df.insert(0, "cell_id", cell_ids)
     df.insert(1, "time_step", time_steps)
     normed_df = pd.DataFrame(columns = df.columns)
-    # for each key (cell_id, time_step), add the first latent row
-    for (cell_id, time_step), grouped_df in df.groupby(['cell_id','time_step']):
-        normed_df[len(normed_df)] = [cell_id, time_step] + [grouped_df.iloc[0][f"z_{i}"] for i in range(3500)]
+    # for each key (cell_id, time_step), we should only have one row but because of LSTM time sequential structure, the sequence will matter so we just avg to  
+    normed_df = df.groupby(['cell_id', 'time_step']).agg({
+      **{f'z_{i}': 'mean' for i in range(3500)}
+    }).reset_index().sort_values(by=['cell_id','time_step'], ascending=[True, True])
     # Save to CSV
     normed_df.to_csv(output_csv, index=False)
     print(f"Latent embeddings saved to: {output_csv}")
