@@ -68,7 +68,7 @@ def export_latents_to_csv(checkpoint="model_weights.pth", output_csv="latents.cs
     df = pd.DataFrame(latents_array, columns=latent_columns)
     df.insert(0, "cell_id", cell_ids)
     df.insert(1, "time_step", time_steps)
-    normed_df = ps.DataFrame(columns = df.columns)
+    normed_df = pd.DataFrame(columns = df.columns)
     # for each key (cell_id, time_step), add the first latent row
     for (cell_id, time_step), grouped_df in df.groupby(['cell_id','time_step']):
         normed_df[len(normed_df)] = [cell_id, time_step] + [group_df.iloc[0][f"z_{i}"] for i in range(3500)]
