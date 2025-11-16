@@ -71,7 +71,7 @@ def export_latents_to_csv(checkpoint="model_weights.pth", output_csv="latents.cs
     normed_df = pd.DataFrame(columns = df.columns)
     # for each key (cell_id, time_step), add the first latent row
     for (cell_id, time_step), grouped_df in df.groupby(['cell_id','time_step']):
-        normed_df[len(normed_df)] = [cell_id, time_step] + [group_df.iloc[0][f"z_{i}"] for i in range(3500)]
+        normed_df[len(normed_df)] = [cell_id, time_step] + [grouped_df.iloc[0][f"z_{i}"] for i in range(3500)]
     # Save to CSV
     normed_df.to_csv(output_csv, index=False)
     print(f"Latent embeddings saved to: {output_csv}")
