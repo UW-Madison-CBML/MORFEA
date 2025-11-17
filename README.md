@@ -15,9 +15,8 @@
     * 3D Convs or attention mechanism instead of LSTM? (ask Prof Jay of course)
 * Incorporate grading\ timestamps of embryos into both model and visualization.
 * Make a testing job i.e. with a small dataset that tests the whole pipeline or probably two for each docker image. This would be a good task for learning the CHTC scripting process and would help me out alot.
-* Remove temporal smoothness loss: more harm than good, will become a burden later
-* Rework model hella, only do 8 epochs, 20 is way too much and the model is hitting a big local minimum that is hindering it greatly. 
-* Ensure that `export_latents.py` is labeling each vector correctly `(cell_id, sequence_idx, ...)` those first two should act as primary key for the latent vector. It is making the tphate jobs messed up. 
+* Merge images
+* Optimize jobs (split into batches), figure out how to speed up matplotlib, etc.
 # Workflows
 * **Clear CHTC log, out and err files**: `./clear.sh`
 * **Train the model**: `./run.sh` or `condor_submit train_model.sub`
