@@ -8,15 +8,15 @@ import os;
 class Model(torch.nn.Module):
     def __init__(self):
         super().__init__() # Call the constructor of the parent class
-        self.conv1 = torch.nn.Conv2d(1, 32, 9)
+        self.conv1 = torch.nn.Conv2d(1, 32, 5, padding = 2)
         self.bn1 = torch.nn.BatchNorm2d(32)
         self.pool1 = torch.nn.MaxPool2d(2)
 
-        self.conv2 = torch.nn.Conv2d(32, 64, 9)
+        self.conv2 = torch.nn.Conv2d(32, 64, 5, padding = 2)
         self.bn2 = torch.nn.BatchNorm2d(64)
         self.pool2 = torch.nn.MaxPool2d(2)
 
-        self.conv3 = torch.nn.Conv2d(64, 128, 5)
+        self.conv3 = torch.nn.Conv2d(64, 128, 5, padding = 2)
         self.bn3 = torch.nn.BatchNorm2d(128)
         self.pool3 = torch.nn.MaxPool2d(2)
 
@@ -69,22 +69,54 @@ class Model(torch.nn.Module):
         self.conv7dec = torch.nn.Conv2d(32, 1, 3, padding = 1)
         # sigmoid, maybe small avg pool
 
+        self.skip_proj_conv2 = torch.nn.Conv2d(32, 64, 1)  # 32->64 channels
+        self.skip_proj_conv3 = torch.nn.Conv2d(64, 128, 1)  # 64->128 channels
+
+        # Decoder skip projections
+        self.skip_proj_conv2dec = torch.nn.Conv2d(128, 128, 1)  # channel match, spatial different
+        self.skip_proj_conv3dec = torch.nn.Conv2d(128, 128, 1)
+        self.skip_proj_conv5dec = torch.nn.Conv2d(128, 64, 1)  # spatial rescale needed
+        self.skip_proj_conv6dec = torch.nn.Conv2d(64, 32, 1)
+
 
     def forward(self, x, empty_well = False):
         b,t,_,_,_ = x.shape
         x = x.view(b*t,1,500,500)
+
         x = F.relu(self.pool1(self.bn1(self.conv1(x))))
+
+        x_skip = F.avg_pool2d(x, 2)  # match spatial dims
+        x_skip = self.skip_proj_conv2(x_skip)  # project channels: 32->64
         x = F.relu(self.pool2(self.bn2(self.conv2(x))))
+        x = x + x_skip
+
+        x_skip = F.avg_pool2d(x, 2)  # match spatial dims
+        x_skip = self.skip_proj_conv3(x_skip)  # project channels: 64->128
         x = F.relu(self.pool3(self.bn3(self.conv3(x))))
+        x = x + x_skip
+
+        x_skip = F.avg_pool2d(x, 2)  # match spatial dims
         x = F.relu(self.pool4(self.bn4(self.conv4(x))))
+        x = x + x_skip
+
+        x_skip = F.avg_pool2d(x,2)
         x = F.relu(self.pool5(self.bn5(self.conv5(x))))
+        x = x + x_skip
+
+        x_skip = F.avg_pool2d(x, 2)
         x = F.relu(self.pool6(self.bn6(self.conv6(x))))
+        x = x + x_skip
+
         x = x.view(b*t, 7 * 7 * 128)
         x = F.relu(self.linear1(x))
         x = x.view(b,t,4000)
         x,_ = self.lstm1(x); x = F.relu(x)
         x = x.reshape(b*t,4000)
+
+        x_skip = x
         x = F.relu(self.linear2(x))
+        x = x + x_skip
+
         lat_vec = x.view(b,t,4000)
         lat_vec = self.dropout(lat_vec)
         # end encoder start decoder
@@ -97,16 +129,48 @@ class Model(torch.nn.Module):
         x = x.view(b,t,4000)
         x, _ = self.lstm2(x); x = F.relu(x)
         x = x.reshape(b*t,4000)
+
+        x_skip = x
         x = F.relu(self.linear4(x))
+        if x.shape == x_skip.shape:
+            x = x + x_skip
+
         x = x.view(b*t, 128, 7, 7)
 
+        x_skip = x
         x = F.relu(F.interpolate(self.bn1dec(self.conv1dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
-                   
-        x = F.relu(F.interpolate(self.bn2dec(self.conv2dec(x)), scale_factor= 2,mode='bilinear', align_corners=True))
+        x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+        x = x + x_skip
+
+        x_skip = x
+        x = F.relu(F.interpolate(self.bn2dec(self.conv2dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
+        x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+        x_skip = self.skip_proj_conv2dec(x_skip)
+        x = x + x_skip
+
+        x_skip = x
         x = F.relu(F.interpolate(self.bn3dec(self.conv3dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
+        x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+        x_skip = self.skip_proj_conv3dec(x_skip)
+        x = x + x_skip
+
+        x_skip = x
         x = F.relu(F.interpolate(self.bn4dec(self.conv4dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
+        x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+        x = x + x_skip
+
+        x_skip = x
         x = F.relu(F.interpolate(self.bn5dec(self.conv5dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
+        x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+        x_skip = self.skip_proj_conv5dec(x_skip)
+        x = x + x_skip
+
+        x_skip = x
         x = F.relu(F.interpolate(self.bn6dec(self.conv6dec(x)), scale_factor= 2, mode='bilinear', align_corners=True))
+        x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+        x_skip = self.skip_proj_conv6dec(x_skip)
+        x = x + x_skip
+
         x = F.sigmoid(F.interpolate(self.conv7dec(x), size=(500,500), mode='bilinear', align_corners=True))
         return x.view(b,t,1,500,500),lat_vec
 
