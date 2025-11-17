@@ -16,7 +16,21 @@ torch.backends.cuda.enable_flash_sdp(False)
 torch.backends.cuda.enable_math_sdp(True)
 batch_size = 50
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+from huggingface_hub import HfApi
+import wandb
 
+hf_api = HfApi(token=os.getenv("HF_TOKEN"))
+wandb.login(key=os.getenv("WANDB_KEY")
+run = wandb.init(
+    entity="jenslundsgaard7-uw-madison",
+    project="IVF-Training",
+    config={
+        "learning_rate": 0.02,
+        "architecture": "Conv LSTM Autoencoder",
+        "dataset": "https://zenodo.org/records/7912264",
+        "epochs": 8,
+    },
+)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(DEVICE)
 
@@ -47,7 +61,7 @@ def train():
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
         for vol, _, _, _ in pbar: # fix empty well
-            vol = vol.to(DEVICE)                         # [B,T,1,128,128]
+            vol = vol.to(DEVICE)
             #print(vol.shape)
             recon, lat = model(vol) #, empty_well = empty_well)
             rec_loss = loss_fn(recon, vol)
@@ -56,10 +70,17 @@ def train():
             optimizer.zero_grad(); loss.backward(); optimizer.step()
             total += loss.item()
             pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", sm=f"{smooth.item():.4f}")
+        run.log({"lr": scheduler.get_last_lr()[0], "loss": total/len(loader)})
         scheduler.step()
         print(f"epoch {epoch} avg loss={total/len(loader):.4f}")
         torch.save(model.state_dict(), f"model_weights.pth")
-
+        hf_api.upload_file(
+            path_or_fileobj=os.path.realpath("model_weights.pth")
+            file_path="model_weights.pth",
+            repo_id="JensLundsgaard/IVF-Model",
+            repo_type="model",
+        )
+    run.finish()
 if __name__ == "__main__":
     train()
 """
