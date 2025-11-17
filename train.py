@@ -76,7 +76,7 @@ def train():
         torch.save(model.state_dict(), f"model_weights.pth")
         hf_api.upload_file(
             path_or_fileobj=os.path.realpath("model_weights.pth"),
-            file_path="model_weights.pth",
+            path_in_repo="model_weights.pth",
             repo_id="JensLundsgaard/IVF-Model",
             repo_type="model",
         )
