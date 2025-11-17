@@ -11,6 +11,7 @@
 * (note so I don't forget) If you want to connect git to github (i.e. only have access to a command line), you create a ssh key, add the public key to github, and set up remotes for the repo as `git remote add origin git@github.com:JensLundsgaard/ivf.git`. To find where git looks for the private key run `ssh -vT git@github.com`
 # TODO:
 * Upload model backups to HuggingFace with the python HuggingFace api, (will probably need to rebuild the docker image).
+* Also set up WandB for tracking loss during long training jobs.
 * Mess with the model a ton, try different activiation functions, different RNN models, different models entirely,
     * 3D Convs or attention mechanism instead of LSTM? (ask Prof Jay of course)
 * Incorporate grading\ timestamps of embryos into both model and visualization.
@@ -23,3 +24,4 @@
 * **Get model latents as csv (stored in group staging)**: `condor_submit export_latents.sub` 
 * **Get model latent csv batchs**: `condor_submit get_cell_groups.sub`
 * **Get model TPHATE plots (in group storage `ivf/plots.tar.gz`)**: `condor_submit visualize.sub`. The log files will be hidden, run `ls -a` to see them.
+
