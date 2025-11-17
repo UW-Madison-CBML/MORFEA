@@ -19,7 +19,7 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 from huggingface_hub import HfApi
 import wandb
 
-hf_api = HfApi(token=os.getenv("HF_TOKEN"))
+#hf_api = HfApi(token=os.getenv("HF_TOKEN"))
 wandb.login(key=os.getenv("WANDB_KEY"))
 run = wandb.init(
     entity="jenslundsgaard7-uw-madison",
@@ -74,12 +74,6 @@ def train():
         scheduler.step()
         print(f"epoch {epoch} avg loss={total/len(loader):.4f}")
         torch.save(model.state_dict(), f"model_weights.pth")
-        hf_api.upload_file(
-            path_or_fileobj=os.path.realpath("model_weights.pth"),
-            path_in_repo="model_weights.pth",
-            repo_id="JensLundsgaard/IVF-Model",
-            repo_type="model",
-        )
     run.finish()
 if __name__ == "__main__":
     train()
