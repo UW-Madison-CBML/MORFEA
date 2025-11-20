@@ -1,0 +1,32 @@
+
+# visualize.sub
+   
+docker_image = jenslundsgaard/tphate:latest
+universe = docker
+# Specify your executable (single binary or a script that runs several
+#  commands) and arguments to be passed to jobs. 
+#  $(Process) will be a integer number for each job, starting with "0"
+#  and increasing for the relevant number of jobs.
+executable = /bin/bash
+arguments = visualize.sh latents.csv $(cell_group) 
+	
+# Specify the name of the log, standard error, and standard output (or
+# "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
+#  queue number assigned to this set of jobs at the time of submission.
+log = .visualize_$(Cluster)_$(Process).log
+error = .visualize_$(Cluster)_$(Process).err
+output = .visualize_$(Cluster)_$(Process).out
+# Transfer our executable script
+transfer_input_files = visualize.sh, visualize.py, file:///staging/groups/bhaskar_group/ivf/latents.csv, cell_groups.txt, file:///staging/groups/bhaskar_group/ivf/plots.tar.gz
+ 
+transfer_output_remaps = "plots.tar.gz = file:///staging/groups/bhaskar_group/ivf/plots.tar.gz;"
+
+transfer_output_files = plots.tar.gz
+# Requirements (e.g., operating system) your job needs, what amount of
+# compute resources each job will need on the computer where it runs.
+request_cpus = 1
+request_memory = 80GB
+request_disk = 32GB
+
+
+queue cell_group from cell_groups.txt
