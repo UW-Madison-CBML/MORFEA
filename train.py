@@ -47,34 +47,37 @@ def train():
     else:
         torch.save(model.state_dict(), f"model_weights.pth")
     model = model.to(DEVICE)
-    #print(summary(model, input_size = (50,50,1,500,500)))
-    # encoder: convo, downsample (maxpool), convo, downsample..., flatten 
-    # rnn: lstm
-    # decoder: reshape to 2d img, upsample, convo, upsample, 
+
     loss_fn = torch.nn.MSELoss(reduction='mean')
     learning_rate = 0.05
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,weight_decay = 1e-5 )
     scheduler = CosineAnnealingLR(optimizer, T_max=8)
+
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
     loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=4, pin_memory=True)
+
     for epoch in range(8):
         model.train()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
-        for embryo_vol, empty_well_vol, sample_vol in pbar: # fix empty well
+        for embryo_vol, empty_well_vol, sample_vol in pbar:
             embryo_size = embryo_vol.shape[0]
 
             vol = np.stack([embryo_vol, sample_vol], axis = 0)
             vol = vol.to(DEVICE)
 
             empty_well_vol = empty_well_vol.to(DEVICE)
-            empty_well_recon, _ = model(empty_well_vol, empty_well=True)
             recon, lat = model(vol, empty_well = False)
+            empty_well_recon, _ = model(empty_well_vol, empty_well=True)
             rec_loss = loss_fn(recon, vol) + loss_fn(empty_well_recon, empty_well_vol)
 
             embryo_lat = lat[:embryo_size].to(DEVICE)
             sample_lat = lat[embryo_size:].to(DEVICE)
-            tcl = -1 * math.log( F.cosine_similarity(embryo_lat[1:], embryo_lat[:-1]) / F.cosine_similarity(embryo_lat, sample_lat))
+
+            embryo_lat1 = torch.stack((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), axis=0).to(DEVICE)
+            embryo_lat2 = torch.stack((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), axis=0).to(DEVICE)
+
+            tcl = -1 * math.log( F.cosine_similarity(embryo_lat1, embryo_lat2)/ F.cosine_similarity(embryo_lat, sample_lat))
             loss = rec_loss + (0.1 * tcl)
 
             optimizer.zero_grad(); loss.backward(); optimizer.step()

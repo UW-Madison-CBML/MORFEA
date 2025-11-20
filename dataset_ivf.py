@@ -1,6 +1,5 @@
 # dataset_ivf.py
 import numpy as np, pandas as pd, torch 
-# import cv2
 from torch.utils.data import Dataset
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -11,17 +10,12 @@ class IVFSequenceDataset(Dataset):
         self.norm = norm
 
     def _read_gray(self, path):
-        #img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
         img = np.array(Image.open(path), dtype = "float32")
         if img is None: 
             raise FileNotFoundError(path)
-        #img = cv2.resize(img, (self.resize, self.resize), interpolation=cv2.INTER_AREA)
-        # 輕量去雜訊（可選）
-        #img = cv2.GaussianBlur(img, (3,3), 1.0)
         return img.astype(np.float32)
 
-    def _normalize_video(self, vol):  # vol: [T,H,W]
-        # per-sequence normalization（嚴謹）
+    def _normalize_video(self, vol):
         if self.norm == "zscore":
             m, s = vol.mean(), vol.std() + 1e-6
             vol = (vol - m) / s
@@ -35,19 +29,22 @@ class IVFSequenceDataset(Dataset):
         embryo_paths = self.df.iloc[idx]["embryo_paths"].split("|")
         empty_well_paths = self.df.iloc[idx]["empty_well_paths"].split("|")
         sample_paths = self.df.iloc[idx]["sample_paths"].split("|")
-        embryo_frames = [self._read_gray(p) for p in paths]
-        vol = np.stack(frames, axis=0)  
-        vol = self._normalize_video(vol)
-        vol = vol[:,None, :, :] 
-        frames = [self._read_gray(p) for p in paths]
-        vol = np.stack(frames, axis=0)  
-        vol = self._normalize_video(vol)
-        vol = vol[:,None, :, :]        
-        frames = [self._read_gray(p) for p in paths]
-        vol = np.stack(frames, axis=0)  
-        vol = self._normalize_video(vol)
-        vol = vol[:,None, :, :]
-        return torch.from_numpy(embryo_vol), torch.from_numpy(embryo_vol),  torch.from_numpy(embryo_vol) 
+
+        embryo_frames = [self._read_gray(p) for p in embryo_paths]
+        embryo_vol = np.stack(embryo_frames, axis=0)  
+        embryo_vol = self._normalize_video(embryo_vol)
+        embryo_vol = embryo_vol[:,None, :, :] 
+
+        empty_well_frames = [self._read_gray(p) for p in empty_well_paths]
+        empty_well_vol = np.stack(empty_well_frames, axis=0)  
+        empty_well_vol = self._normalize_video(empty_well_vol)
+        empty_well_vol = empty_well_vol[:,None, :, :]        
+
+        sample_frames = [self._read_gray(p) for p in sample_paths]
+        sample_vol = np.stack(sample_frames, axis=0)  
+        sample_vol = self._normalize_video(sample_vol)
+        sample_vol = sample_vol[:,None, :, :]
+        return torch.from_numpy(embryo_vol), torch.from_numpy(empty_well_vol),  torch.from_numpy(sample_vol) 
 
     def __len__(self):
         return len(self.df)

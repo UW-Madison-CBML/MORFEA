@@ -105,19 +105,14 @@ def main():
             contains_empty = contains_empty_image(seq, empty_image)
 
             # Sample temporal contrastive frame pairs
-            sample_paths_list = []
-            for _ in range(NUM_TEMPORAL_SAMPLES):
-                if dataset_frames:
-                    sample_paths_list.append(random.choice(dataset_frames))
-
+            np.random.shuffle(dataset_frames)
             np.random.shuffle(empty_images) 
             rows.append({
                 "cell_id": cell.name,
                 "start_idx": start,
-                "embryo_paths": "|".join(str(p) for p in seq),
-                "empty_well_paths": "|".join(str(p) for p in empty_images[:50]),
-                "sample_paths": "|".join(sample_paths_list),
-                "contains_empty": contains_empty,
+                "embryo_paths": "|".join([str(p) for p in seq]),
+                "empty_well_paths": "|".join([str(p) for p in empty_images[:T]]),
+                "sample_paths": "|".join([str(p) for p in dataset_frames[:T]])
             })
 
     # Create DataFrame and save to CSV using pandas
