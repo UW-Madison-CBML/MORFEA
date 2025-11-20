@@ -43,7 +43,7 @@ def load_empty_image_paths(filepath):
         for line in f:
             line = line.strip()
             if line:
-                empty_paths.add(line)
+                empty_paths.append(line)
     return empty_paths
 
 
