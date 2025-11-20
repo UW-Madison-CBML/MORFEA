@@ -82,8 +82,6 @@ def main():
     cell_dirs = [p for p in root.iterdir() if p.is_dir()]
     rows = []
 
-    # Load known empty image paths
-    print(f"Loaded {len(empty_image_set)} known empty image paths")
     
     empty_images = load_empty_image_paths(EMPTY_IMAGE_PATHS_FILE)
     # Sample temporal contrastive frames from the dataset
