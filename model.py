@@ -53,11 +53,12 @@ class Model(torch.nn.Module):
         self.conv4dec = torch.nn.ConvTranspose2d(128, 128, 3, stride = 2)
         self.bn4dec = torch.nn.BatchNorm2d(128)
 
-        self.conv5dec = torch.nn.ConvTranspose2d(128, 64, 3, stride = 2)
-        self.bn5dec = torch.nn.BatchNorm2d(64)
+        #fix the numbers here lol 
+        self.conv6dec = torch.nn.ConvTranspose2d(128, 64, 3, stride = 2)
+        self.bn6dec = torch.nn.BatchNorm2d(64)
 
-        self.conv6dec = torch.nn.Conv2d(64, 32, 3, padding = 1)
-        self.bn6dec = torch.nn.BatchNorm2d(32)
+        self.conv7dec = torch.nn.ConvTranspose2d(64, 32, 3, stride = 2)
+        self.bn7dec = torch.nn.BatchNorm2d(32)
         
         # empty
         self.conv1dec_e = torch.nn.ConvTranspose2d(128, 128, 3, stride = 2)
@@ -71,15 +72,15 @@ class Model(torch.nn.Module):
 
         self.conv4dec_e = torch.nn.ConvTranspose2d(128, 128, 3, stride = 2)
         self.bn4dec_e = torch.nn.BatchNorm2d(128)
+        #fix the numbers here lol 
+        self.conv6dec_e = torch.nn.ConvTranspose2d(128, 64, 3, stride = 2)
+        self.bn6dec_e = torch.nn.BatchNorm2d(64)
 
-        self.conv5dec_e = torch.nn.ConvTranspose2d(128, 64, 3, stride = 2)
-        self.bn5dec_e = torch.nn.BatchNorm2d(64)
-
-        self.conv6dec_e = torch.nn.Conv2d(64, 32, 3, padding = 1)
-        self.bn6dec_e = torch.nn.BatchNorm2d(32)
+        self.conv7dec_e = torch.nn.ConvTranspose2d(64, 32, 3, stride = 2)
+        self.bn7dec_e = torch.nn.BatchNorm2d(32)
 
         # end
-        self.conv7dec = torch.nn.Conv2d(32, 1, 3, padding = 1)
+        self.conv8dec = torch.nn.Conv2d(32, 1, 3, padding = 1)
         # sigmoid, maybe small avg pool
 
         self.skip_proj_32_64 = torch.nn.Conv2d(32, 64, 1)  
@@ -98,7 +99,7 @@ class Model(torch.nn.Module):
         x = x + x_skip
 
         x_skip = F.avg_pool2d(x, 2)  
-        x_skip = self.skip_proj_conv3(x_skip)  
+        x_skip = self.skip_proj_64_128(x_skip)  
         x = F.relu(self.pool3(self.bn3(self.conv3(x))))
         x = x + x_skip
 
@@ -117,14 +118,14 @@ class Model(torch.nn.Module):
         x = x.view(-1, 128*7*7) 
 
         x = F.relu(self.linear1(x))
-        x = F.relu(self.linear2(x))
+        lat_vec = F.relu(self.linear2(x))
 
         lat_vec = self.dropout(lat_vec)
         if (empty_well):
-            x = lat_vec[:2000]
+            x = lat_vec[:,:2000]
         else:
-            x = lat_vec[2000:]
-        lat_vec = lat_vec[2000:]
+            x = lat_vec[:, 2000:]
+        lat_vec = lat_vec[:, 2000:]
         x = F.relu(self.linear3(x))
         x = F.relu(self.linear4(x))
 
@@ -132,33 +133,33 @@ class Model(torch.nn.Module):
         if(empty_well):
             x_skip = x
             x = F.relu(self.bn1dec_e(self.conv1dec_e(x)))
-            x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+            x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
 
             x_skip = x
             x = F.relu(self.bn2dec_e(self.conv2dec_e(x)))
-            x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+            x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
 
             x_skip = x
             x = F.relu(self.bn3dec_e(self.conv3dec_e(x)))
-            x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+            x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
 
             x_skip = x
             x = F.relu(self.bn4dec_e(self.conv4dec_e(x)))
-            x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+            x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
-
+            
             x_skip = x
-            x = F.relu(self.bn5dec_e(self.conv5dec_e(x)))
-            x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+            x = F.relu(self.bn6dec_e(self.conv6dec_e(x)))
+            x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x_skip = self.skip_proj_128_64(x_skip)
             x = x + x_skip
 
             x_skip = x
-            x = F.relu(self.bn6dec_e(self.conv6dec_e(x)))
-            x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+            x = F.relu(self.bn7dec_e(self.conv7dec_e(x)))
+            x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x_skip = self.skip_proj_64_32(x_skip)
             x = x + x_skip
 
@@ -166,44 +167,44 @@ class Model(torch.nn.Module):
         else:
             x_skip = x
             x = F.relu(self.bn1dec(self.conv1dec(x)))
-            x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+            x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
 
             x_skip = x
             x = F.relu(self.bn2dec(self.conv2dec(x)))
-            x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+            x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
 
             x_skip = x
             x = F.relu(self.bn3dec(self.conv3dec(x)))
-            x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+            x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
 
             x_skip = x
             x = F.relu(self.bn4dec(self.conv4dec(x)))
-            x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+            x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
-
+            
             x_skip = x
-            x = F.relu(self.bn5dec(self.conv5dec(x)))
-            x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+            x = F.relu(self.bn6dec(self.conv6dec(x)))
+            x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x_skip = self.skip_proj_128_64(x_skip)
             x = x + x_skip
 
             x_skip = x
-            x = F.relu(self.bn6dec(self.conv6dec(x)))
-            x_skip = F.interpolate(x_skip, scale_factor=2, mode='bilinear', align_corners=True)
+            x = F.relu(self.bn7dec(self.conv7dec(x)))
+            x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x_skip = self.skip_proj_64_32(x_skip)
             x = x + x_skip
 
-        x = F.sigmoid(F.interpolate(self.conv7dec(x), size=(500,500), mode='bilinear', align_corners=True))
+        x = F.sigmoid(F.interpolate(self.conv8dec(x), size=(500,500), mode='bilinear', align_corners=True))
         return x, lat_vec
 
 def main():
     model = Model()
-    print("convlstmae: ", summary(model, input_size = (1,1,1,500,500), empty_well = False))
-    #enc_model = Enc_Model(model = model)
-    #print("encoder: ", summary(enc_model, input_size = (1,1,1,500,500)))
+    print("convlstmae: ", summary(model, input_size = (1,1,500,500), empty_well = False))
+    
+    print("convlstmae empty: ", summary(model, input_size = (1,1,500,500), empty_well = True))
     if len(sys.argv) > 1:
         if os.path.exists(sys.argv[1]):
             try:
