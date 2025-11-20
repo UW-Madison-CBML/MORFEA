@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR, CosineAnnealingWarmRestarts
 import math
 from PIL import Image
@@ -15,7 +16,6 @@ torch.backends.cuda.enable_mem_efficient_sdp(False)
 torch.backends.cuda.enable_flash_sdp(False)
 torch.backends.cuda.enable_math_sdp(True)
 batch_size = 50
-import math
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 from huggingface_hub import HfApi
 import wandb
@@ -51,19 +51,24 @@ def train():
     loss_fn = torch.nn.MSELoss(reduction='mean')
     learning_rate = 0.05
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,weight_decay = 1e-5 )
-    scheduler = CosineAnnealingLR(optimizer, T_max=8)
+    scheduler = CosineAnnealingLR(optimizer, T_max=10)
 
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
     loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=4, pin_memory=True)
 
-    for epoch in range(8):
+    for epoch in range(10):
         model.train()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
         for index, (embryo_vol, empty_well_vol, sample_vol) in enumerate(pbar):
-            embryo_size = embryo_vol.shape[0]
+            embryo_vol = torch.from_numpy(embryo_vol)
+            empty_well_vol = torch.from_numpy(empty_well_vol)
+            sample_vol = torch.from_numpy(sample_vol)
 
-            vol = np.stack([embryo_vol, sample_vol], axis = 0)
+            embryo_size = embryo_vol.shape[0]
+            sample_size = sample_vol.shape[0]
+
+            vol = torch.stack((embryo_vol, sample_vol), axis = 0)
             vol = vol.to(DEVICE)
 
             empty_well_vol = empty_well_vol.to(DEVICE)
@@ -85,56 +90,13 @@ def train():
             
             if(index % 50 == 0):
                 run.log({"loss": loss})
-            pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", sm=f"{smooth.item():.4f}")
+            pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", sm=f"{tcl:.4f}")
         run.log({"lr": scheduler.get_last_lr()[0], "avg_loss": total/len(loader)})
         scheduler.step()
         print(f"epoch {epoch} avg loss={total/len(loader):.4f}")
         torch.save(model.state_dict(), f"model_weights.pth")
     run.finish()
+
 if __name__ == "__main__":
     train()
-"""
-    embryo_vids = os.listdir()
-    np.random.shuffle(embryo_vids)
-    select_amount = 1
-    embryo_vids = embryo_vids[:int(len(embryo_vids)*select_amount)]
-    for i in embryo_vids:
-        PATH = "./../model_weights.pth"
-        torch.save(model.state_dict(), PATH)
-        os.chdir("./"+i)
-
-        print(os.getcwd())
-        images = os.listdir()
-        try:
-            np.array([Image.open(img) for img in images])
-        except OSError:
-            with open('./../../bad_imgs.txt', 'w') as f:
-                f.write(i +'\n')
-            os.chdir("./..")
-            continue
-        images = natsorted(images)
-        images = [img for img in images if not os.path.isdir(img)]
-        for k in range(2 * (1+ (len(images)//batch_size)) ):
-            x = torch.tensor(np.array([Image.open(img) for img in images[
-                k*batch_size - ((k & 1) * (batch_size // 2)) : min(len(images)-1,(k+1)*batch_size - ((k & 1) * (batch_size // 2)))
-                ]]), dtype=torch.float32).reshape((-1,1,500,500)).to(device)
-            if(len(x)) == 0:
-                continue
-            y = x.clone().to(device)
-            print(x.shape)
-            y_pred = model(x)
-
-            loss = loss_fn(y_pred, y)
-            print(loss)
-            optimizer.zero_grad()
-
-            loss.backward()
-
-            optimizer.step()
-
-        os.chdir("./..")
-        print(os.getcwd())
-
-os.chdir("./..")
-"""
 
