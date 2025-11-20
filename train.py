@@ -15,6 +15,7 @@ torch.backends.cuda.enable_mem_efficient_sdp(False)
 torch.backends.cuda.enable_flash_sdp(False)
 torch.backends.cuda.enable_math_sdp(True)
 batch_size = 50
+import math
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 from huggingface_hub import HfApi
 import wandb
@@ -51,7 +52,7 @@ def train():
     # rnn: lstm
     # decoder: reshape to 2d img, upsample, convo, upsample, 
     loss_fn = torch.nn.MSELoss(reduction='mean')
-    learning_rate = 0.1
+    learning_rate = 0.05
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,weight_decay = 1e-5 )
     scheduler = CosineAnnealingLR(optimizer, T_max=8)
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
@@ -60,15 +61,25 @@ def train():
         model.train()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
-        for vol, _, _, _ in pbar: # fix empty well
+        for embryo_vol, empty_well_vol, sample_vol in pbar: # fix empty well
+            embryo_size = embryo_vol.shape[0]
+
+            vol = np.stack([embryo_vol, sample_vol], axis = 0)
             vol = vol.to(DEVICE)
-            #print(vol.shape)
-            recon, lat = model(vol) #, empty_well = empty_well)
-            rec_loss = loss_fn(recon, vol)
-            smooth = ((lat[:,1:]-lat[:,:-1])**2).mean()  # temporal smooth
-            loss = rec_loss # + 0.005 * smooth maybe add this back
+
+            empty_well_vol = empty_well_vol.to(DEVICE)
+            empty_well_recon, _ = model(empty_well_vol, empty_well=True)
+            recon, lat = model(vol, empty_well = False)
+            rec_loss = loss_fn(recon, vol) + loss_fn(empty_well_recon, empty_well_vol)
+
+            embryo_lat = lat[:embryo_size].to(DEVICE)
+            sample_lat = lat[embryo_size:].to(DEVICE)
+            tcl = -1 * math.log( F.cosine_similarity(embryo_lat[1:], embryo_lat[:-1]) / F.cosine_similarity(embryo_lat, sample_lat))
+            loss = rec_loss + (0.1 * tcl)
+
             optimizer.zero_grad(); loss.backward(); optimizer.step()
             total += loss.item()
+
             pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", sm=f"{smooth.item():.4f}")
         run.log({"lr": scheduler.get_last_lr()[0], "loss": total/len(loader)})
         scheduler.step()

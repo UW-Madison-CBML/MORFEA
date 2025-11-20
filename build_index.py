@@ -1,4 +1,4 @@
-import re, os, glob, csv
+import re, os, glob, pandas as pd
 from pathlib import Path
 from tqdm import tqdm
 from detect_empty_wells import EmptyWellDetector
