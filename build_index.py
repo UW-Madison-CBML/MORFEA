@@ -99,9 +99,6 @@ def main():
         for start in range(0, len(frames)-T+1, WINDOW_STRIDE):
             seq = frames[start:start+T]
 
-            # Check if sequence contains any known empty images
-            contains_empty = contains_empty_image(seq, empty_image)
-
             # Sample temporal contrastive frame pairs
             np.random.shuffle(dataset_frames)
             np.random.shuffle(empty_images) 

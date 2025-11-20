@@ -29,7 +29,7 @@ run = wandb.init(
         "learning_rate": 0.02,
         "architecture": "Conv LSTM Autoencoder",
         "dataset": "https://zenodo.org/records/7912264",
-        "epochs": 8,
+        "epochs": 10,
     },
 )
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -60,7 +60,7 @@ def train():
         model.train()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
-        for embryo_vol, empty_well_vol, sample_vol in pbar:
+        for index, (embryo_vol, empty_well_vol, sample_vol) in enumerate(pbar):
             embryo_size = embryo_vol.shape[0]
 
             vol = np.stack([embryo_vol, sample_vol], axis = 0)
@@ -82,9 +82,11 @@ def train():
 
             optimizer.zero_grad(); loss.backward(); optimizer.step()
             total += loss.item()
-
+            
+            if(index % 50 == 0):
+                run.log({"loss": loss})
             pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", sm=f"{smooth.item():.4f}")
-        run.log({"lr": scheduler.get_last_lr()[0], "loss": total/len(loader)})
+        run.log({"lr": scheduler.get_last_lr()[0], "avg_loss": total/len(loader)})
         scheduler.step()
         print(f"epoch {epoch} avg loss={total/len(loader):.4f}")
         torch.save(model.state_dict(), f"model_weights.pth")
