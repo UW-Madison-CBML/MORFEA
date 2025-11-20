@@ -1,0 +1,44 @@
+# CHTC H200 Training Submit File
+
+executable = run_train.sh
+arguments  =
+
+log    = logs/train_$(Cluster)_$(Process).log
+output = logs/train_$(Cluster)_$(Process).out
+error  = logs/train_$(Cluster)_$(Process).err
+
+# Transfer necessary files
+transfer_input_files = \
+    run_train.sh, \
+    train.py, \
+    model.py, \
+    conv_lstm.py, \
+    losses.py, \
+    dataset_ivf.py, \
+    build_index.py, \
+    verify_data_connection.py
+
+# GPU job hints
++WantGPULab = true
++GPUJobLength = "short"
+gpus_minimum_capability = 7.0
+
+# Project
++ProjectName = "UWMadison_BME_Bhaskar"
+
+# Container
++SingularityImage = "docker://pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime"
+
+request_gpus   = 1
+request_cpus   = 2
+request_memory = 16GB
+request_disk   = 30GB
+
+# H200 only
+Requirements = regexp("H200", TARGET.CUDADeviceName)
+
+# File transfer behavior
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT_OR_EVICT
+
+queue 1
