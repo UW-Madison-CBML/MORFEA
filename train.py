@@ -61,12 +61,14 @@ def train():
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
         for index, (embryo_vol, empty_well_vol, sample_vol) in enumerate(pbar):
+            embryo_vol = embryo_vol.view(-1,1,500,500)
+            empty_well_vol = empty_well_vol.view(-1,1,500,500)
+            sample_vol = sample_vol.view(-1,1,500,500)
+
             embryo_size = embryo_vol.shape[0]
             sample_size = sample_vol.shape[0]
 
-            vol = torch.cat((embryo_vol, sample_vol))
-            vol = vol.to(DEVICE)
-
+            vol = torch.cat((embryo_vol, sample_vol), 0).to(DEVICE)
             empty_well_vol = empty_well_vol.to(DEVICE)
             recon, lat = model(vol, empty_well = False)
             empty_well_recon, _ = model(empty_well_vol, empty_well=True)
