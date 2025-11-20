@@ -32,12 +32,22 @@ class IVFSequenceDataset(Dataset):
         return vol
 
     def __getitem__(self, idx):
-        paths = self.df.iloc[idx]["paths"].split("|")
-        frames = [self._read_gray(p) for p in paths]
-        vol = np.stack(frames, axis=0)  # [T,H,W]
+        embryo_paths = self.df.iloc[idx]["embryo_paths"].split("|")
+        empty_well_paths = self.df.iloc[idx]["empty_well_paths"].split("|")
+        sample_paths = self.df.iloc[idx]["sample_paths"].split("|")
+        embryo_frames = [self._read_gray(p) for p in paths]
+        vol = np.stack(frames, axis=0)  
         vol = self._normalize_video(vol)
-        vol = vol[:,None, :, :]        # [T,1,128,128]
-        return torch.from_numpy(vol), self.df.iloc[idx]["cell_id"], self.df.iloc[idx]["empty_well"], self.df.iloc[idx]["start_idx"]
+        vol = vol[:,None, :, :] 
+        frames = [self._read_gray(p) for p in paths]
+        vol = np.stack(frames, axis=0)  
+        vol = self._normalize_video(vol)
+        vol = vol[:,None, :, :]        
+        frames = [self._read_gray(p) for p in paths]
+        vol = np.stack(frames, axis=0)  
+        vol = self._normalize_video(vol)
+        vol = vol[:,None, :, :]
+        return torch.from_numpy(embryo_vol), torch.from_numpy(embryo_vol),  torch.from_numpy(embryo_vol) 
 
     def __len__(self):
         return len(self.df)
