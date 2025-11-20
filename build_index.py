@@ -122,8 +122,6 @@ def main():
     print(f"\nDataset summary:")
     print(f"  Wrote {OUT_CSV} with {len(df)} sequences")
     print(f"  Columns: {list(df.columns)}")
-    print(f"  Contains empty: {df['contains_empty'].sum()} sequences")
-    print(f"  Clean sequences: {(~df['contains_empty']).sum()} sequences")
 
 if __name__ == "__main__":
     main()
