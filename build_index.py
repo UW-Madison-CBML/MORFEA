@@ -1,28 +1,26 @@
 import re, os, glob, pandas as pd
+import numpy as np
+import random
 from pathlib import Path
 from tqdm import tqdm
-from detect_empty_wells import EmptyWellDetector
 
-DATASET_ROOT = "./embryo_dataset"  # ← 改這裡
+DATASET_ROOT = "./embryo_dataset"
 OUT_CSV = "index.csv"
-T = 50                 # 序列長度（幀）
-WINDOW_STRIDE = T//2   # 50% 重疊
-DETECT_EMPTY_WELLS = True  # Enable empty well detection
-EMPTY_WELL_THRESHOLD = 0.75  # Probability threshold for empty classification
-EMPTY_WELL_MODEL = None    # Path to trained model (optional)
+T = 50                 # Sequence length (frames)
+WINDOW_STRIDE = T//2   # 50% overlap
+EMPTY_IMAGE_PATHS_FILE = "empty_images.txt"
+NUM_TEMPORAL_SAMPLES = 2   # Number of temporal contrastive pairs per sequence
+TEMPORAL_DISTANCES = [1, 5, 10, 20]  # Frame distances for temporal sampling
 
 run_pat = re.compile(r'RUN[_\- ]?(\d+)', re.I)
 num_pat = re.compile(r'(\d+)')
 
 def parse_sort_key(p: Path):
     name = p.name
-    # 取 RUN 編號
     run_m = run_pat.search(name)
-    run_idx = int(run_m.group(1)) if run_m else 10**9  # 沒有 RUN 放最後
-    # 2) 檔名裡所有數字
+    run_idx = int(run_m.group(1)) if run_m else 10**9  
     nums = [int(x) for x in num_pat.findall(name)]
     nums = tuple(nums) if nums else ()
-    # 3) 檔案修改時間（奈秒）
     mtime = p.stat().st_mtime_ns
     return (run_idx, nums, mtime)
 
@@ -35,55 +33,102 @@ def list_frames(cell_dir: Path):
     frames.sort(key=parse_sort_key)
     return frames
 
+def load_empty_image_paths(filepath):
+    """Load known empty image paths from a text file."""
+    if not filepath or not os.path.exists(filepath):
+        return []
+
+    empty_paths = []
+    with open(filepath, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                empty_paths.add(line)
+    return empty_paths
+
+
+def contains_empty_image(frame_paths, empty_image_set):
+    """Check if any frame in the sequence is in the empty image set."""
+    for frame_path in frame_paths:
+        if str(frame_path) in empty_image_set:
+            return True
+    return False
+
+
+def sample_frames_from_dataset(root_path, num_samples=100):
+    """Randomly sample frame paths from the entire dataset using os.walk()."""
+    all_frames = []
+    exts = ("*.jpg", "*.jpeg", "*.png", "*.JPG", "*.JPEG", "*.PNG")
+
+    for dirpath, dirnames, filenames in os.walk(root_path):
+        for ext in exts:
+            pattern = os.path.join(dirpath, ext)
+            frames = glob.glob(pattern)
+            all_frames.extend(frames)
+
+    if not all_frames:
+        return []
+
+    # Filter for non-empty files
+    all_frames = [p for p in all_frames if os.path.exists(p) and os.path.getsize(p) > 0]
+
+    # Sample randomly
+    sample_size = min(num_samples, len(all_frames))
+    return random.sample(all_frames, sample_size)
+
+
 def main():
     root = Path(DATASET_ROOT)
     cell_dirs = [p for p in root.iterdir() if p.is_dir()]
     rows = []
 
-    # Initialize empty well detector if enabled
-    detector = None
-    if DETECT_EMPTY_WELLS:
-        detector = EmptyWellDetector(model_path=EMPTY_WELL_MODEL)
+    # Load known empty image paths
+    print(f"Loaded {len(empty_image_set)} known empty image paths")
+    
+    empty_images = load_empty_image_paths(EMPTY_IMAGE_PATHS_FILE)
+    # Sample temporal contrastive frames from the dataset
+    print(f"Sampling frames for temporal contrastive learning...")
+    dataset_frames = sample_frames_from_dataset(DATASET_ROOT, num_samples=5000)
+    print(f"Found {len(dataset_frames)} total frames in dataset")
 
     for cell in tqdm(sorted(cell_dirs, key=lambda x: x.name)):
         frames = list_frames(cell)
         if not frames:
             continue
-        # 下採樣（時間）
         if len(frames) < T:
             continue
 
-        # Detect empty well status (cache per sequence since frames are same)
-        empty_well = False
-        
-        # 滑動視窗
         for start in range(0, len(frames)-T+1, WINDOW_STRIDE):
             seq = frames[start:start+T]
-            if detector and frames:
-                try:
-                    # Use first frame to determine if well is empty
-                    prob = min(detector.predict(seq[0]), detector.predict(seq[T//2]),detector.predict(seq[T-1]))
-                    empty_well = prob >= EMPTY_WELL_THRESHOLD
-                except Exception as e:
-                    print(f"Warning: empty well detection failed for {cell.name}: {e}")
-                    empty_well = False
+
+            # Check if sequence contains any known empty images
+            contains_empty = contains_empty_image(seq, empty_image)
+
+            # Sample temporal contrastive frame pairs
+            sample_paths_list = []
+            for _ in range(NUM_TEMPORAL_SAMPLES):
+                if dataset_frames:
+                    sample_paths_list.append(random.choice(dataset_frames))
+
+            np.random.shuffle(empty_images) 
             rows.append({
                 "cell_id": cell.name,
                 "start_idx": start,
-                "paths": "|".join(str(p) for p in seq),
-                "empty_well": empty_well,
+                "embryo_paths": "|".join(str(p) for p in seq),
+                "empty_well_paths": "|".join(str(p) for p in empty_images[:50]),
+                "sample_paths": "|".join(sample_paths_list),
+                "contains_empty": contains_empty,
             })
-    # 輸出 CSV
-    with open(OUT_CSV, "w", newline="") as f:
-        fieldnames = ["cell_id", "start_idx", "paths", "empty_well"] if DETECT_EMPTY_WELLS else ["cell_id", "start_idx", "paths"]
-        w = csv.DictWriter(f, fieldnames=fieldnames)
-        w.writeheader()
-        for r in rows: w.writerow(r)
-    print(f"wrote {OUT_CSV} with {len(rows)} sequences")
 
-    if DETECT_EMPTY_WELLS:
-        num_empty = sum(1 for r in rows if r.get("empty_well", False))
-        print(f"Empty wells: {num_empty}/{len(rows)} ({100*num_empty/len(rows):.1f}%)")
+    # Create DataFrame and save to CSV using pandas
+    df = pd.DataFrame(rows)
+    df.to_csv(OUT_CSV, index=False)
+
+    print(f"\nDataset summary:")
+    print(f"  Wrote {OUT_CSV} with {len(df)} sequences")
+    print(f"  Columns: {list(df.columns)}")
+    print(f"  Contains empty: {df['contains_empty'].sum()} sequences")
+    print(f"  Clean sequences: {(~df['contains_empty']).sum()} sequences")
 
 if __name__ == "__main__":
     main()

@@ -17,17 +17,12 @@ when_to_transfer_output = ON_EXIT
 Requirements = (Target.HasCHTCStaging == true)
 
 # Transfer necessary files
-transfer_input_files = detect_empty_wells.sh, detect_empty_wells.py, build_index.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz
+transfer_input_files = detect_empty_wells.sh, detect_empty_wells.py, build_index.py, empty_images.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz
 
 # Output remaps to staging area
 transfer_output_remaps = "index.csv = file:///staging/groups/bhaskar_group/ivf/index.csv"
 transfer_output_files = index.csv
 
-# GPU requirements
-+WantGPULab = true
-+GPUJobLength = "short"
-gpus_minimum_capability = 7.0
-request_gpus = 4
 
 # Compute resources
 request_cpus = 4
