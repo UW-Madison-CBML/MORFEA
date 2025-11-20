@@ -3,28 +3,22 @@
 docker_image = jenslundsgaard/ivf-training:latest
 universe = docker
 
-# Script that runs the detection
 shell = ./detect_empty_wells.sh
 
-# Log files
 log = detect_empty_wells_$(Cluster)_$(Process).log
 error = detect_empty_wells_$(Cluster)_$(Process).err
 output = detect_empty_wells_$(Cluster)_$(Process).out
 
-# File transfer settings
 should_transfer_files = YES
 when_to_transfer_output = ON_EXIT
 Requirements = (Target.HasCHTCStaging == true)
 
-# Transfer necessary files
 transfer_input_files = detect_empty_wells.sh, detect_empty_wells.py, build_index.py, empty_images.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz
 
-# Output remaps to staging area
 transfer_output_remaps = "index.csv = file:///staging/groups/bhaskar_group/ivf/index.csv"
 transfer_output_files = index.csv
 
 
-# Compute resources
 request_cpus = 4
 request_memory = 32GB
 request_disk = 80GB
