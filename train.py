@@ -12,6 +12,7 @@ import sys
 from torch.utils.data import DataLoader
 from dataset_ivf import IVFSequenceDataset
 from tqdm import tqdm
+from torch.cuda.amp import autocast, GradScaler
 torch.backends.cuda.enable_mem_efficient_sdp(False)
 torch.backends.cuda.enable_flash_sdp(False)
 torch.backends.cuda.enable_math_sdp(True)
@@ -47,7 +48,7 @@ def train():
         except Exception:
             torch.save(model.state_dict(), f"model_weights.pth")
             print("model has wrong shape")
-            #return 
+            #return
     else:
         torch.save(model.state_dict(), f"model_weights.pth")
     model = model.to(DEVICE)
@@ -56,6 +57,7 @@ def train():
     learning_rate = 0.05
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,weight_decay = 1e-5 )
     scheduler = CosineAnnealingLR(optimizer, T_max=10)
+    scaler = GradScaler()
 
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
     loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=4, pin_memory=True) # keep batch size at 1 bcs of how it's loaded, the embryo_vol needs to be time sequential from a single embryo in order for temp. cont. loss to work.
@@ -77,20 +79,25 @@ def train():
 
             vol = torch.cat((embryo_vol, sample_vol), 0).to(DEVICE)
             empty_well_vol = empty_well_vol.to(DEVICE)
-            recon, lat = model(vol, empty_well = False)
-            empty_well_recon, _ = model(empty_well_vol, empty_well=True)
-            rec_loss = loss_fn(recon, vol) + loss_fn(empty_well_recon, empty_well_vol)
 
-            embryo_lat = lat[:embryo_size].to(DEVICE)
-            sample_lat = lat[embryo_size:].to(DEVICE)
+            optimizer.zero_grad()
+            with autocast(dtype=torch.float16):
+                recon, lat = model(vol, empty_well = False)
+                empty_well_recon, _ = model(empty_well_vol, empty_well=True)
+                rec_loss = loss_fn(recon, vol) + loss_fn(empty_well_recon, empty_well_vol)
 
-            embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0).to(DEVICE)
-            embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0).to(DEVICE)
+                embryo_lat = lat[:embryo_size].to(DEVICE)
+                sample_lat = lat[embryo_size:].to(DEVICE)
 
-            tcl = -1 * math.log( torch.sum(F.cosine_similarity(embryo_lat1, embryo_lat2))/ torch.sum(F.cosine_similarity(embryo_lat, sample_lat)))
-            loss = rec_loss + (0.1 * tcl)
+                embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0).to(DEVICE)
+                embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0).to(DEVICE)
 
-            optimizer.zero_grad(); loss.backward(); optimizer.step()
+                tcl = -1 * math.log( torch.sum(F.cosine_similarity(embryo_lat1, embryo_lat2))/ torch.sum(F.cosine_similarity(embryo_lat, sample_lat)))
+                loss = rec_loss + (0.1 * tcl)
+
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
             total += loss.item()
             
             if(index % 50 == 0):
