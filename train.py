@@ -77,10 +77,10 @@ def train():
             embryo_lat = lat[:embryo_size].to(DEVICE)
             sample_lat = lat[embryo_size:].to(DEVICE)
 
-            embryo_lat1 = torch.stack((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), axis=0).to(DEVICE)
-            embryo_lat2 = torch.stack((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), axis=0).to(DEVICE)
+            embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0).to(DEVICE)
+            embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0).to(DEVICE)
 
-            tcl = -1 * math.log( F.cosine_similarity(embryo_lat1, embryo_lat2)/ F.cosine_similarity(embryo_lat, sample_lat))
+            tcl = -1 * math.log( torch.sum(F.cosine_similarity(embryo_lat1, embryo_lat2))/ torch.sum(F.cosine_similarity(embryo_lat, sample_lat)))
             loss = rec_loss + (0.1 * tcl)
 
             optimizer.zero_grad(); loss.backward(); optimizer.step()
