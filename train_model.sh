@@ -6,6 +6,7 @@ WANDB_KEY=$(tail -n 1 api_keys.txt)
 export WANDB_KEY=$WANDB_KEY
 tar -zxf embryo_dataset.tar.gz
 
+python build_index.py
 python train.py 
 
 rm -r embryo_dataset
