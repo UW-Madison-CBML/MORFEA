@@ -32,7 +32,9 @@ run = wandb.init(
         "epochs": 10,
     },
 )
+torch.cuda.memory_summary(device=None, abbreviated=False)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+torch.cuda.empty_cache()
 print(DEVICE)
 
 def train():
@@ -54,7 +56,7 @@ def train():
     scheduler = CosineAnnealingLR(optimizer, T_max=10)
 
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
-    loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=4, pin_memory=True)
+    loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=4, pin_memory=True) # keep batch size at 1 bcs of how it's loaded, the embryo_vol needs to be time sequential from a single embryo in order for temp. cont. loss to work.
 
     for epoch in range(10):
         model.train()
