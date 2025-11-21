@@ -26,9 +26,15 @@ class IVFSequenceDataset(Dataset):
         return vol
 
     def __getitem__(self, idx):
-        embryo_paths = self.df.iloc[idx]["embryo_paths"].split("|")
-        empty_well_paths = self.df.iloc[idx]["empty_well_paths"].split("|")
-        sample_paths = self.df.iloc[idx]["sample_paths"].split("|")
+        row = self.df.iloc[idx]
+        if pd.isna(row["embryo_paths"]) or pd.isna(row["empty_well_paths"]) or pd.isna(row["sample_paths"]):
+            #raise ValueError(f"Row {idx} has missing path data")
+            print(f"Row {idx} has missing path data: ", row.to_string(index = False))
+            return torch.tensor([]), torch.tensor([]), torch.tensor([])           
+
+        embryo_paths = row["embryo_paths"].split("|")
+        empty_well_paths = row["empty_well_paths"].split("|")
+        sample_paths = row["sample_paths"].split("|")
 
         embryo_frames = [self._read_gray(p) for p in embryo_paths]
         embryo_vol = np.stack(embryo_frames, axis=0)  
