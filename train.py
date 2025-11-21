@@ -19,6 +19,8 @@ batch_size = 50
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 from huggingface_hub import HfApi
 import wandb
+import gc
+gc.collect()
 
 #hf_api = HfApi(token=os.getenv("HF_TOKEN"))
 wandb.login(key=os.getenv("WANDB_KEY"))
@@ -32,7 +34,7 @@ run = wandb.init(
         "epochs": 10,
     },
 )
-torch.cuda.memory_summary(device=None, abbreviated=False)
+print(torch.cuda.memory_summary(device=None, abbreviated=False))
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.cuda.empty_cache()
 print(DEVICE)
@@ -68,6 +70,7 @@ def train():
             sample_vol = sample_vol.view(-1,1,500,500)
 
             embryo_size = embryo_vol.shape[0]
+            embryo_size = embryo_vol.shape[0]
             sample_size = sample_vol.shape[0]
 
             vol = torch.cat((embryo_vol, sample_vol), 0).to(DEVICE)
@@ -91,12 +94,29 @@ def train():
             if(index % 50 == 0):
                 run.log({"loss": loss})
             pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", sm=f"{tcl:.4f}")
+
+            del embryo_vol 
+            del embryo_vol 
+            del empty_well_vol 
+            del sample_vol 
+            del vol 
+            del empty_well_vol 
+            del recon, lat 
+            del empty_well_recon,
+            del embryo_lat 
+            del sample_lat 
+            del embryo_lat1 
+            del embryo_lat2 
+            torch.cuda.empty_cache()
+
         run.log({"lr": scheduler.get_last_lr()[0], "avg_loss": total/len(loader)})
         scheduler.step()
         print(f"epoch {epoch} avg loss={total/len(loader):.4f}")
         torch.save(model.state_dict(), f"model_weights.pth")
     run.finish()
-
+    del model
+    gc.collect()
+    torch.cuda.empty_cache()
 if __name__ == "__main__":
     train()
 
