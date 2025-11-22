@@ -93,7 +93,7 @@ def train():
             embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0).to(DEVICE)
             embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0).to(DEVICE)
 
-            tcl = -1 * math.log( (F.cosine_similarity(embryo_lat1, embryo_lat2).mean()/ F.cosine_similarity(embryo_lat, sample_lat).mean() ) + 0.005)
+            tcl = -1 * torch.log( (F.cosine_similarity(embryo_lat1, embryo_lat2).mean()/ F.cosine_similarity(embryo_lat, sample_lat).mean() ) + 0.005)
             loss = rec_loss + (0.1 * tcl)
 
             optimizer.zero_grad()
@@ -103,7 +103,7 @@ def train():
             
             if(index % 50 == 0):
                 run.log({"loss": loss})
-            pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", sm=f"{tcl:.4f}")
+            pbar.set_postfix(loss=f"{loss.item():.4f}", rec=f"{rec_loss.item():.4f}", tcl=f"{tcl:.4f}")
 
             del embryo_vol 
             del empty_well_vol 
