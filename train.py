@@ -81,26 +81,24 @@ def train():
 
             vol = torch.cat((embryo_vol, sample_vol), 0).to(DEVICE)
             empty_well_vol = empty_well_vol.to(DEVICE)
+            
+         
+            recon, lat = model(vol, empty_well = False)
+            empty_well_recon, _ = model(empty_well_vol, empty_well=True)
+            rec_loss = loss_fn(recon, vol) + loss_fn(empty_well_recon, empty_well_vol)
+
+            embryo_lat = lat[:embryo_size].to(DEVICE)
+            sample_lat = lat[embryo_size:].to(DEVICE)
+
+            embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0).to(DEVICE)
+            embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0).to(DEVICE)
+
+            tcl = -1 * math.log( (F.cosine_similarity(embryo_lat1, embryo_lat2).mean()/ F.cosine_similarity(embryo_lat, sample_lat).mean() ) + 0.005)
+            loss = rec_loss + (0.1 * tcl)
 
             optimizer.zero_grad()
-         
-            with autocast(dtype=torch.float16):
-                recon, lat = model(vol, empty_well = False)
-                empty_well_recon, _ = model(empty_well_vol, empty_well=True)
-                rec_loss = loss_fn(recon, vol) + loss_fn(empty_well_recon, empty_well_vol)
-
-                embryo_lat = lat[:embryo_size].to(DEVICE)
-                sample_lat = lat[embryo_size:].to(DEVICE)
-
-                embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0).to(DEVICE)
-                embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0).to(DEVICE)
-
-                tcl = -1 * math.log( torch.sum(F.cosine_similarity(embryo_lat1, embryo_lat2))/ torch.sum(F.cosine_similarity(embryo_lat, sample_lat)))
-                loss = rec_loss + (0.1 * tcl)
-
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+            loss.backward()
+            optimizer.step()
             total += loss.item()
             
             if(index % 50 == 0):
