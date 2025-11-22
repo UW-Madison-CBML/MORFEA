@@ -69,6 +69,8 @@ def train():
         for index, (embryo_vol, empty_well_vol, sample_vol) in enumerate(pbar):
             if(embryo_vol.numel() == 0 or empty_well_vol.numel() == 0 or sample_vol.numel() == 0):
                 continue
+            elif(index % 100 == 0):
+                print("training")
             embryo_vol = embryo_vol.view(-1,1,500,500)
             empty_well_vol = empty_well_vol.view(-1,1,500,500)
             sample_vol = sample_vol.view(-1,1,500,500)
@@ -108,7 +110,6 @@ def train():
             del empty_well_vol 
             del sample_vol 
             del vol 
-            del empty_well_vol 
             del recon
             del lat 
             del empty_well_recon
