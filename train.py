@@ -71,6 +71,10 @@ def train():
                 continue
             elif(index % 100 == 0):
                 print("training")
+
+
+            optimizer.zero_grad()
+
             embryo_vol = embryo_vol.view(-1,1,500,500)
             empty_well_vol = empty_well_vol.view(-1,1,500,500)
             sample_vol = sample_vol.view(-1,1,500,500)
@@ -96,8 +100,8 @@ def train():
             tcl = -1 * torch.log( (F.cosine_similarity(embryo_lat1, embryo_lat2).mean()/ F.cosine_similarity(embryo_lat, sample_lat).mean() ) + 0.005)
             loss = rec_loss + (0.1 * tcl)
 
-            optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
             optimizer.step()
             total += loss.item()
             
