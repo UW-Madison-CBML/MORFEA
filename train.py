@@ -83,6 +83,7 @@ def train():
             empty_well_vol = empty_well_vol.to(DEVICE)
 
             optimizer.zero_grad()
+         
             with autocast(dtype=torch.float16):
                 recon, lat = model(vol, empty_well = False)
                 empty_well_recon, _ = model(empty_well_vol, empty_well=True)
