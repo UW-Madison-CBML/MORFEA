@@ -39,6 +39,7 @@ print(torch.cuda.memory_summary(device=None, abbreviated=False))
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.cuda.empty_cache()
 print(DEVICE)
+torch.autograd.detect_anomaly(True)
 
 def train():
     model = Model()
@@ -54,24 +55,19 @@ def train():
     model = model.to(DEVICE)
 
     loss_fn = torch.nn.MSELoss(reduction='mean')
-    learning_rate = 0.05
+    learning_rate = 0.005
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,weight_decay = 1e-5 )
     scheduler = CosineAnnealingLR(optimizer, T_max=10)
     scaler = GradScaler()
 
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
-    loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=4, pin_memory=True) # keep batch size at 1 bcs of how it's loaded, the embryo_vol needs to be time sequential from a single embryo in order for temp. cont. loss to work.
+    loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=16, pin_memory=True) # keep batch size at 1 bcs of how it's loaded, the embryo_vol needs to be time sequential from a single embryo in order for temp. cont. loss to work.
 
     for epoch in range(10):
         model.train()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
         for index, (embryo_vol, empty_well_vol, sample_vol) in enumerate(pbar):
-            if(embryo_vol.numel() == 0 or empty_well_vol.numel() == 0 or sample_vol.numel() == 0):
-                continue
-            elif(index % 100 == 0):
-                print("training")
-
 
             optimizer.zero_grad()
 
