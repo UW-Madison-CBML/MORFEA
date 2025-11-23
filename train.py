@@ -92,6 +92,11 @@ def train():
 
             embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0).to(DEVICE)
             embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0).to(DEVICE)
+            embryo_lat1.requires_grad_()
+            embryo_lat2.requires_grad_()
+
+            embryo_lat.requires_grad_()
+            sample_lat.requires_grad_()
 
             tcl = -1 * torch.log( (F.cosine_similarity(embryo_lat1, embryo_lat2).mean()/ F.cosine_similarity(embryo_lat, sample_lat).mean() ) + 0.005)
             loss = rec_loss + (0.1 * tcl)
