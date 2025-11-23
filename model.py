@@ -131,33 +131,33 @@ class Model(torch.nn.Module):
 
         x = x.view(-1, 128, 7, 7)
         if(empty_well):
-            x_skip = x
+            x_skip = x.clone()
             x = F.relu(self.bn1dec_e(self.conv1dec_e(x)))
             x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
 
-            x_skip = x
+            x_skip = x.clone()
             x = F.relu(self.bn2dec_e(self.conv2dec_e(x)))
             x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
 
-            x_skip = x
+            x_skip = x.clone()
             x = F.relu(self.bn3dec_e(self.conv3dec_e(x)))
             x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
 
-            x_skip = x
+            x_skip = x.clone()
             x = F.relu(self.bn4dec_e(self.conv4dec_e(x)))
             x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
             
-            x_skip = x
+            x_skip = x.clone()
             x = F.relu(self.bn6dec_e(self.conv6dec_e(x)))
             x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x_skip = self.skip_proj_128_64(x_skip)
             x = x + x_skip
 
-            x_skip = x
+            x_skip = x.clone()
             x = F.relu(self.bn7dec_e(self.conv7dec_e(x)))
             x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x_skip = self.skip_proj_64_32(x_skip)
@@ -165,33 +165,33 @@ class Model(torch.nn.Module):
 
 
         else:
-            x_skip = x
+            x_skip = x.clone()
             x = F.relu(self.bn1dec(self.conv1dec(x)))
             x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
 
-            x_skip = x
+            x_skip = x.clone()
             x = F.relu(self.bn2dec(self.conv2dec(x)))
             x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
 
-            x_skip = x
+            x_skip = x.clone()
             x = F.relu(self.bn3dec(self.conv3dec(x)))
             x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
 
-            x_skip = x
+            x_skip = x.clone()
             x = F.relu(self.bn4dec(self.conv4dec(x)))
             x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x = x + x_skip
             
-            x_skip = x
+            x_skip = x.clone() 
             x = F.relu(self.bn6dec(self.conv6dec(x)))
             x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x_skip = self.skip_proj_128_64(x_skip)
             x = x + x_skip
 
-            x_skip = x
+            x_skip = x.clone()
             x = F.relu(self.bn7dec(self.conv7dec(x)))
             x_skip = F.interpolate(x_skip, size = x.shape[-2:], mode='bilinear', align_corners=True)
             x_skip = self.skip_proj_64_32(x_skip)
