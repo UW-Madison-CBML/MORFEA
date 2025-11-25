@@ -52,10 +52,45 @@ def plot_cell_trajectory_circle(cell_id, tphate_data, time_steps, output_dir="pl
     fig, ax = plt.subplots(figsize=(10, 8))
     print("making plots with ", str(tphate_data.shape), " shape")
     ax.plot(tphate_data[:, 0], tphate_data[:, 1], 'k-', alpha=0.3, linewidth=1.5)
-    
-    curvature = np.abs(np.gradient(np.gradient(tphate_data[:, 1], tphate_data[:, 0]),  tphate_data[:, 0]))
 
-    norm_curvature = (curvature - np.min(curvature)) / (np.max(curvature) - np.min(curvature))
+    # Calculate Menger curvature using three consecutive points
+    # For points p1, p2, p3: κ = 2 * Area(triangle) / (|p1-p2| * |p2-p3| * |p3-p1|)
+    n_points = len(tphate_data)
+    curvature = np.zeros(n_points)
+
+    for i in range(1, n_points - 1):
+        p1 = tphate_data[i - 1]
+        p2 = tphate_data[i]
+        p3 = tphate_data[i + 1]
+
+        # Calculate distances between points
+        d12 = np.linalg.norm(p2 - p1)
+        d23 = np.linalg.norm(p3 - p2)
+        d31 = np.linalg.norm(p1 - p3)
+
+        # Calculate area using cross product (2D: just the z-component magnitude)
+        v1 = p2 - p1
+        v2 = p3 - p1
+        area = 0.5 * np.abs(v1[0] * v2[1] - v1[1] * v2[0])
+
+        # Menger curvature formula
+        denominator = d12 * d23 * d31
+        if denominator > 1e-10:  # Avoid division by zero
+            curvature[i] = 2.0 * area / denominator
+        else:
+            curvature[i] = 0.0
+
+    # Handle boundary points (use neighboring curvature)
+    curvature[0] = curvature[1]
+    curvature[-1] = curvature[-2]
+
+    # Normalize curvature for color mapping
+    curvature_range = np.max(curvature) - np.min(curvature)
+    if curvature_range > 1e-10:
+        norm_curvature = (curvature - np.min(curvature)) / curvature_range
+    else:
+        norm_curvature = np.zeros_like(curvature)
+
     colors = plt.cm.jet(norm_curvature)
     scatter = ax.scatter(tphate_data[:, 0], tphate_data[:, 1],
                          c=colors, alpha=0.8, s=50,
