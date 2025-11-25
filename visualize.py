@@ -13,12 +13,16 @@
 
 import sys
 import os
+import warnings
 import tphate
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 import argparse
+
+# Suppress statsmodels warnings from TPHATE's autocorrelation calculations
+warnings.filterwarnings('ignore', message='invalid value encountered in divide', category=RuntimeWarning)
 
 
 def load_latents(csv_file):
@@ -54,7 +58,7 @@ def plot_cell_trajectory_circle(cell_id, tphate_data, time_steps, output_dir="pl
     norm_curvature = (curvature - np.min(curvature)) / (np.max(curvature) - np.min(curvature))
     colors = plt.cm.jet(norm_curvature)
     scatter = ax.scatter(tphate_data[:, 0], tphate_data[:, 1],
-                         c=colors, cmap='viridis', alpha=0.8, s=50,
+                         c=colors, alpha=0.8, s=50,
                          edgecolors='black', linewidth=0.5, zorder=5)
 
     ax.plot(tphate_data[0, 0], tphate_data[0, 1], 'go', markersize=12, label='Start', zorder=6)
