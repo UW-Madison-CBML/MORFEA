@@ -18,16 +18,23 @@ def main():
         except Exception:
             #torch.save(model.state_dict(), f"model_weights.pth")
             print("model has wrong shape")
-            return 
+            return
     model = model.to(DEVICE)
-    for vol, x, _, _ in loader:
+    for idx, (embryo_vol, empty_well_vol, sample_vol) in enumerate(loader):
         model.eval()
-        vol = vol.to(DEVICE)
-        recon, _ = model(vol)
-        vol = vol[-1,-1,-1].cpu().detach().numpy() * 255
-        recon = recon[-1,-1,-1].cpu().detach().numpy() * 255
-        comparison = np.concatenate((vol, recon), axis=1).astype(np.uint8)
-        plt.imsave("./imgs/"+str(x[0])+".png", comparison, cmap='gray') 
+
+        # Get cell_id from dataframe for filename
+        row = ds.df.iloc[idx]
+        cell_id = row.get("cell_id", f"cell_{idx}")
+
+        # Reshape embryo volume like in training
+        embryo_vol = embryo_vol.view(-1, 1, 500, 500).to(DEVICE)
+
+        recon, _ = model(embryo_vol, empty_well=False)
+        vol_img = embryo_vol[-1, 0].cpu().detach().numpy() * 255
+        recon_img = recon[-1, 0].cpu().detach().numpy() * 255
+        comparison = np.concatenate((vol_img, recon_img), axis=1).astype(np.uint8)
+        plt.imsave("./imgs/"+str(cell_id)+".png", comparison, cmap='gray')
         plt.close()
 
 if __name__ == "__main__":
