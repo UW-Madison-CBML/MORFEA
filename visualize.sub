@@ -17,7 +17,8 @@ log = .visualize_$(Cluster)_$(Process).log
 error = .visualize_$(Cluster)_$(Process).err
 output = .visualize_$(Cluster)_$(Process).out
 # Transfer our executable script
-transfer_input_files = visualize.sh, visualize.py, file:///staging/groups/bhaskar_group/ivf/latents.csv, cell_groups.txt, file:///staging/groups/bhaskar_group/ivf/plots.tar.gz
+transfer_input_files = visualize.sh, visualize.py, file:///staging/groups/bhaskar_group/ivf/latents.csv, cell_groups.txt, file:///staging/groups/bhaskar_group/ivf/plots.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz
+
  
 transfer_output_remaps = "plots.tar.gz = file:///staging/groups/bhaskar_group/ivf/plots.tar.gz;"
 
@@ -25,8 +26,8 @@ transfer_output_files = plots.tar.gz
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
 request_cpus = 1
-request_memory = 80GB
-request_disk = 32GB
+request_memory = 32GB
+request_disk = 16GB
 
 
 queue cell_group from cell_groups.txt
