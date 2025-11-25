@@ -28,9 +28,9 @@ def main():
         cell_id = row.get("cell_id", f"cell_{idx}")
 
         # Reshape embryo volume like in training
-        embryo_vol = embryo_vol.view(-1, 1, 500, 500).to(DEVICE)
-
-        recon, _ = model(embryo_vol, empty_well=False)
+        embryo_vol = embryo_vol[:,0].view(1, 1, 500, 500).to(DEVICE)
+        with torch.no_grad(): 
+            recon, _ = model(embryo_vol, empty_well=False)
         vol_img = embryo_vol[-1, 0].cpu().detach().numpy() * 255
         recon_img = recon[-1, 0].cpu().detach().numpy() * 255
         comparison = np.concatenate((vol_img, recon_img), axis=1).astype(np.uint8)

@@ -44,7 +44,7 @@ def apply_tphate(data, n_jobs=-1):
 
 def plot_cell_scatter(cell_id, tphate_data, time_steps, output_dir="plots"):
     fig, ax = plt.subplots(figsize=(10, 8))
-
+    
     scatter = ax.scatter(tphate_data[:, 0], tphate_data[:, 1],
                          c=time_steps, cmap='viridis', alpha=0.7, s=50,
                          edgecolors='black', linewidth=0.5)
@@ -65,7 +65,7 @@ def plot_cell_scatter(cell_id, tphate_data, time_steps, output_dir="plots"):
 
 def plot_cell_trajectory(cell_id, tphate_data, time_steps, output_dir="plots"):
     fig, ax = plt.subplots(figsize=(10, 8))
-
+    print("making plots with ", str(tphate_data.shape), " shape")
     ax.plot(tphate_data[:, 0], tphate_data[:, 1], 'k-', alpha=0.3, linewidth=1.5)
 
     scatter = ax.scatter(sorted_tphate[:, 0], sorted_tphate[:, 1],
