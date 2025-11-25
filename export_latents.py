@@ -76,7 +76,7 @@ def export_latents_to_csv(checkpoint="model_weights.pth", output_csv="latents.cs
     df.insert(0, "cell_id", cell_ids)
     df.insert(1, "time_step", time_steps)
     normed_df = pd.DataFrame(columns = df.columns)
-    # for each key (cell_id, time_step), we should only have one row but because of LSTM time sequential structure, the sequence will matter so we just avg to
+    # for each key (cell_id, time_step), we should only have one row but there are two because of sequence overlap. Latent vector is no longer a function of sequence so theoretically it won't matter whether we average or take the first of the two
     normed_df = df.groupby(['cell_id', 'time_step']).agg({
       **{f'z_{i}': 'mean' for i in range(2000)}
     }).reset_index().sort_values(by=['cell_id','time_step'], ascending=[True, True])
