@@ -15,7 +15,7 @@ def export_latents_to_csv(checkpoint="model_weights.pth", output_csv="latents.cs
     """
     Export latent embeddings from the model to a CSV file.
 
-    Each row contains: cell_id, time_step, and 3500 latent dimensions
+    Each row contains: cell_id, time_step, and 2000 latent dimensions
 
     Args:
         checkpoint: Path to model weights file
@@ -42,36 +42,43 @@ def export_latents_to_csv(checkpoint="model_weights.pth", output_csv="latents.cs
     time_steps = []
 
     print(f"\nExtracting latent embeddings from {len(ds)} sequences...")
-    for idx, (vol, cell_id, _, start_idx) in enumerate(loader):
+    for idx, (embryo_vol, empty_well_vol, sample_vol) in enumerate(loader):
         if (idx + 1) % 10 == 0:
             print(f"  Processed {idx + 1}/{len(ds)} sequences")
 
-        model.eval()
-        vol = vol.to(DEVICE)
-        with torch.no_grad():
-            _, z_seq = model(vol)
+        # Get metadata from dataframe
+        row = ds.df.iloc[idx]
+        cell_id = row.get("cell_id", f"cell_{idx}")
+        start_idx = row.get("start_idx", 0)
 
-        # z_seq shape: (1, T, 3500)
-        z = z_seq.squeeze(0).cpu().numpy()  # Shape: (T, 3500)
+        # Reshape embryo volume like in training
+        embryo_vol = embryo_vol.view(-1, 1, 500, 500).to(DEVICE)
+
+        model.eval()
+        with torch.no_grad():
+            _, z_seq = model(embryo_vol, empty_well=False)
+
+        # z_seq shape: (T, 2000) where T is number of frames
+        z = z_seq.cpu().numpy()  # Shape: (T, 2000)
 
         # Add one row per time step
         for t in range(z.shape[0]):
             all_latents.append(z[t])
-            cell_ids.append(cell_id[0])
+            cell_ids.append(cell_id)
             time_steps.append(int(t + start_idx))
 
     # Create DataFrame
     print(f"\nCreating CSV with {len(all_latents)} samples...")
-    latent_columns = [f"z_{i}" for i in range(3500)]
+    latent_columns = [f"z_{i}" for i in range(2000)]
 
-    latents_array = np.array(all_latents)  # Shape: (num_samples, 200)
+    latents_array = np.array(all_latents)  # Shape: (num_samples, 2000)
     df = pd.DataFrame(latents_array, columns=latent_columns)
     df.insert(0, "cell_id", cell_ids)
     df.insert(1, "time_step", time_steps)
     normed_df = pd.DataFrame(columns = df.columns)
-    # for each key (cell_id, time_step), we should only have one row but because of LSTM time sequential structure, the sequence will matter so we just avg to  
+    # for each key (cell_id, time_step), we should only have one row but because of LSTM time sequential structure, the sequence will matter so we just avg to
     normed_df = df.groupby(['cell_id', 'time_step']).agg({
-      **{f'z_{i}': 'mean' for i in range(3500)}
+      **{f'z_{i}': 'mean' for i in range(2000)}
     }).reset_index().sort_values(by=['cell_id','time_step'], ascending=[True, True])
     # Save to CSV
     normed_df.to_csv(output_csv, index=False)
