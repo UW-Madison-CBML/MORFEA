@@ -22,6 +22,8 @@ else
     mkdir -p "$OUTPUT_DIR"
 fi
 
+tar -xzvf embryo_dataset_annotations.tar.gz
+
 # Run visualization for this batch
 python visualize.py "$LATENTS_CSV" "$CELL_LINE" --output "$OUTPUT_DIR"
 
