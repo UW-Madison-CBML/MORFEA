@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
+from matplotlib.gridspec import GridSpec
 import argparse
 
 # Suppress statsmodels warnings from TPHATE's autocorrelation calculations
@@ -243,8 +244,90 @@ def plot_cell_trajectory_timestamp(cell_id, tphate_data, time_steps, output_dir=
     print(f"    Saved trajectory plot: {output_file}")
 
 
-def process_cell_id_batch(cell_ids, df, latent_cols, output_dir="plots"):
+def create_merged_comparison_plot(cell_ids, df, latent_cols, grades_df, output_dir="plots"):
+    """
+    Create a merged plot showing all cell trajectories colored by their grade category.
+    """
+    print(f"\n  Creating merged comparison plot for {len(cell_ids)} cells")
+
+    # Group cells by grade
+    grade_groups = {}
+    for cell_id in cell_ids:
+        if grades_df is not None:
+            grade_row = grades_df[grades_df['cell_id'] == cell_id]
+            if not grade_row.empty:
+                g1 = grade_row.iloc[0]['grade1']
+                g2 = grade_row.iloc[0]['grade2']
+                g1_str = str(g1) if not pd.isna(g1) else 'NA'
+                g2_str = str(g2) if not pd.isna(g2) else 'NA'
+                grade_cat = f"{g1_str}-{g2_str}"
+            else:
+                grade_cat = "Unknown"
+        else:
+            grade_cat = "Unknown"
+
+        if grade_cat not in grade_groups:
+            grade_groups[grade_cat] = []
+        grade_groups[grade_cat].append(cell_id)
+
+    # Create plot
+    fig, ax = plt.subplots(figsize=(14, 10))
+
+    # Color palette for different grades
+    unique_grades = sorted(grade_groups.keys())
+    colors = plt.cm.tab20(np.linspace(0, 1, len(unique_grades)))
+    grade_to_color = {grade: colors[i] for i, grade in enumerate(unique_grades)}
+
+    # Plot each cell
+    for grade_cat, cells in grade_groups.items():
+        color = grade_to_color[grade_cat]
+
+        for cell_id in cells:
+            cell_df = df[df['cell_id'] == cell_id]
+            if len(cell_df) == 0:
+                continue
+
+            # Get latents and apply TPHATE
+            cell_latents = cell_df[latent_cols].values
+            cell_tphate = apply_tphate(cell_latents)
+
+            # Plot trajectory
+            ax.plot(cell_tphate[:, 0], cell_tphate[:, 1], '-',
+                   color=color, alpha=0.4, linewidth=1.5)
+            ax.scatter(cell_tphate[:, 0], cell_tphate[:, 1],
+                      c=[color], alpha=0.6, s=30, edgecolors='black', linewidth=0.3)
+
+            # Mark start/end
+            ax.plot(cell_tphate[0, 0], cell_tphate[0, 1], 'go', markersize=6, alpha=0.5)
+            ax.plot(cell_tphate[-1, 0], cell_tphate[-1, 1], 'r*', markersize=10, alpha=0.5)
+
+    # Add legend
+    import matplotlib.patches as mpatches
+    legend_patches = []
+    for grade_cat in unique_grades:
+        patch = mpatches.Patch(color=grade_to_color[grade_cat], label=f"Grade {grade_cat}")
+        legend_patches.append(patch)
+
+    ax.legend(handles=legend_patches, loc='best', fontsize=10)
+    ax.set_xlabel("TPHATE Dimension 1", fontsize=12)
+    ax.set_ylabel("TPHATE Dimension 2", fontsize=12)
+    ax.set_title("Merged Trajectories by Grade", fontsize=14)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    output_file = os.path.join(output_dir, "merged_all_grades.png")
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    print(f"    Saved merged comparison plot: {output_file}")
+
+
+def process_cell_id_batch(cell_ids, df, latent_cols, output_dir="plots", grades_df=None, create_merged=False):
     print(f"\n  Processing batch with {len(cell_ids)} cell_ids")
+
+    # Create merged comparison plot if requested
+    if create_merged and len(cell_ids) > 1:
+        create_merged_comparison_plot(cell_ids, df, latent_cols, grades_df, output_dir)
 
     # Process each cell_id individually with its own TPHATE run
     for cell_id in cell_ids:
@@ -252,6 +335,22 @@ def process_cell_id_batch(cell_ids, df, latent_cols, output_dir="plots"):
         num_cell_samples = len(cell_df)
 
         print(f"    Processing {cell_id} ({num_cell_samples} samples)")
+
+        # Determine output subdirectory based on grade
+        cell_output_dir = output_dir
+        if grades_df is not None:
+            grade_row = grades_df[grades_df['cell_id'] == cell_id]
+            if not grade_row.empty:
+                g1 = grade_row.iloc[0]['grade1']
+                g2 = grade_row.iloc[0]['grade2']
+                g1_str = str(g1) if not pd.isna(g1) else 'NA'
+                g2_str = str(g2) if not pd.isna(g2) else 'NA'
+                grade_cat = f"{g1_str}-{g2_str}"
+                cell_output_dir = os.path.join(output_dir, grade_cat)
+                os.makedirs(cell_output_dir, exist_ok=True)
+            else:
+                cell_output_dir = os.path.join(output_dir, "Unknown")
+                os.makedirs(cell_output_dir, exist_ok=True)
 
         # Get latents for this cell_id only
         cell_latents = cell_df[latent_cols].values
@@ -261,15 +360,136 @@ def process_cell_id_batch(cell_ids, df, latent_cols, output_dir="plots"):
         cell_time_steps = cell_df['time_step'].values
 
         # Create scatter and trajectory plots
-        plot_cell_trajectory_circle(cell_id, cell_tphate, cell_time_steps, output_dir)
-        plot_cell_trajectory_velocity(cell_id, cell_tphate, cell_time_steps, output_dir)
-        plot_cell_trajectory_timestamp(cell_id, cell_tphate, cell_time_steps, output_dir)
+        plot_cell_trajectory_circle(cell_id, cell_tphate, cell_time_steps, cell_output_dir)
+        plot_cell_trajectory_velocity(cell_id, cell_tphate, cell_time_steps, cell_output_dir)
+        plot_cell_trajectory_timestamp(cell_id, cell_tphate, cell_time_steps, cell_output_dir)
+
+def filter_cells_by_grade(grades_df, grade_filter):
+    """
+    Filter cell_ids based on grade criteria.
+
+    Args:
+        grades_df: DataFrame with columns ['cell_id', 'grade1', 'grade2']
+        grade_filter: Filter criteria, can be:
+            - "all": all cells
+            - Single letter: "A", "B", "C" (matches if either grade matches)
+            - Exact category: "A-A", "B-NA", "NA-C", etc.
+            - Special: "any_A", "any_B", "any_C" (at least one of the grades)
+
+    Returns:
+        List of cell_ids matching the filter
+    """
+    if grades_df is None or grade_filter == "all":
+        return None  # Will process all cells
+
+    matching_cells = []
+
+    for _, row in grades_df.iterrows():
+        cell_id = row['cell_id']
+        g1 = row['grade1']
+        g2 = row['grade2']
+
+        # Convert to strings for comparison
+        g1_str = str(g1) if not pd.isna(g1) else 'NA'
+        g2_str = str(g2) if not pd.isna(g2) else 'NA'
+
+        # Check filter criteria
+        if grade_filter in ['A', 'B', 'C']:
+            # Single letter: match if either grade matches
+            if g1_str == grade_filter or g2_str == grade_filter:
+                matching_cells.append(cell_id)
+
+        elif grade_filter.startswith('any_'):
+            # any_X: at least one grade is X
+            target_grade = grade_filter.split('_')[1]
+            if g1_str == target_grade or g2_str == target_grade:
+                matching_cells.append(cell_id)
+
+        elif '-' in grade_filter:
+            # Exact category match
+            g1_filter, g2_filter = grade_filter.split('-')
+            if g1_str == g1_filter and g2_str == g2_filter:
+                matching_cells.append(cell_id)
+
+    return matching_cells
+
+
+def process_all_cells_batched(df, latent_cols, grades_df, output_dir, cell_ids_filter=None,
+                               create_merged=False, batch_size=50):
+    """
+    Process all cells in batches for memory efficiency.
+
+    Args:
+        df: DataFrame with latents
+        latent_cols: List of latent column names
+        grades_df: DataFrame with grades
+        output_dir: Output directory
+        cell_ids_filter: Optional list of cell_ids to process (None = all)
+        create_merged: Whether to create merged comparison plots
+        batch_size: Number of cells to process before clearing memory
+    """
+    # Get unique cell_ids
+    if cell_ids_filter is not None:
+        all_cell_ids = [cid for cid in cell_ids_filter if cid in df['cell_id'].values]
+    else:
+        all_cell_ids = df['cell_id'].unique().tolist()
+
+    total_cells = len(all_cell_ids)
+    print(f"\nProcessing {total_cells} cells in batches of {batch_size}")
+
+    # Process in batches
+    for batch_start in range(0, total_cells, batch_size):
+        batch_end = min(batch_start + batch_size, total_cells)
+        batch_cells = all_cell_ids[batch_start:batch_end]
+
+        print(f"\n{'='*60}")
+        print(f"Batch {batch_start//batch_size + 1}: Processing cells {batch_start+1} to {batch_end}")
+        print(f"{'='*60}")
+
+        # Process this batch
+        process_cell_id_batch(batch_cells, df, latent_cols, output_dir, grades_df,
+                            create_merged=(create_merged and batch_start == 0))
+
+        # Clear memory between batches
+        import gc
+        gc.collect()
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Visualize cell_id batch with TPHATE")
+    parser = argparse.ArgumentParser(
+        description="Visualize cell trajectories with TPHATE",
+        epilog="""
+Examples:
+  # Process specific cells
+  python visualize.py latents.csv --cells "cell1,cell2,cell3"
+
+  # Process all cells
+  python visualize.py latents.csv --all
+
+  # Process cells with grade B
+  python visualize.py latents.csv --grade-filter "any_B" --by-grade
+
+  # Process all A-A grade cells with merged plot
+  python visualize.py latents.csv --grade-filter "A-A" --by-grade --create-merged
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+
     parser.add_argument("latents_csv", help="Path to latents CSV file")
-    parser.add_argument("cell_line", help="Cell group line (comma-separated cell_ids)")
+    parser.add_argument("--cells", type=str, help="Comma-separated list of cell_ids to process")
+    parser.add_argument("--all", action="store_true", help="Process all cells in the CSV")
+    parser.add_argument("--grade-filter", type=str,
+                       help="Filter cells by grade (e.g., 'A', 'B', 'A-A', 'any_B')")
     parser.add_argument("--output", type=str, default="plots", help="Output directory for plots")
+    parser.add_argument("--by-grade", action="store_true", help="Organize plots by embryo grades")
+    parser.add_argument("--grades-file", type=str, default="embryo_dataset_grades.csv",
+                       help="Path to grades CSV file")
+    parser.add_argument("--create-merged", action="store_true", help="Create merged comparison plot")
+    parser.add_argument("--batch-size", type=int, default=50,
+                       help="Number of cells to process per batch (for memory efficiency)")
+
+    # Legacy support for old interface
+    parser.add_argument("cell_line", nargs='?', help="(Legacy) Cell group line (comma-separated cell_ids)")
 
     args = parser.parse_args()
 
@@ -285,17 +505,73 @@ def main():
     # Load latents
     df, latent_cols = load_latents(args.latents_csv)
 
-    # Parse cell_ids from the line argument
-    cell_ids = args.cell_line.strip().split(',')
-    cell_ids = [cid.strip() for cid in cell_ids if cid.strip()]  # Clean up and filter empty
+    # Load grades if requested
+    grades_df = None
+    if args.by_grade or args.create_merged or args.grade_filter:
+        if os.path.exists(args.grades_file):
+            print(f"Loading grades from: {args.grades_file}")
+            grades_df = pd.read_csv(args.grades_file, header=None, names=['cell_id', 'grade1', 'grade2'])
+            print(f"  Loaded grades for {len(grades_df)} cell_ids\n")
+        else:
+            print(f"Warning: Grades file not found: {args.grades_file}")
+            if args.grade_filter:
+                print("Cannot use --grade-filter without grades file")
+                sys.exit(1)
+            print("Proceeding without grade organization\n")
 
-    if not cell_ids:
-        print("Error: No cell_ids found in the provided line")
+    # Determine which cells to process
+    cell_ids = None
+
+    if args.all:
+        # Process all cells
+        print("Processing all cells in the CSV")
+        cell_ids = None  # Will be handled in process_all_cells_batched
+
+    elif args.grade_filter:
+        # Filter by grade
+        print(f"Filtering cells by grade: {args.grade_filter}")
+        cell_ids = filter_cells_by_grade(grades_df, args.grade_filter)
+        if not cell_ids:
+            print(f"No cells found matching grade filter: {args.grade_filter}")
+            sys.exit(1)
+        print(f"Found {len(cell_ids)} cells matching filter")
+
+    elif args.cells:
+        # Parse cell_ids from --cells argument
+        cell_ids = args.cells.strip().split(',')
+        cell_ids = [cid.strip() for cid in cell_ids if cid.strip()]
+
+    elif args.cell_line:
+        # Legacy support: positional argument
+        cell_ids = args.cell_line.strip().split(',')
+        cell_ids = [cid.strip() for cid in cell_ids if cid.strip()]
+
+    else:
+        print("Error: Must specify --all, --cells, or --grade-filter")
+        print("Use --help for more information")
         sys.exit(1)
 
-    print(f"Processing batch with {len(cell_ids)} cell_ids:")
-    print(f"  Cell IDs: {', '.join(cell_ids)}\n")
-    process_cell_id_batch(cell_ids, df, latent_cols, args.output)
+    # Process cells
+    if cell_ids is None:
+        # Process all cells in batches
+        process_all_cells_batched(df, latent_cols, grades_df, args.output,
+                                 cell_ids_filter=None,
+                                 create_merged=args.create_merged,
+                                 batch_size=args.batch_size)
+    elif len(cell_ids) > args.batch_size:
+        # Process filtered cells in batches
+        process_all_cells_batched(df, latent_cols, grades_df, args.output,
+                                 cell_ids_filter=cell_ids,
+                                 create_merged=args.create_merged,
+                                 batch_size=args.batch_size)
+    else:
+        # Process small batch directly
+        print(f"Processing {len(cell_ids)} cell_ids:")
+        if len(cell_ids) <= 10:
+            print(f"  Cell IDs: {', '.join(cell_ids)}\n")
+        else:
+            print(f"  First 10: {', '.join(cell_ids[:10])}...\n")
+        process_cell_id_batch(cell_ids, df, latent_cols, args.output, grades_df, args.create_merged)
 
     print(f"\n\nVisualization complete! Plots saved to: {args.output}")
 
