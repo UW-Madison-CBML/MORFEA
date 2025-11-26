@@ -211,7 +211,6 @@ def train():
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         model = DDP(model, device_ids=[local_rank], output_device=local_rank)
 
-    loss_fn = torch.nn.MSELoss(reduction='mean')
     learning_rate = 0.005
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,weight_decay = 1e-5 )
     scheduler = CosineAnnealingLR(optimizer, T_max=10)
@@ -263,11 +262,20 @@ def train():
 
             vol = torch.cat((embryo_vol, sample_vol), 0).to(DEVICE)
             empty_well_vol = empty_well_vol.to(DEVICE)
-            
-         
+
+
             recon, _ = model(vol, empty_well = False)
             empty_well_recon, _ = model(empty_well_vol, empty_well=True)
-            rec_loss = loss_fn(recon, vol) + loss_fn(empty_well_recon, empty_well_vol)
+
+            # Use SSIM-based reconstruction loss
+            # Reshape for reconstruction_loss function: (B, T, C, H, W)
+            rec_loss_vol, rec_metrics_vol = reconstruction_loss(
+                recon.unsqueeze(1), vol.unsqueeze(1), l1_weight=0.5, ms_ssim_weight=0.5
+            )
+            rec_loss_empty, rec_metrics_empty = reconstruction_loss(
+                empty_well_recon.unsqueeze(1), empty_well_vol.unsqueeze(1), l1_weight=0.5, ms_ssim_weight=0.5
+            )
+            rec_loss = rec_loss_vol + rec_loss_empty
             
             with torch.no_grad():
                 model.eval()  
@@ -283,9 +291,9 @@ def train():
             embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0).to(DEVICE)
             embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0).to(DEVICE)
             temp_adj_sim = F.cosine_similarity(embryo_lat1, embryo_lat2).mean()
-            rand_sample_sim = F.cosine_similarity(embryo_lat, sample_lat).mean() 
+            rand_sample_sim = F.cosine_similarity(embryo_lat, sample_lat).mean()
             tcl = rand_sample_sim - temp_adj_sim
-            loss = rec_loss + (0.05 * tcl)
+            loss = rec_loss + (0.01 * tcl)
 
             if torch.isnan(loss) or torch.isinf(loss):
                 if is_main:
@@ -315,10 +323,12 @@ def train():
             del recon
             del lat 
             del empty_well_recon
-            del embryo_lat 
-            del sample_lat 
-            del embryo_lat1 
-            del embryo_lat2 
+            del embryo_lat
+            del sample_lat
+            del embryo_lat1
+            del embryo_lat2
+            del rec_metrics_vol
+            del rec_metrics_empty
             torch.cuda.empty_cache()
             if is_main and (index % 50 == 0) and run is not None:
                 run.log({
@@ -327,7 +337,11 @@ def train():
                     "rec_loss": rec_loss.item(),
                     "tcl": tcl.item(),
                     "temp_adj_sim": temp_adj_sim.item(),
-                    "rand_sample_sim": rand_sample_sim.item()
+                    "rand_sample_sim": rand_sample_sim.item(),
+                    "ms_ssim_vol": rec_metrics_vol["ms_ssim_value"],
+                    "ms_ssim_empty": rec_metrics_empty["ms_ssim_value"],
+                    "l1_loss_vol": rec_metrics_vol["l1_loss"],
+                    "l1_loss_empty": rec_metrics_empty["l1_loss"]
                 })
 
                 if isinstance(pbar, tqdm):
