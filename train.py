@@ -315,21 +315,6 @@ def train():
             optimizer.step()
             total += loss.item()
             count += 1
-            
-            del embryo_vol 
-            del empty_well_vol 
-            del sample_vol 
-            del vol 
-            del recon
-            del lat 
-            del empty_well_recon
-            del embryo_lat
-            del sample_lat
-            del embryo_lat1
-            del embryo_lat2
-            del rec_metrics_vol
-            del rec_metrics_empty
-            torch.cuda.empty_cache()
             if is_main and (index % 50 == 0) and run is not None:
                 run.log({
                     "step": epoch * len(loader) + index,
@@ -349,7 +334,22 @@ def train():
                         loss=f"{loss.item():.4f}",
                         rec=f"{rec_loss.item():.4f}",
                         tcl=f"{tcl.item():.4f}"
-                    )
+                    ) 
+            del embryo_vol 
+            del empty_well_vol 
+            del sample_vol 
+            del vol 
+            del recon
+            del lat 
+            del empty_well_recon
+            del embryo_lat
+            del sample_lat
+            del embryo_lat1
+            del embryo_lat2
+            del rec_metrics_vol
+            del rec_metrics_empty
+            torch.cuda.empty_cache()
+            
         avg_loss = total/max(1,count)
         if world_size > 1:
             avg_loss_tensor = torch.tensor([avg_loss], device=DEVICE)
