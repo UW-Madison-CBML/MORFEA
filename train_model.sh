@@ -4,6 +4,8 @@ HF_KEY=$(head -n 1 api_keys.txt)
 export HF_TOKEN=$HF_KEY
 WANDB_KEY=$(tail -n 1 api_keys.txt)
 export WANDB_KEY=$WANDB_KEY
+export TORCH_DISTRIBUTED_DEBUG=DETAIL
+export NCCL_DEBUG=INFO
 tar -zxf embryo_dataset.tar.gz
 
 #python train.py 
