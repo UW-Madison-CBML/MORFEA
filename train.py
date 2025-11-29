@@ -293,7 +293,7 @@ def train():
             temp_adj_sim = F.cosine_similarity(embryo_lat1, embryo_lat2).mean()
             rand_sample_sim = F.cosine_similarity(embryo_lat, sample_lat).mean()
             tcl = rand_sample_sim - temp_adj_sim
-            loss = rec_loss + (0.01 * tcl)
+            loss = rec_loss + (0.03 * tcl)
 
             if torch.isnan(loss) or torch.isinf(loss):
                 if is_main:
