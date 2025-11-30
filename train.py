@@ -366,11 +366,15 @@ def train():
             run.log({"avg_loss": avg_loss})
             print(f"epoch {epoch} avg loss={avg_loss}:.4f")
             model_to_save = model.module if hasattr(model, 'module') else model
-            model_to_save = model_to_save.cpu()
+            # Save the state dict without moving the model to CPU
             torch.save(model_to_save.state_dict(), "model_weights.pth")
 
-            model_to_save.save_pretrained("IVF-Model")
-            model_to_save.push_to_hub("IVF-Model")
+            # Create a temporary CPU copy for HuggingFace upload
+            model_cpu = type(model_to_save)()  # Create new instance
+            model_cpu.load_state_dict(model_to_save.state_dict())
+            model_cpu.save_pretrained("IVF-Model")
+            model_cpu.push_to_hub("IVF-Model")
+            del model_cpu  # Clean up the CPU copy
 
     if is_main:
         run.finish()
