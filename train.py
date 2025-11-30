@@ -202,12 +202,15 @@ def train():
             if is_main:
                 print("Loaded model weights")
                 model_cpu = model.cpu()
-                model.save_pretrained("IVF-Model")
-                model.push_to_hub("IVF-Model")
+                model_cpu.save_pretrained("IVF-Model")
+                model_cpu.push_to_hub("IVF-Model")
         except Exception as e:
             if is_main:
                 print(f"Error loading weights: {e}")
                 torch.save(model.state_dict(), "model_weights.pth")
+                model_cpu = model.cpu()
+                model_cpu.save_pretrained("IVF-Model")
+                model_cpu.push_to_hub("IVF-Model")
     else:
         if is_main:
             torch.save(model.state_dict(), "model_weights.pth") 
