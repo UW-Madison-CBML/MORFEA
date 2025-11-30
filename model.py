@@ -3,9 +3,9 @@ import torch.nn.functional as F
 from torchinfo import summary
 import sys
 import os;
+from huggingface_hub import PyTorchModelHubMixin
 
-
-class Model(torch.nn.Module):
+class Model(torch.nn.Module, PyTorchModelHubMixin):
     def __init__(self):
         super().__init__() # Call the constructor of the parent class
         self.conv1 = torch.nn.Conv2d(1, 32, 5, padding = 2)

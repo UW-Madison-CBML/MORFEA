@@ -25,6 +25,7 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
 import os
+from huggingface_hub import login
 def setup_distributed():
     """Initialize distributed training"""
     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
@@ -188,6 +189,8 @@ def train():
                 "world_size": world_size,
             },
         )
+
+        login(os.getenv("HF_KEY"))
         print(torch.cuda.memory_summary(device=None, abbreviated=False))
         print(DEVICE)
 
@@ -198,6 +201,9 @@ def train():
             model.load_state_dict(checkpoint)
             if is_main:
                 print("Loaded model weights")
+                model_cpu = model.cpu()
+                model.save_pretrained("IVF-Model")
+                model.push_to_hub("IVF-Model")
         except Exception as e:
             if is_main:
                 print(f"Error loading weights: {e}")
@@ -212,8 +218,7 @@ def train():
         model = DDP(model, device_ids=[local_rank], output_device=local_rank)
 
     learning_rate = 0.005
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,weight_decay = 1e-5 )
-    scheduler = CosineAnnealingLR(optimizer, T_max=10)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4,weight_decay = 1e-5 )
 
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
 
@@ -223,7 +228,7 @@ def train():
     else:
         sampler = None
         shuffle = True
-
+    
     num_workers = max(4, 16 // world_size)
 
     loader = DataLoader(
@@ -235,7 +240,9 @@ def train():
         pin_memory=True,
         drop_last=True  # Important for DDP
     )
-
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer, max_lr=learning_rate, steps_per_epoch=len(loader), epochs=10
+    )
     for epoch in range(10):
         model.train()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
@@ -277,13 +284,8 @@ def train():
             )
             rec_loss = rec_loss_vol + rec_loss_empty
             
-            with torch.no_grad():
-                model.eval()  
 
             _, lat = model(vol, empty_well=False)
-
-            with torch.no_grad():
-                model.train()  
 
             embryo_lat = lat[:embryo_size].clone()
             sample_lat = lat[embryo_size:].clone()
@@ -312,6 +314,7 @@ def train():
                 print(f"Warning: Large gradient norm: {total_norm:.2f}")
 
             torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
+            scheduler.step()
             optimizer.step()
             total += loss.item()
             count += 1
@@ -326,7 +329,8 @@ def train():
                     "ms_ssim_vol": rec_metrics_vol["ms_ssim_value"],
                     "ms_ssim_empty": rec_metrics_empty["ms_ssim_value"],
                     "l1_loss_vol": rec_metrics_vol["l1_loss"],
-                    "l1_loss_empty": rec_metrics_empty["l1_loss"]
+                    "l1_loss_empty": rec_metrics_empty["l1_loss"],
+                    "lr": scheduler.get_last_lr()[0]
                 })
 
                 if isinstance(pbar, tqdm):
@@ -356,11 +360,15 @@ def train():
             dist.all_reduce(avg_loss_tensor, op=dist.ReduceOp.AVG)
             avg_loss = avg_loss_tensor.item()
         if is_main:
-            run.log({"lr": scheduler.get_last_lr()[0], "avg_loss": avg_loss})
+            run.log({"avg_loss": avg_loss})
             print(f"epoch {epoch} avg loss={avg_loss}:.4f")
             model_to_save = model.module if hasattr(model, 'module') else model
+            model_to_save = model_to_save.cpu()
             torch.save(model_to_save.state_dict(), "model_weights.pth")
-        scheduler.step()
+
+            model_to_save.save_pretrained("IVF-Model")
+            model_to_save.push_to_hub("IVF-Model")
+
     if is_main:
         run.finish()
     cleanup_distributed()
