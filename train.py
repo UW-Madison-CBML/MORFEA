@@ -166,15 +166,16 @@ def reconstruction_loss(x_rec, x_true, l1_weight=0.5, ms_ssim_weight=0.5):
 
 
 def train():
+    """Original training with MS-SSIM loss and distributed training"""
     print(torch.cuda.memory_summary(device=None, abbreviated=False))
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     rank, world_size, local_rank = setup_distributed()
     DEVICE = torch.device(f"cuda:{local_rank}")
-    
+
     # Only print on main process
     is_main = rank == 0
-    run = None 
+    run = None
     # Initialize wandb only on main process
     if is_main:
         wandb.login(key=os.getenv("WANDB_KEY"))
@@ -187,6 +188,7 @@ def train():
                 "dataset": "https://zenodo.org/records/7912264",
                 "epochs": 10,
                 "world_size": world_size,
+                "loss": "MS-SSIM + L1",
             },
         )
 
@@ -213,7 +215,7 @@ def train():
                 model_cpu.push_to_hub("IVF-Model")
     else:
         if is_main:
-            torch.save(model.state_dict(), "model_weights.pth") 
+            torch.save(model.state_dict(), "model_weights.pth")
     model = model.to(DEVICE)
 
     if world_size > 1:
@@ -231,7 +233,7 @@ def train():
     else:
         sampler = None
         shuffle = True
-    
+
     num_workers = max(4, 16 // world_size)
 
     loader = DataLoader(
@@ -286,7 +288,7 @@ def train():
                 empty_well_recon.unsqueeze(1), empty_well_vol.unsqueeze(1), l1_weight=0.5, ms_ssim_weight=0.5
             )
             rec_loss = rec_loss_vol + rec_loss_empty
-            
+
 
             _, lat = model(vol, empty_well=False)
 
@@ -304,7 +306,7 @@ def train():
                 if is_main:
                     print(f"NaN/Inf detected, skipping batch")
                 continue
-            
+
             loss.backward()
             total_norm = 0
             for p in model.parameters():
@@ -341,13 +343,13 @@ def train():
                         loss=f"{loss.item():.4f}",
                         rec=f"{rec_loss.item():.4f}",
                         tcl=f"{tcl.item():.4f}"
-                    ) 
-            del embryo_vol 
-            del empty_well_vol 
-            del sample_vol 
-            del vol 
+                    )
+            del embryo_vol
+            del empty_well_vol
+            del sample_vol
+            del vol
             del recon
-            del lat 
+            del lat
             del empty_well_recon
             del embryo_lat
             del sample_lat
@@ -356,7 +358,7 @@ def train():
             del rec_metrics_vol
             del rec_metrics_empty
             torch.cuda.empty_cache()
-            
+
         avg_loss = total/max(1,count)
         if world_size > 1:
             avg_loss_tensor = torch.tensor([avg_loss], device=DEVICE)
@@ -382,5 +384,352 @@ def train():
     del model
     gc.collect()
     torch.cuda.empty_cache()
+
+
+def train_mse_distributed():
+    """Training with MSE loss and distributed training"""
+    print(torch.cuda.memory_summary(device=None, abbreviated=False))
+    torch.cuda.empty_cache()
+    torch.autograd.detect_anomaly(True)
+    rank, world_size, local_rank = setup_distributed()
+    DEVICE = torch.device(f"cuda:{local_rank}")
+
+    is_main = rank == 0
+    run = None
+    if is_main:
+        wandb.login(key=os.getenv("WANDB_KEY"))
+        run = wandb.init(
+            entity="jenslundsgaard7-uw-madison",
+            project="IVF-Training",
+            config={
+                "learning_rate": 0.005,
+                "architecture": "Conv LSTM Autoencoder",
+                "dataset": "https://zenodo.org/records/7912264",
+                "epochs": 10,
+                "world_size": world_size,
+                "loss": "MSE",
+            },
+        )
+
+        login(os.getenv("HF_KEY"))
+        print(torch.cuda.memory_summary(device=None, abbreviated=False))
+        print(DEVICE)
+
+    model = Model()
+    if os.path.exists("model_weights.pth"):
+        try:
+            checkpoint = torch.load("model_weights.pth", map_location=DEVICE, weights_only=True)
+            model.load_state_dict(checkpoint)
+            if is_main:
+                print("Loaded model weights")
+        except Exception as e:
+            if is_main:
+                print(f"Error loading weights: {e}")
+    model = model.to(DEVICE)
+
+    if world_size > 1:
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        model = DDP(model, device_ids=[local_rank], output_device=local_rank)
+
+    learning_rate = 0.005
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
+
+    ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
+
+    if world_size > 1:
+        sampler = DistributedSampler(ds, num_replicas=world_size, rank=rank, shuffle=True)
+        shuffle = False
+    else:
+        sampler = None
+        shuffle = True
+
+    num_workers = max(4, 16 // world_size)
+
+    loader = DataLoader(
+        ds,
+        batch_size=1,
+        shuffle=shuffle,
+        sampler=sampler,
+        num_workers=num_workers,
+        pin_memory=True,
+        drop_last=True
+    )
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer, max_lr=learning_rate, steps_per_epoch=len(loader), epochs=10
+    )
+    for epoch in range(10):
+        model.train()
+        if sampler is not None:
+            sampler.set_epoch(epoch)
+
+        if is_main:
+            pbar = tqdm(loader, desc=f"epoch {epoch}")
+        else:
+            pbar = loader
+        total = 0.0
+        count = 0
+        for index, (embryo_vol, empty_well_vol, sample_vol) in enumerate(pbar):
+
+            optimizer.zero_grad()
+
+            embryo_vol = embryo_vol.view(-1,1,500,500)
+            empty_well_vol = empty_well_vol.view(-1,1,500,500)
+            sample_vol = sample_vol.view(-1,1,500,500)
+
+            embryo_size = embryo_vol.shape[0]
+            sample_size = sample_vol.shape[0]
+
+            vol = torch.cat((embryo_vol, sample_vol), 0).to(DEVICE)
+            empty_well_vol = empty_well_vol.to(DEVICE)
+
+            recon, _ = model(vol, empty_well=False)
+            empty_well_recon, _ = model(empty_well_vol, empty_well=True)
+
+            # MSE-based reconstruction loss
+            rec_loss_vol = F.mse_loss(recon, vol)
+            rec_loss_empty = F.mse_loss(empty_well_recon, empty_well_vol)
+            rec_loss = rec_loss_vol + rec_loss_empty
+
+            _, lat = model(vol, empty_well=False)
+
+            embryo_lat = lat[:embryo_size].clone()
+            sample_lat = lat[embryo_size:].clone()
+
+            embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0).to(DEVICE)
+            embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0).to(DEVICE)
+            temp_adj_sim = F.cosine_similarity(embryo_lat1, embryo_lat2).mean()
+            rand_sample_sim = F.cosine_similarity(embryo_lat, sample_lat).mean()
+            tcl = rand_sample_sim - temp_adj_sim
+            loss = rec_loss + (0.03 * tcl)
+
+            if torch.isnan(loss) or torch.isinf(loss):
+                if is_main:
+                    print(f"NaN/Inf detected, skipping batch")
+                continue
+
+            loss.backward()
+            total_norm = 0
+            for p in model.parameters():
+                if p.grad is not None:
+                    param_norm = p.grad.data.norm(2)
+                    total_norm += param_norm.item() ** 2
+            total_norm = total_norm ** 0.5
+
+            if total_norm > 100:
+                print(f"Warning: Large gradient norm: {total_norm:.2f}")
+
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
+            scheduler.step()
+            optimizer.step()
+            total += loss.item()
+            count += 1
+            if is_main and (index % 50 == 0) and run is not None:
+                run.log({
+                    "step": epoch * len(loader) + index,
+                    "loss": loss.item(),
+                    "rec_loss": rec_loss.item(),
+                    "tcl": tcl.item(),
+                    "temp_adj_sim": temp_adj_sim.item(),
+                    "rand_sample_sim": rand_sample_sim.item(),
+                    "lr": scheduler.get_last_lr()[0]
+                })
+
+                if isinstance(pbar, tqdm):
+                    pbar.set_postfix(
+                        loss=f"{loss.item():.4f}",
+                        rec=f"{rec_loss.item():.4f}",
+                        tcl=f"{tcl.item():.4f}"
+                    )
+            del embryo_vol
+            del empty_well_vol
+            del sample_vol
+            del vol
+            del recon
+            del lat
+            del empty_well_recon
+            del embryo_lat
+            del sample_lat
+            del embryo_lat1
+            del embryo_lat2
+            torch.cuda.empty_cache()
+
+        avg_loss = total/max(1,count)
+        if world_size > 1:
+            avg_loss_tensor = torch.tensor([avg_loss], device=DEVICE)
+            dist.all_reduce(avg_loss_tensor, op=dist.ReduceOp.AVG)
+            avg_loss = avg_loss_tensor.item()
+        if is_main:
+            run.log({"avg_loss": avg_loss})
+            print(f"epoch {epoch} avg loss={avg_loss}:.4f")
+            model_to_save = model.module if hasattr(model, 'module') else model
+            torch.save(model_to_save.state_dict(), "model_weights_mse.pth")
+
+    if is_main:
+        run.finish()
+    cleanup_distributed()
+    del model
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
+def train_mse_single():
+    """Training with MSE loss without distributed training"""
+    print(torch.cuda.memory_summary(device=None, abbreviated=False))
+    torch.cuda.empty_cache()
+    torch.autograd.detect_anomaly(True)
+    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    wandb.login(key=os.getenv("WANDB_KEY"))
+    run = wandb.init(
+        entity="jenslundsgaard7-uw-madison",
+        project="IVF-Training",
+        config={
+            "learning_rate": 0.005,
+            "architecture": "Conv LSTM Autoencoder",
+            "dataset": "https://zenodo.org/records/7912264",
+            "epochs": 10,
+            "world_size": 1,
+            "loss": "MSE",
+            "distributed": False,
+        },
+    )
+
+    login(os.getenv("HF_KEY"))
+    print(torch.cuda.memory_summary(device=None, abbreviated=False))
+    print(DEVICE)
+
+    model = Model()
+    if os.path.exists("model_weights.pth"):
+        try:
+            checkpoint = torch.load("model_weights.pth", map_location=DEVICE, weights_only=True)
+            model.load_state_dict(checkpoint)
+            print("Loaded model weights")
+        except Exception as e:
+            print(f"Error loading weights: {e}")
+    model = model.to(DEVICE)
+
+    learning_rate = 0.005
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
+
+    ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
+
+    loader = DataLoader(
+        ds,
+        batch_size=1,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+        drop_last=True
+    )
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer, max_lr=learning_rate, steps_per_epoch=len(loader), epochs=10
+    )
+    for epoch in range(10):
+        model.train()
+        pbar = tqdm(loader, desc=f"epoch {epoch}")
+        total = 0.0
+        count = 0
+        for index, (embryo_vol, empty_well_vol, sample_vol) in enumerate(pbar):
+
+            optimizer.zero_grad()
+
+            embryo_vol = embryo_vol.view(-1,1,500,500)
+            empty_well_vol = empty_well_vol.view(-1,1,500,500)
+            sample_vol = sample_vol.view(-1,1,500,500)
+
+            embryo_size = embryo_vol.shape[0]
+            sample_size = sample_vol.shape[0]
+
+            vol = torch.cat((embryo_vol, sample_vol), 0).to(DEVICE)
+            empty_well_vol = empty_well_vol.to(DEVICE)
+
+            recon, _ = model(vol, empty_well=False)
+            empty_well_recon, _ = model(empty_well_vol, empty_well=True)
+
+            # MSE-based reconstruction loss
+            rec_loss_vol = F.mse_loss(recon, vol)
+            rec_loss_empty = F.mse_loss(empty_well_recon, empty_well_vol)
+            rec_loss = rec_loss_vol + rec_loss_empty
+
+            _, lat = model(vol, empty_well=False)
+
+            embryo_lat = lat[:embryo_size].clone()
+            sample_lat = lat[embryo_size:].clone()
+
+            embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0).to(DEVICE)
+            embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0).to(DEVICE)
+            temp_adj_sim = F.cosine_similarity(embryo_lat1, embryo_lat2).mean()
+            rand_sample_sim = F.cosine_similarity(embryo_lat, sample_lat).mean()
+            tcl = rand_sample_sim - temp_adj_sim
+            loss = rec_loss + (0.03 * tcl)
+
+            if torch.isnan(loss) or torch.isinf(loss):
+                print(f"NaN/Inf detected, skipping batch")
+                continue
+
+            loss.backward()
+            total_norm = 0
+            for p in model.parameters():
+                if p.grad is not None:
+                    param_norm = p.grad.data.norm(2)
+                    total_norm += param_norm.item() ** 2
+            total_norm = total_norm ** 0.5
+
+            if total_norm > 100:
+                print(f"Warning: Large gradient norm: {total_norm:.2f}")
+
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
+            scheduler.step()
+            optimizer.step()
+            total += loss.item()
+            count += 1
+            if (index % 50 == 0) and run is not None:
+                run.log({
+                    "step": epoch * len(loader) + index,
+                    "loss": loss.item(),
+                    "rec_loss": rec_loss.item(),
+                    "tcl": tcl.item(),
+                    "temp_adj_sim": temp_adj_sim.item(),
+                    "rand_sample_sim": rand_sample_sim.item(),
+                    "lr": scheduler.get_last_lr()[0]
+                })
+
+                pbar.set_postfix(
+                    loss=f"{loss.item():.4f}",
+                    rec=f"{rec_loss.item():.4f}",
+                    tcl=f"{tcl.item():.4f}"
+                )
+            del embryo_vol
+            del empty_well_vol
+            del sample_vol
+            del vol
+            del recon
+            del lat
+            del empty_well_recon
+            del embryo_lat
+            del sample_lat
+            del embryo_lat1
+            del embryo_lat2
+            torch.cuda.empty_cache()
+
+        avg_loss = total/max(1,count)
+        run.log({"avg_loss": avg_loss})
+        print(f"epoch {epoch} avg loss={avg_loss}:.4f")
+        torch.save(model.state_dict(), "model_weights_mse_single.pth")
+
+    run.finish()
+    del model
+    gc.collect()
+    torch.cuda.empty_cache()
 if __name__ == "__main__":
-    train()
+    import sys
+    if len(sys.argv) > 1:
+        mode = sys.argv[1]
+        if mode == "mse_distributed":
+            train_mse_distributed()
+        elif mode == "mse_single":
+            train_mse_single()
+        else:
+            train()
+    else:
+        train()
