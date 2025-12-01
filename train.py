@@ -12,6 +12,7 @@ import sys
 from torch.utils.data import DataLoader
 from dataset_ivf import IVFSequenceDataset
 from tqdm import tqdm
+from datetime import datetime
 torch.backends.cuda.enable_mem_efficient_sdp(False)
 torch.backends.cuda.enable_flash_sdp(False)
 torch.backends.cuda.enable_math_sdp(True)
@@ -374,8 +375,12 @@ def train():
             # Create a temporary CPU copy for HuggingFace upload
             model_cpu = type(model_to_save)()  # Create new instance
             model_cpu.load_state_dict(model_to_save.state_dict())
-            model_cpu.save_pretrained("IVF-Model")
-            model_cpu.push_to_hub("IVF-Model")
+
+            # Save with date label
+            date_label = datetime.now().strftime("%Y-%m-%d")
+            repo_name = f"IVF-Model-{date_label}"
+            model_cpu.save_pretrained(repo_name)
+            model_cpu.push_to_hub(repo_name)
             del model_cpu  # Clean up the CPU copy
 
     if is_main:
@@ -564,6 +569,15 @@ def train_mse_distributed():
             model_to_save = model.module if hasattr(model, 'module') else model
             torch.save(model_to_save.state_dict(), "model_weights_mse.pth")
 
+            # Save to HuggingFace with date label
+            model_cpu = type(model_to_save)()
+            model_cpu.load_state_dict(model_to_save.state_dict())
+            date_label = datetime.now().strftime("%Y-%m-%d")
+            repo_name = f"IVF-Model-MSE-{date_label}"
+            model_cpu.save_pretrained(repo_name)
+            model_cpu.push_to_hub(repo_name)
+            del model_cpu
+
     if is_main:
         run.finish()
     cleanup_distributed()
@@ -704,6 +718,12 @@ def train_mse_single():
         run.log({"avg_loss": avg_loss})
         print(f"epoch {epoch} avg loss={avg_loss}:.4f")
         torch.save(model.state_dict(), "model_weights_mse_single.pth")
+
+        # Save to HuggingFace with date label
+        date_label = datetime.now().strftime("%Y-%m-%d")
+        repo_name = f"IVF-Model-MSE-Single-{date_label}"
+        model.save_pretrained(repo_name)
+        model.push_to_hub(repo_name)
 
     run.finish()
     gc.collect()
