@@ -661,7 +661,7 @@ def train_mse_single():
             temp_adj_sim = F.cosine_similarity(embryo_lat1, embryo_lat2).mean()
             rand_sample_sim = F.cosine_similarity(embryo_lat, sample_lat).mean()
             tcl = rand_sample_sim - temp_adj_sim
-            loss = rec_loss + (0.03 * tcl)
+            loss = rec_loss + (0.05 * tcl)
 
             if torch.isnan(loss) or torch.isinf(loss):
                 print(f"NaN/Inf detected, skipping batch")
@@ -699,18 +699,6 @@ def train_mse_single():
                     rec=f"{rec_loss.item():.4f}",
                     tcl=f"{tcl.item():.4f}"
                 )
-            del embryo_vol
-            del empty_well_vol
-            del sample_vol
-            del vol
-            del recon
-            del lat
-            del empty_well_recon
-            del embryo_lat
-            del sample_lat
-            del embryo_lat1
-            del embryo_lat2
-            torch.cuda.empty_cache()
 
         avg_loss = total/max(1,count)
         run.log({"avg_loss": avg_loss})
@@ -718,7 +706,6 @@ def train_mse_single():
         torch.save(model.state_dict(), "model_weights_mse_single.pth")
 
     run.finish()
-    del model
     gc.collect()
     torch.cuda.empty_cache()
 if __name__ == "__main__":
