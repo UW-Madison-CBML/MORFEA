@@ -237,6 +237,55 @@ def create_grid_plot(cell_ids, df, latent_cols, output_file, title="Grid Compari
     print(f"  Saved grid plot: {output_file}")
 
 
+def is_grade_at_least(grade_str, min_grade='B'):
+    """
+    Check if a grade meets the minimum threshold.
+
+    Args:
+        grade_str: Grade string (e.g., 'A', 'B', 'C', 'NA')
+        min_grade: Minimum grade threshold ('A' or 'B')
+
+    Returns:
+        True if grade >= min_grade
+    """
+    if grade_str == 'NA' or pd.isna(grade_str):
+        return False
+
+    grade_order = {'A': 0, 'B': 1, 'C': 2}
+    if grade_str not in grade_order or min_grade not in grade_order:
+        return False
+
+    return grade_order[grade_str] <= grade_order[min_grade]
+
+
+def filter_cells_by_grade_threshold(grades_df, min_grade='B'):
+    """
+    Filter cells where at least one grade meets the minimum threshold.
+
+    Args:
+        grades_df: DataFrame with columns ['cell_id', 'grade1', 'grade2']
+        min_grade: Minimum grade threshold ('A' or 'B')
+
+    Returns:
+        List of cell_ids where grade1 OR grade2 >= min_grade
+    """
+    matching_cells = []
+
+    for _, row in grades_df.iterrows():
+        cell_id = row['cell_id']
+        g1 = row['grade1']
+        g2 = row['grade2']
+
+        g1_str = str(g1) if not pd.isna(g1) else 'NA'
+        g2_str = str(g2) if not pd.isna(g2) else 'NA'
+
+        # Include if either grade meets threshold
+        if is_grade_at_least(g1_str, min_grade) or is_grade_at_least(g2_str, min_grade):
+            matching_cells.append(cell_id)
+
+    return matching_cells
+
+
 def create_grade_comparison_plots(df, latent_cols, grades_df, output_dir="comparison_plots"):
     """
     Create comparison plots for all grade categories.
@@ -301,13 +350,15 @@ def create_grade_comparison_plots(df, latent_cols, grades_df, output_dir="compar
 def main():
     parser = argparse.ArgumentParser(description="Visualization utilities for grade-based analysis")
     parser.add_argument("latents_csv", help="Path to latents CSV file")
-    parser.add_argument("--output", type=str, default="comparison_plots", help="Output directory")
+    parser.add_argument("--output", type=str, default="plots", help="Output directory")
     parser.add_argument("--grades-file", type=str, default="embryo_dataset_grades.csv",
                        help="Path to grades CSV file")
     parser.add_argument("--compare-grades", action="store_true",
                        help="Create comparison plots for all grades")
     parser.add_argument("--grade-filter", type=str,
                        help="Filter by grade (e.g., 'A', 'B', 'A-A', 'any_B')")
+    parser.add_argument("--grade-threshold", type=str, choices=['A', 'B'],
+                       help="Create aggregated plot for cells at least this grade (A or B)")
     parser.add_argument("--plot-type", type=str, choices=['merged', 'grid', 'both'],
                        default='both', help="Type of plot to create")
     parser.add_argument("--max-cells", type=int, help="Maximum number of cells to include")
@@ -334,6 +385,32 @@ def main():
     if args.compare_grades:
         # Create all grade comparison plots
         create_grade_comparison_plots(df, latent_cols, grades_df, args.output)
+
+    elif args.grade_threshold:
+        # Create aggregated plot for cells at grade threshold or better
+        cells = filter_cells_by_grade_threshold(grades_df, args.grade_threshold)
+
+        if len(cells) == 0:
+            print(f"Error: No cells found at grade {args.grade_threshold} or better")
+            sys.exit(1)
+
+        print(f"\nFound {len(cells)} cells graded {args.grade_threshold} or better")
+
+        # Limit cells if requested
+        if args.max_cells and len(cells) > args.max_cells:
+            print(f"Limiting to first {args.max_cells} cells")
+            cells = cells[:args.max_cells]
+
+        # Create plots
+        if args.plot_type in ['merged', 'both']:
+            output_file = os.path.join(args.output, f"merged_at_least_{args.grade_threshold}.png")
+            create_merged_plot(cells, df, latent_cols, output_file,
+                             title=f"Merged Trajectories: Grade {args.grade_threshold}+")
+
+        if args.plot_type in ['grid', 'both']:
+            output_file = os.path.join(args.output, f"grid_at_least_{args.grade_threshold}.png")
+            create_grid_plot(cells, df, latent_cols, output_file,
+                           title=f"Individual Trajectories: Grade {args.grade_threshold}+")
 
     elif args.grade_filter:
         # Filter cells by grade
@@ -362,7 +439,7 @@ def main():
                            title=f"Individual Trajectories: Grade {args.grade_filter}")
 
     else:
-        print("Error: Must specify either --compare-grades or --grade-filter")
+        print("Error: Must specify --compare-grades, --grade-threshold, or --grade-filter")
         sys.exit(1)
 
     print(f"\n\nVisualization complete! Plots saved to: {args.output}")
