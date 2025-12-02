@@ -48,7 +48,70 @@ def apply_tphate(data, n_jobs=-1):
 
 
 
+def fit_circle_2d(x, y, w=[]):
+    
+    A = np.array([x, y, np.ones(len(x))]).T
+    b = x**2 + y**2
+    
+    # Modify A,b for weighted least squares
+    if len(w) == len(x):
+        W = np.diag(w)
+        A = np.dot(W,A)
+        b = np.dot(W,b)
+    
+    # Solve by method of least squares
+    c = np.linalg.lstsq(A,b,rcond=None)[0]
+    
+    # Get circle parameters from solution c
+    xc = c[0]/2
+    yc = c[1]/2
+    r = np.sqrt(c[2] + xc**2 + yc**2)
+    return xc, yc, r
 
+def rodrigues_rot(P, n0, n1):
+    
+    # If P is only 1d array (coords of single point), fix it to be matrix
+    if P.ndim == 1:
+        P = P[newaxis,:]
+    
+    # Get vector of rotation k and angle theta
+    n0 = n0/np.linalg.norm(n0)
+    n1 = n1/np.linalg.norm(n1)
+    k = np.cross(n0,n1)
+    k = k/np.linalg.norm(k)
+    theta = np.arccos(np.dot(n0,n1))
+    
+    # Compute rotated points
+    P_rot = np.zeros((len(P),3))
+    for i in range(len(P)):
+        P_rot[i] = P[i]*np.cos(theta) + np.cross(k,P[i])*np.sin(theta) + k*np.dot(k,P[i])*(1-np.cos(theta))
+
+    return P_rot
+
+def angle_between(u, v, n=None):
+    
+    if n is None:
+        return np.arctan2(np.linalg.norm(np.cross(u,v)), np.dot(u,v))
+    else:
+        return np.arctan2(np.dot(n,np.cross(u,v)), np.dot(u,v))
+    
+def compute_curvature(nbd, traj, num_pts):
+
+    kappa = []
+
+    for pt_idx in range(0, num_pts):
+
+        P = traj[max(0, pt_idx-nbd):min(num_pts, pt_idx+nbd),:]
+        P_mean = P.mean(axis=0)
+        P_centered = P - P_mean
+        U,s,V = np.linalg.svd(P_centered)
+        normal = V[2,:]
+        d = -np.dot(P_mean, normal) 
+        P_xy = rodrigues_rot(P_centered, normal, [0,0,1])
+        xc, yc, r = fit_circle_2d(P_xy[:,0], P_xy[:,1])
+        kappa.append(1.0/r)
+    
+    return kappa
 def plot_cell_trajectory_circle(cell_id, tphate_data, time_steps, output_dir="plots"):
     fig, ax = plt.subplots(figsize=(10, 8))
     print("making plots with ", str(tphate_data.shape), " shape")
