@@ -49,30 +49,39 @@ def apply_tphate(data, n_jobs=-1):
 
 
 def fit_circle_2d(x, y, w=[]):
-    
+
     A = np.array([x, y, np.ones(len(x))]).T
     b = x**2 + y**2
-    
+
     # Modify A,b for weighted least squares
     if len(w) == len(x):
         W = np.diag(w)
         A = np.dot(W,A)
         b = np.dot(W,b)
-    
-    # Solve by method of least squares
-    c = np.linalg.lstsq(A,b,rcond=None)[0]
-    
+
+    # Solve by method of least squares with error handling
+    try:
+        c = np.linalg.lstsq(A, b, rcond=None)[0]
+    except np.linalg.LinAlgError:
+        # If SVD fails, return default values
+        return 0, 0, 1e10
+
     # Get circle parameters from solution c
     xc = c[0]/2
     yc = c[1]/2
-    r = np.sqrt(c[2] + xc**2 + yc**2)
+    r_sq = c[2] + xc**2 + yc**2
+
+    # Ensure radius is positive and reasonable
+    if r_sq <= 0:
+        return xc, yc, 1e10
+    r = np.sqrt(r_sq)
     return xc, yc, r
 
 def rodrigues_rot(P, n0, n1):
-    
+
     # If P is only 1d array (coords of single point), fix it to be matrix
     if P.ndim == 1:
-        P = P[newaxis,:]
+        P = P[np.newaxis, :]
     
     # Get vector of rotation k and angle theta
     n0 = n0/np.linalg.norm(n0)
@@ -104,13 +113,19 @@ def compute_curvature(nbd, traj, num_pts):
         P = traj[max(0, pt_idx-nbd):min(num_pts, pt_idx+nbd),:]
         P_mean = P.mean(axis=0)
         P_centered = P - P_mean
-        U,s,V = np.linalg.svd(P_centered)
-        normal = V[2,:]
-        d = -np.dot(P_mean, normal) 
-        P_xy = rodrigues_rot(P_centered, normal, [0,0,1])
-        xc, yc, r = fit_circle_2d(P_xy[:,0], P_xy[:,1])
-        kappa.append(1.0/r)
-    
+
+        try:
+            U, s, V = np.linalg.svd(P_centered, full_matrices=True)
+            # Handle low-rank case: if last singular value is very small, use it anyway
+            normal = V[-1, :]
+            P_xy = rodrigues_rot(P_centered, normal, [0, 0, 1])
+            xc, yc, r = fit_circle_2d(P_xy[:, 0], P_xy[:, 1])
+            # Clamp curvature to reasonable range
+            kappa.append(min(1.0 / r, 1e10) if r > 0 else 0)
+        except (np.linalg.LinAlgError, ValueError, ZeroDivisionError):
+            # If curvature computation fails, use zero curvature
+            kappa.append(0)
+
     return kappa
 def plot_cell_trajectory_circle(cell_id, tphate_data, time_steps, output_dir="plots"):
     fig, ax = plt.subplots(figsize=(10, 8))
