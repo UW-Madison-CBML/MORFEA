@@ -363,7 +363,7 @@ def create_merged_plot(cell_ids, df, latent_cols, output_file, title="Merged Tra
     print(f"  Saved merged plot: {output_file}")
 
 
-def create_grid_plot(cell_ids, df, latent_cols, output_file, title="Grid Comparison", max_cols=4, coloring='uniform'):
+def create_grid_plot(cell_ids, df, latent_cols, output_file, title="Grid Comparison", max_cols=8, coloring='uniform'):
     """
     Create a grid of individual trajectory plots.
 
