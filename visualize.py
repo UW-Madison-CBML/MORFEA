@@ -117,36 +117,13 @@ def plot_cell_trajectory_circle(cell_id, tphate_data, time_steps, output_dir="pl
     print("making plots with ", str(tphate_data.shape), " shape")
     ax.plot(tphate_data[:, 0], tphate_data[:, 1], 'k-', alpha=0.3, linewidth=1.5)
 
-    # Calculate Menger curvature using three consecutive points
-    # For points p1, p2, p3: κ = 2 * Area(triangle) / (|p1-p2| * |p2-p3| * |p3-p1|)
+    # Convert 2D TPHATE data to 3D by adding a zero z-dimension for curvature calculation
+    tphate_data_3d = np.column_stack([tphate_data, np.zeros(len(tphate_data))])
+
+    # Calculate curvature using the compute_curvature function
     n_points = len(tphate_data)
-    curvature = np.zeros(n_points)
-
-    for i in range(1, n_points - 1):
-        p1 = tphate_data[i - 1]
-        p2 = tphate_data[i]
-        p3 = tphate_data[i + 1]
-
-        # Calculate distances between points
-        d12 = np.linalg.norm(p2 - p1)
-        d23 = np.linalg.norm(p3 - p2)
-        d31 = np.linalg.norm(p1 - p3)
-
-        # Calculate area using cross product (2D: just the z-component magnitude)
-        v1 = p2 - p1
-        v2 = p3 - p1
-        area = 0.5 * np.abs(v1[0] * v2[1] - v1[1] * v2[0])
-
-        # Menger curvature formula
-        denominator = d12 * d23 * d31
-        if denominator > 1e-10:  # Avoid division by zero
-            curvature[i] = 2.0 * area / denominator
-        else:
-            curvature[i] = 0.0
-
-    # Handle boundary points (use neighboring curvature)
-    curvature[0] = curvature[1]
-    curvature[-1] = curvature[-2]
+    nbd = 2  # Neighborhood size for curvature calculation
+    curvature = compute_curvature(nbd, tphate_data_3d, n_points)
 
     # Normalize curvature for color mapping
     curvature_range = np.max(curvature) - np.min(curvature)
