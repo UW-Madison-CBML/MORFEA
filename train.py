@@ -8,6 +8,8 @@ from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 import os
 from model import Model
+from raffael_model import ConvLSTMAutoencoder
+from raffael_losses import reconstruction_loss as convlstm_reconstruction_loss
 import sys
 from torch.utils.data import DataLoader
 from dataset_ivf import IVFSequenceDataset
@@ -728,6 +730,192 @@ def train_mse_single():
     run.finish()
     gc.collect()
     torch.cuda.empty_cache()
+
+
+def train_convlstm():
+    """Training ConvLSTM Autoencoder with MS-SSIM + L1 Loss (single GPU)"""
+    print(torch.cuda.memory_summary(device=None, abbreviated=False))
+    torch.cuda.empty_cache()
+    torch.autograd.detect_anomaly(True)
+    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    wandb.login(key=os.getenv("WANDB_KEY"))
+    run = wandb.init(
+        entity="jenslundsgaard7-uw-madison",
+        project="IVF-Training",
+        config={
+            "learning_rate": 0.005,
+            "architecture": "ConvLSTM Autoencoder",
+            "dataset": "https://zenodo.org/records/7912264",
+            "epochs": 10,
+            "loss": "MS-SSIM + L1 + TCL",
+            "latent_size": 4000,
+            "seq_len": 50,
+            "distributed": False,
+        },
+    )
+
+    login(os.getenv("HF_KEY"))
+    print(torch.cuda.memory_summary(device=None, abbreviated=False))
+    print(DEVICE)
+
+    model = ConvLSTMAutoencoder(
+        seq_len=50,
+        input_channels=1,
+        encoder_hidden_dim=256,
+        encoder_layers=2,
+        decoder_hidden_dim=128,
+        decoder_layers=2,
+        latent_size=4000,
+        use_classifier=False,
+        num_classes=2
+    )
+
+    if os.path.exists("convlstm_model_weights.pth"):
+        try:
+            checkpoint = torch.load("convlstm_model_weights.pth", map_location=DEVICE, weights_only=True)
+            model.load_state_dict(checkpoint)
+            print("Loaded ConvLSTM model weights")
+        except Exception as e:
+            print(f"Error loading weights: {e}")
+
+    model = model.to(DEVICE)
+
+    learning_rate = 0.005
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
+
+    ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
+
+    loader = DataLoader(
+        ds,
+        batch_size=1,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+        drop_last=True
+    )
+
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer, max_lr=learning_rate, steps_per_epoch=len(loader), epochs=10
+    )
+
+    for epoch in range(10):
+        model.train()
+        pbar = tqdm(loader, desc=f"epoch {epoch}")
+        total = 0.0
+        count = 0
+
+        for index, (embryo_vol, empty_well_vol, sample_vol) in enumerate(pbar):
+            optimizer.zero_grad()
+
+            # embryo_vol is (T, 1, 500, 500), we need (1, T, 1, 500, 500)
+            embryo_vol = embryo_vol.unsqueeze(0).to(DEVICE)  # (1, T, 1, 500, 500)
+            sample_vol = sample_vol.unsqueeze(0).to(DEVICE)  # (1, T, 1, 500, 500)
+
+            # Forward pass - returns (reconstruction, latent_seq)
+            embryo_recon, embryo_lat = model(embryo_vol)
+            sample_recon, sample_lat = model(sample_vol)
+
+            # Reconstruction loss using MS-SSIM + L1
+            rec_loss_embryo, rec_metrics_embryo = convlstm_reconstruction_loss(
+                embryo_recon, embryo_vol, l1_weight=0.5, ms_ssim_weight=0.5
+            )
+            rec_loss_sample, rec_metrics_sample = convlstm_reconstruction_loss(
+                sample_recon, sample_vol, l1_weight=0.5, ms_ssim_weight=0.5
+            )
+            rec_loss = rec_loss_embryo + rec_loss_sample
+
+            # Temporal contrastive loss on latents
+            # embryo_lat and sample_lat are (1, T, 4000)
+            embryo_lat = embryo_lat.squeeze(0)  # (T, 4000)
+            sample_lat = sample_lat.squeeze(0)  # (T, 4000)
+
+            # Temporal adjacency similarity (similar frames should have similar latents)
+            embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0)
+            embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0)
+            temp_adj_sim = F.cosine_similarity(embryo_lat1, embryo_lat2).mean()
+
+            # Random sample similarity (different embryos should be different)
+            rand_sample_sim = F.cosine_similarity(embryo_lat, sample_lat).mean()
+
+            # TCL: maximize temporal coherence, minimize cross-sample similarity
+            tcl = rand_sample_sim - temp_adj_sim
+
+            loss = rec_loss + (0.03 * tcl)
+
+            if torch.isnan(loss) or torch.isinf(loss):
+                print(f"NaN/Inf detected, skipping batch")
+                continue
+
+            loss.backward()
+            total_norm = 0
+            for p in model.parameters():
+                if p.grad is not None:
+                    param_norm = p.grad.data.norm(2)
+                    total_norm += param_norm.item() ** 2
+            total_norm = total_norm ** 0.5
+
+            if total_norm > 100:
+                print(f"Warning: Large gradient norm: {total_norm:.2f}")
+
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
+            scheduler.step()
+            optimizer.step()
+            total += loss.item()
+            count += 1
+
+            if (index % 50 == 0) and run is not None:
+                run.log({
+                    "step": epoch * len(loader) + index,
+                    "loss": loss.item(),
+                    "rec_loss": rec_loss.item(),
+                    "tcl": tcl.item(),
+                    "temp_adj_sim": temp_adj_sim.item(),
+                    "rand_sample_sim": rand_sample_sim.item(),
+                    "ms_ssim_embryo": rec_metrics_embryo["ms_ssim_value"],
+                    "ms_ssim_sample": rec_metrics_sample["ms_ssim_value"],
+                    "l1_loss_embryo": rec_metrics_embryo["l1_loss"],
+                    "l1_loss_sample": rec_metrics_sample["l1_loss"],
+                    "lr": scheduler.get_last_lr()[0]
+                })
+
+                pbar.set_postfix(
+                    loss=f"{loss.item():.4f}",
+                    rec=f"{rec_loss.item():.4f}",
+                    tcl=f"{tcl.item():.4f}"
+                )
+
+            del embryo_vol
+            del empty_well_vol
+            del sample_vol
+            del embryo_recon
+            del sample_recon
+            del embryo_lat
+            del sample_lat
+            del embryo_lat1
+            del embryo_lat2
+            del rec_metrics_embryo
+            del rec_metrics_sample
+            torch.cuda.empty_cache()
+
+        avg_loss = total/max(1, count)
+        run.log({"avg_loss": avg_loss})
+        print(f"epoch {epoch} avg loss={avg_loss:.4f}")
+
+        # Save the state dict
+        torch.save(model.state_dict(), "convlstm_model_weights.pth")
+
+        # Save to HuggingFace with date label
+        date_label = datetime.now().strftime("%Y-%m-%d")
+        repo_name = f"IVF-ConvLSTM-Model-{date_label}"
+        model.save_pretrained(repo_name)
+        model.push_to_hub(repo_name)
+
+    run.finish()
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
 if __name__ == "__main__":
     import sys
     if len(sys.argv) > 1:
@@ -736,6 +924,8 @@ if __name__ == "__main__":
             train_mse_distributed()
         elif mode == "mse_single":
             train_mse_single()
+        elif mode == "convlstm":
+            train_convlstm()
         else:
             train()
     else:
