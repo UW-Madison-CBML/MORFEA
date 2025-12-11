@@ -9,7 +9,7 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 import os
 from model import Model
 from raffael_model import ConvLSTMAutoencoder
-from raffael_losses import reconstruction_loss as convlstm_reconstruction_loss
+from raffael_losses import reconstruction_loss as convlstm_reconstruction_loss, temporal_smoothness_loss
 import sys
 from torch.utils.data import DataLoader
 from dataset_ivf import IVFSequenceDataset
@@ -815,17 +815,16 @@ def train_convlstm():
             embryo_recon, embryo_lat = model(embryo_vol)
 
             # Reconstruction loss using MS-SSIM + L1
-            rec_loss_embryo, rec_metrics_embryo = convlstm_reconstruction_loss(
+            rec_loss, rec_metrics = convlstm_reconstruction_loss(
                 embryo_recon, embryo_vol, l1_weight=0.5, ms_ssim_weight=0.5
             )
-            rec_loss = rec_loss_embryo
 
-            # Temporal contrastive loss on latents
-            # embryo_lat and sample_lat are (1, T, 4000)
-            embryo_lat = embryo_lat.squeeze(0)  # (T, 4000)
+            # Temporal smoothness loss
+            # embryo_lat is (1, T, 4000) - encourages smooth transitions between frames
+            smooth_loss = temporal_smoothness_loss(embryo_lat, weight=0.1)
 
-
-            loss = rec_loss
+            # Total loss
+            loss = rec_loss + smooth_loss
 
             if torch.isnan(loss) or torch.isinf(loss):
                 print(f"NaN/Inf detected, skipping batch")
@@ -853,21 +852,18 @@ def train_convlstm():
                     "step": epoch * len(loader) + index,
                     "loss": loss.item(),
                     "rec_loss": rec_loss.item(),
-                    "tcl": tcl.item(),
-                    "temp_adj_sim": temp_adj_sim.item(),
-                    "rand_sample_sim": rand_sample_sim.item(),
-                    "ms_ssim_embryo": rec_metrics_embryo["ms_ssim_value"],
-                    "ms_ssim_sample": rec_metrics_sample["ms_ssim_value"],
-                    "l1_loss_embryo": rec_metrics_embryo["l1_loss"],
-                    "l1_loss_sample": rec_metrics_sample["l1_loss"],
+                    "smooth_loss": smooth_loss.item(),
+                    "ms_ssim": rec_metrics["ms_ssim_value"],
+                    "l1_loss": rec_metrics["l1_loss"],
                     "lr": scheduler.get_last_lr()[0]
                 })
 
                 pbar.set_postfix(
                     loss=f"{loss.item():.4f}",
                     rec=f"{rec_loss.item():.4f}",
-                    tcl=f"{tcl.item():.4f}"
+                    smooth=f"{smooth_loss.item():.4f}"
                 )
+
 
 
         avg_loss = total/max(1, count)
