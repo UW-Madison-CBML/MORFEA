@@ -8,7 +8,7 @@ export TORCH_DISTRIBUTED_DEBUG=DETAIL
 export NCCL_DEBUG=INFO
 tar -zxf embryo_dataset.tar.gz
 
-python train.py mse_single
+python train.py convlstm
 #python -m torch.distributed.launch --nproc_per_node=4 --use_env train.py
 
 rm -r embryo_dataset

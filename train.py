@@ -737,7 +737,7 @@ def train_convlstm():
     print(torch.cuda.memory_summary(device=None, abbreviated=False))
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
-    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     wandb.login(key=os.getenv("WANDB_KEY"))
     run = wandb.init(
@@ -805,43 +805,27 @@ def train_convlstm():
         total = 0.0
         count = 0
 
-        for index, (embryo_vol, empty_well_vol, sample_vol) in enumerate(pbar):
+        for index, (embryo_vol, _, _) in enumerate(pbar):
             optimizer.zero_grad()
 
             # embryo_vol is (T, 1, 500, 500), we need (1, T, 1, 500, 500)
-            embryo_vol = embryo_vol.unsqueeze(0).to(DEVICE)  # (1, T, 1, 500, 500)
-            sample_vol = sample_vol.unsqueeze(0).to(DEVICE)  # (1, T, 1, 500, 500)
+            embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, 500, 500)
 
             # Forward pass - returns (reconstruction, latent_seq)
             embryo_recon, embryo_lat = model(embryo_vol)
-            sample_recon, sample_lat = model(sample_vol)
 
             # Reconstruction loss using MS-SSIM + L1
             rec_loss_embryo, rec_metrics_embryo = convlstm_reconstruction_loss(
                 embryo_recon, embryo_vol, l1_weight=0.5, ms_ssim_weight=0.5
             )
-            rec_loss_sample, rec_metrics_sample = convlstm_reconstruction_loss(
-                sample_recon, sample_vol, l1_weight=0.5, ms_ssim_weight=0.5
-            )
-            rec_loss = rec_loss_embryo + rec_loss_sample
+            rec_loss = rec_loss_embryo
 
             # Temporal contrastive loss on latents
             # embryo_lat and sample_lat are (1, T, 4000)
             embryo_lat = embryo_lat.squeeze(0)  # (T, 4000)
-            sample_lat = sample_lat.squeeze(0)  # (T, 4000)
 
-            # Temporal adjacency similarity (similar frames should have similar latents)
-            embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0)
-            embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0)
-            temp_adj_sim = F.cosine_similarity(embryo_lat1, embryo_lat2).mean()
 
-            # Random sample similarity (different embryos should be different)
-            rand_sample_sim = F.cosine_similarity(embryo_lat, sample_lat).mean()
-
-            # TCL: maximize temporal coherence, minimize cross-sample similarity
-            tcl = rand_sample_sim - temp_adj_sim
-
-            loss = rec_loss + (0.03 * tcl)
+            loss = rec_loss
 
             if torch.isnan(loss) or torch.isinf(loss):
                 print(f"NaN/Inf detected, skipping batch")
@@ -885,18 +869,6 @@ def train_convlstm():
                     tcl=f"{tcl.item():.4f}"
                 )
 
-            del embryo_vol
-            del empty_well_vol
-            del sample_vol
-            del embryo_recon
-            del sample_recon
-            del embryo_lat
-            del sample_lat
-            del embryo_lat1
-            del embryo_lat2
-            del rec_metrics_embryo
-            del rec_metrics_sample
-            torch.cuda.empty_cache()
 
         avg_loss = total/max(1, count)
         run.log({"avg_loss": avg_loss})
