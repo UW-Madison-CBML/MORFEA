@@ -795,9 +795,7 @@ def train_convlstm():
         drop_last=True
     )
 
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer, max_lr=learning_rate, steps_per_epoch=len(loader), epochs=10
-    )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * 10)
 
     for epoch in range(10):
         model.train()
