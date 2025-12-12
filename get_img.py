@@ -9,7 +9,7 @@ import os
 from raffael_model import ConvLSTMAutoencoder
 from huggingface_hub import HfApi
 from huggingface_hub import login
-
+from datetime import datetime
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(DEVICE)
@@ -37,7 +37,7 @@ def main():
         num_classes=2
     )
     date_label = datetime.now().strftime("%Y-%m-%d")
-    repo_name = f"IVF-ConvLSTM-Model-{date_label}"
+    model_name = f"JensLundsgaard/IVF-ConvLSTM-Model-{date_label}"
     model.from_pretrained(model_name)
 
 
