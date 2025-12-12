@@ -11,6 +11,7 @@ from model import Model
 from raffael_model import ConvLSTMAutoencoder
 from raffael_losses import reconstruction_loss as convlstm_reconstruction_loss, temporal_smoothness_loss
 import sys
+
 from torch.utils.data import DataLoader
 from dataset_ivf import IVFSequenceDataset
 from tqdm import tqdm
