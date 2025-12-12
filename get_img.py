@@ -9,7 +9,7 @@ import os
 from raffael_model import ConvLSTMAutoencoder
 from huggingface_hub import HfApi
 from huggingface_hub import login
-from datetime import datetime
+from datetime import datetime, timedelta
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(DEVICE)
@@ -36,9 +36,27 @@ def main():
         use_classifier=False,
         num_classes=2
     )
-    date_label = datetime.now().strftime("%Y-%m-%d")
-    model_name = f"JensLundsgaard/IVF-ConvLSTM-Model-{date_label}"
-    model.from_pretrained(model_name)
+
+    # Search for model going back up to 30 days
+    model_loaded = False
+    for days_back in range(31):
+        date_label = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        model_name = f"JensLundsgaard/IVF-ConvLSTM-Model-{date_label}"
+        try:
+            print(f"Attempting to load model: {model_name}")
+            model.from_pretrained(model_name)
+            print(f"Successfully loaded model from {date_label}")
+            model_loaded = True
+            break
+        except Exception as e:
+            if days_back < 30:
+                continue
+            else:
+                print(f"Failed to find model within 30 days. Last error: {e}")
+                raise
+
+    if not model_loaded:
+        raise Exception("Could not find any model within the last 30 days")
 
 
     model = model.to(DEVICE)
