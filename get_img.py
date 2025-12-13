@@ -70,7 +70,7 @@ def main():
         # Reshape embryo volume like in training
         embryo_vol = embryo_vol[:,0].view(1, 1, 500, 500).unsqueeze(0).to(DEVICE)
         with torch.no_grad(): 
-            recon, _ = model(embryo_vol, empty_well=False)
+            recon, _ = model(embryo_vol)
         vol_img = embryo_vol[0, -1, 0].cpu().detach().numpy() * 255
         recon_img = recon[0, -1, 0].cpu().detach().numpy() * 255
         comparison = np.concatenate((vol_img, recon_img), axis=1).astype(np.uint8)
