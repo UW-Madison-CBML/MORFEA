@@ -67,8 +67,8 @@ def main():
         row = ds.df.iloc[idx]
         cell_id = row.get("cell_id", f"cell_{idx}")
 
-        # Reshape embryo volume like in training
-        embryo_vol = embryo_vol[:,0].view(1, 1, 500, 500).unsqueeze(0).to(DEVICE)
+        # Pass full sequence to model
+        embryo_vol = embryo_vol.to(DEVICE)
         with torch.no_grad(): 
             recon, _ = model(embryo_vol)
         vol_img = embryo_vol[0, -1, 0].cpu().detach().numpy() * 255
