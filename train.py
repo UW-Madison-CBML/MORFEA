@@ -750,8 +750,9 @@ def train_convlstm():
             "dataset": "https://zenodo.org/records/7912264",
             "epochs": 10,
             "loss": "MS-SSIM + L1 + TCL",
-            "latent_size": 4000,
+            "latent_size": 4096,
             "seq_len": 50,
+            "image_size": 128,
             "distributed": False,
         },
     )
@@ -767,7 +768,7 @@ def train_convlstm():
         encoder_layers=2,
         decoder_hidden_dim=128,
         decoder_layers=2,
-        latent_size=4000,
+        latent_size=4096,
         use_classifier=False,
         num_classes=2
     )
@@ -785,7 +786,7 @@ def train_convlstm():
     learning_rate = 0.005
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
 
-    ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
+    ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=128, norm="minmax01")
 
     loader = DataLoader(
         ds,
