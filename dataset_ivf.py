@@ -10,10 +10,13 @@ class IVFSequenceDataset(Dataset):
         self.norm = norm
 
     def _read_gray(self, path):
-        img = np.array(Image.open(path), dtype = "float32")
-        if img is None: 
+        img = Image.open(path)
+        if img is None:
             raise FileNotFoundError(path)
-        return img.astype(np.float32)
+        # Resize if needed
+        if self.resize is not None:
+            img = img.resize((self.resize, self.resize), Image.BILINEAR)
+        return np.array(img, dtype="float32")
 
     def _normalize_video(self, vol):
         if self.norm == "zscore":
