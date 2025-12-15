@@ -70,7 +70,7 @@ class Encoder(nn.Module):
     def forward(self, x):
         """
         Args:
-            x: (B, T, 1, H, W) - input video sequence (128x128)
+            x: (B, T, 1, H, W) - input video sequence (any size, will be resized to 128x128)
 
         Returns:
             z_seq: (B, T, latent_size) - compressed latent sequence
@@ -78,8 +78,12 @@ class Encoder(nn.Module):
         """
         B, T, C, H, W = x.shape
 
+        # Resize to 128x128 if needed
+        x = x.view(B * T, C, H, W)  # (B*T, 1, H, W)
+        if H != 128 or W != 128:
+            x = torch.nn.functional.interpolate(x, size=(128, 128), mode='bilinear', align_corners=True)
+
         # Spatial compression: process each frame separately
-        x = x.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
         x = self.spatial_cnn(x)      # (B*T, 256, 16, 16)
         _, C2, H2, W2 = x.shape
         x = x.view(B, T, C2, H2, W2)  # (B, T, 256, 16, 16)
@@ -267,12 +271,12 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
     def forward(self, x, return_all=False):
         """
         Args:
-            x: (B, T, 1, H, W) - input video sequence (128x128)
+            x: (B, T, 1, H, W) - input video sequence (any size, will be resized internally)
             return_all: whether to return all intermediate results
 
         Returns:
             Tuple of (reconstruction, lat_vec_seq) where:
-                - reconstruction: (B, T, 1, 128, 128) - reconstructed video
+                - reconstruction: (B, T, 1, H, W) - reconstructed video (same size as input)
                 - lat_vec_seq: (B, T, latent_size) - compressed latent sequence
 
             If return_all is True, returns dict with keys:
@@ -281,11 +285,19 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
                 - z_last: (B, latent_size) - last timestep compressed latent
                 - logits: (B, num_classes) - classification logits (if enabled)
         """
-        # Encode
+        B, T, C, orig_H, orig_W = x.shape
+
+        # Encode (will resize to 128x128 internally)
         z_seq, z_last = self.encoder(x)
 
-        # Decode
+        # Decode (outputs 128x128)
         x_rec = self.decoder(z_seq)
+
+        # Resize back to original input size if needed
+        if orig_H != 128 or orig_W != 128:
+            x_rec_flat = x_rec.view(B * T, C, 128, 128)
+            x_rec_flat = torch.nn.functional.interpolate(x_rec_flat, size=(orig_H, orig_W), mode='bilinear', align_corners=True)
+            x_rec = x_rec_flat.view(B, T, C, orig_H, orig_W)
 
         if return_all:
             # Build output dictionary
