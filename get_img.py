@@ -38,6 +38,12 @@ def main():
     )
 
     # Search for model going back up to 30 days
+    api = HfApi()
+
+    # List the first 10 most downloaded models
+    models = api.list_models(sort="downloads", direction=-1, limit=10)
+
+    print(f"Model ID: {model.id} | Downloads: {model.downloads}")
     model_loaded = False
     for days_back in range(31):
         date_label = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
