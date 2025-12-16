@@ -35,7 +35,7 @@ transfer_output_files = model_weights.pth
 request_cpus = 4
 request_memory = 64GB
 request_disk = 80GB
-request_gpus = 2
+request_gpus = 1
 
 
 queue 1
