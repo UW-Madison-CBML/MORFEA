@@ -6,11 +6,84 @@ Complete High-Quality ConvLSTM Autoencoder
 - Optional Empty/Non-empty Classifier
 - Works with 128x128 input images
 - Latent format: (B, T, N) where N is flattened spatial dimensions
+- Includes ResNet-style residual connections in CNN layers
 """
 import torch
 import torch.nn as nn
 from raffael_conv_lstm import ConvLSTM
 from huggingface_hub import PyTorchModelHubMixin
+
+
+class ResidualBlock(nn.Module):
+    """
+    Residual block for encoder with optional downsampling
+    """
+    def __init__(self, in_channels, out_channels, downsample=False):
+        super(ResidualBlock, self).__init__()
+
+        stride = 2 if downsample else 1
+
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+
+        # Projection shortcut if channels change or downsampling
+        if in_channels != out_channels or downsample:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride),
+                nn.BatchNorm2d(out_channels)
+            )
+        else:
+            self.shortcut = nn.Identity()
+
+    def forward(self, x):
+        identity = self.shortcut(x)
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+
+        out += identity
+        out = self.relu(out)
+
+        return out
+
+
+class ResidualUpBlock(nn.Module):
+    """
+    Residual block for decoder with upsampling
+    """
+    def __init__(self, in_channels, out_channels):
+        super(ResidualUpBlock, self).__init__()
+
+        self.upsample = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+
+        # Shortcut with upsampling
+        self.shortcut = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1)
+
+    def forward(self, x):
+        identity = self.shortcut(x)
+
+        out = self.upsample(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv(out)
+        out = self.bn2(out)
+
+        out += identity
+        out = self.relu(out)
+
+        return out
 
 
 class Encoder(nn.Module):
@@ -25,26 +98,17 @@ class Encoder(nn.Module):
         self.hidden_dim = hidden_dim
         self.latent_size = latent_size
 
-        # Spatial convolution: process each frame separately
+        # Spatial convolution with residual connections: process each frame separately
         # 128x128 -> 64x64 -> 32x32 -> 16x16
         self.spatial_cnn = nn.Sequential(
-            # Layer 1: 128 -> 64
-            nn.Conv2d(input_channels, 64, kernel_size=3, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),  # 128 -> 64
+            # Layer 1: 128 -> 64 (with downsampling)
+            ResidualBlock(input_channels, 64, downsample=True),
 
-            # Layer 2: 64 -> 32
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),  # 64 -> 32
+            # Layer 2: 64 -> 32 (with downsampling)
+            ResidualBlock(64, 128, downsample=True),
 
-            # Layer 3: 32 -> 16
-            nn.Conv2d(128, 256, kernel_size=3, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),  # 32 -> 16
+            # Layer 3: 32 -> 16 (with downsampling)
+            ResidualBlock(128, 256, downsample=True),
         )
 
         # ConvLSTM: process temporal sequence
@@ -133,22 +197,16 @@ class Decoder(nn.Module):
             return_all_layers=False
         )
 
-        # Spatial decoding: 16x16 -> 32x32 -> 64x64 -> 128x128
+        # Spatial decoding with residual connections: 16x16 -> 32x32 -> 64x64 -> 128x128
         self.spatial_decoder = nn.Sequential(
-            # 16 -> 32
-            nn.ConvTranspose2d(hidden_dim, 128, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
+            # 16 -> 32 (with upsampling)
+            ResidualUpBlock(hidden_dim, 128),
 
-            # 32 -> 64
-            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
+            # 32 -> 64 (with upsampling)
+            ResidualUpBlock(128, 64),
 
-            # 64 -> 128
-            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
+            # 64 -> 128 (with upsampling)
+            ResidualUpBlock(64, 32),
 
             # Final output layer
             nn.Conv2d(32, 1, kernel_size=3, padding=1),
