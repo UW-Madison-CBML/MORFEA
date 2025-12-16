@@ -776,12 +776,25 @@ def train_mse_single():
     torch.cuda.empty_cache()
 
 
-def train_convlstm():
-    """Training ConvLSTM Autoencoder with MS-SSIM + L1 Loss (single GPU)"""
+def train_convlstm(loss_type="l1", use_temporal_smoothness=True):
+    """Training ConvLSTM Autoencoder with configurable loss (single GPU)
+
+    Args:
+        loss_type: "l1" or "mse" - type of reconstruction loss to use with MS-SSIM
+        use_temporal_smoothness: bool - whether to apply temporal smoothness loss
+    """
     print(torch.cuda.memory_summary(device=None, abbreviated=False))
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Build loss description for logging
+    loss_components = []
+    loss_components.append("MS-SSIM")
+    loss_components.append(loss_type.upper())
+    if use_temporal_smoothness:
+        loss_components.append("Temporal-Smooth")
+    loss_description = " + ".join(loss_components)
 
     wandb.login(key=os.getenv("WANDB_KEY"))
     run = wandb.init(
@@ -792,7 +805,9 @@ def train_convlstm():
             "architecture": "ConvLSTM Autoencoder",
             "dataset": "https://zenodo.org/records/7912264",
             "epochs": 10,
-            "loss": "MS-SSIM + L1 + TCL",
+            "loss": loss_description,
+            "loss_type": loss_type,
+            "use_temporal_smoothness": use_temporal_smoothness,
             "latent_size": 4096,
             "seq_len": 50,
             "image_size": 128,
@@ -803,6 +818,60 @@ def train_convlstm():
     login(os.getenv("HF_KEY"))
     print(torch.cuda.memory_summary(device=None, abbreviated=False))
     print(DEVICE)
+    print(f"\nTraining Configuration:")
+    print(f"  Loss Type: {loss_type.upper()}")
+    print(f"  Temporal Smoothness: {'Enabled' if use_temporal_smoothness else 'Disabled'}")
+    print(f"  Combined Loss: {loss_description}\n")
+
+    # Save detailed training configuration
+    config_content = f"""ConvLSTM Autoencoder Training Configuration
+============================================
+Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+Model Architecture:
+  - Architecture: ConvLSTM Autoencoder with Residual Connections
+  - Sequence Length: 50
+  - Input Channels: 1
+  - Encoder Hidden Dim: 256
+  - Encoder Layers: 2
+  - Decoder Hidden Dim: 128
+  - Decoder Layers: 2
+  - Latent Size: 4096
+  - Use Classifier: False
+  - Image Size: 128x128
+
+Training Configuration:
+  - Loss Type: {loss_type.upper()}
+  - Temporal Smoothness Loss: {'Enabled (weight=0.1)' if use_temporal_smoothness else 'Disabled'}
+  - Combined Loss Function: {loss_description}
+  - Learning Rate: 2e-4 (CosineAnnealingLR)
+  - Weight Decay: 1e-5
+  - Optimizer: Adam
+  - Batch Size: 1
+  - Epochs: 10
+  - Gradient Clipping: 5.0
+  - Device: {DEVICE}
+
+Dataset:
+  - Dataset: https://zenodo.org/records/7912264
+  - Resize: 128x128
+  - Normalization: minmax01
+
+Loss Weights:
+  - Reconstruction Loss Weight: 0.5
+  - MS-SSIM Weight: 0.5
+  - Temporal Smoothness Weight: {0.1 if use_temporal_smoothness else 0.0}
+
+Model Files:
+  - raffael_model.py (with ResNet-style residual blocks)
+  - raffael_conv_lstm.py (ConvLSTM implementation)
+  - raffael_losses.py (Loss functions)
+"""
+
+    with open("training_config_detailed.txt", "w") as f:
+        f.write(config_content)
+
+    print("Configuration saved to training_config_detailed.txt")
 
     model = ConvLSTMAutoencoder(
         seq_len=50,
@@ -857,17 +926,38 @@ def train_convlstm():
             # Forward pass - returns (reconstruction, latent_seq)
             embryo_recon, embryo_lat = model(embryo_vol)
 
-            # Reconstruction loss using MS-SSIM + L1
-            rec_loss, rec_metrics = convlstm_reconstruction_loss(
-                embryo_recon, embryo_vol, l1_weight=0.5, ms_ssim_weight=0.5
-            )
+            # Reconstruction loss using MS-SSIM + L1 or MSE
+            if loss_type == "l1":
+                rec_loss, rec_metrics = convlstm_reconstruction_loss(
+                    embryo_recon, embryo_vol, l1_weight=0.5, ms_ssim_weight=0.5
+                )
+            elif loss_type == "mse":
+                # MS-SSIM + MSE loss
+                B, T, C, H, W = embryo_recon.shape
+                x_rec_flat = embryo_recon.view(B * T, C, H, W)
+                x_true_flat = embryo_vol.view(B * T, C, H, W)
 
-            # Temporal smoothness loss
-            # embryo_lat is (1, T, 4000) - encourages smooth transitions between frames
-            smooth_loss = temporal_smoothness_loss(embryo_lat, weight=0.1)
+                mse_loss = F.mse_loss(embryo_recon, embryo_vol)
+                ms_ssim_val = ms_ssim(x_rec_flat, x_true_flat)
+                ms_ssim_loss = 1 - ms_ssim_val
 
-            # Total loss
-            loss = rec_loss + smooth_loss
+                rec_loss = 0.5 * mse_loss + 0.5 * ms_ssim_loss
+                rec_metrics = {
+                    "mse_loss": mse_loss.item(),
+                    "ms_ssim_loss": ms_ssim_loss.item(),
+                    "ms_ssim_value": ms_ssim_val.item()
+                }
+            else:
+                raise ValueError(f"Invalid loss_type: {loss_type}. Must be 'l1' or 'mse'")
+
+            # Temporal smoothness loss (optional)
+            # embryo_lat is (1, T, 4096) - encourages smooth transitions between frames
+            if use_temporal_smoothness:
+                smooth_loss = temporal_smoothness_loss(embryo_lat, weight=0.1)
+                loss = rec_loss + smooth_loss
+            else:
+                smooth_loss = torch.tensor(0.0, device=DEVICE)
+                loss = rec_loss
 
             if torch.isnan(loss) or torch.isinf(loss):
                 print(f"NaN/Inf detected, skipping batch")
@@ -891,15 +981,22 @@ def train_convlstm():
             count += 1
 
             if (index % 50 == 0) and run is not None:
-                run.log({
+                log_dict = {
                     "step": epoch * len(loader) + index,
                     "loss": loss.item(),
                     "rec_loss": rec_loss.item(),
                     "smooth_loss": smooth_loss.item(),
                     "ms_ssim": rec_metrics["ms_ssim_value"],
-                    "l1_loss": rec_metrics["l1_loss"],
                     "lr": scheduler.get_last_lr()[0]
-                })
+                }
+
+                # Add loss-specific metrics
+                if loss_type == "l1":
+                    log_dict["l1_loss"] = rec_metrics["l1_loss"]
+                elif loss_type == "mse":
+                    log_dict["mse_loss"] = rec_metrics["mse_loss"]
+
+                run.log(log_dict)
 
                 pbar.set_postfix(
                     loss=f"{loss.item():.4f}",
@@ -918,7 +1015,10 @@ def train_convlstm():
 
         # Save to HuggingFace with descriptive name
         date_label = datetime.now().strftime("%Y-%m-%d")
-        repo_name = f"embryo-convlstm-temporal-{date_label}"
+        loss_suffix = f"{loss_type}"
+        if use_temporal_smoothness:
+            loss_suffix += "-temporal"
+        repo_name = f"embryo-convlstm-{loss_suffix}-{date_label}"
 
         # Required files for ConvLSTM model
         required_files = [
@@ -927,6 +1027,9 @@ def train_convlstm():
             "raffael_losses.py",
             "raffael_conv_lstm.py",
             "dataset_ivf.py",
+            "train_model.sh",
+            "training_config.txt",  # Shell script training configuration
+            "training_config_detailed.txt",  # Detailed training configuration
         ]
 
         save_and_push_model(model, repo_name, required_files)
@@ -938,15 +1041,28 @@ def train_convlstm():
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) > 1:
+    import argparse
+
+    # Check if using old command line interface
+    if len(sys.argv) > 1 and sys.argv[1] in ["mse_distributed", "mse_single", "convlstm"]:
         mode = sys.argv[1]
         if mode == "mse_distributed":
             train_mse_distributed()
         elif mode == "mse_single":
             train_mse_single()
         elif mode == "convlstm":
-            train_convlstm()
-        else:
-            train()
+            # Parse additional convlstm arguments
+            parser = argparse.ArgumentParser(description="Train ConvLSTM Autoencoder")
+            parser.add_argument("mode", type=str, help="Training mode")
+            parser.add_argument("--loss-type", type=str, default="l1", choices=["l1", "mse"],
+                              help="Reconstruction loss type: l1 or mse (default: l1)")
+            parser.add_argument("--no-temporal-smoothness", action="store_true",
+                              help="Disable temporal smoothness loss")
+            args = parser.parse_args()
+
+            train_convlstm(
+                loss_type=args.loss_type,
+                use_temporal_smoothness=not args.no_temporal_smoothness
+            )
     else:
         train()
