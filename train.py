@@ -30,6 +30,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
 import os
 from huggingface_hub import login
+import shutil
 def setup_distributed():
     """Initialize distributed training"""
     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
@@ -50,6 +51,33 @@ def setup_distributed():
 def cleanup_distributed():
     if dist.is_initialized():
         dist.destroy_process_group()
+
+def save_and_push_model(model, repo_name, required_files):
+    """
+    Save model and push it along with required training files to HuggingFace Hub
+
+    Args:
+        model: The model to save
+        repo_name: Repository name on HuggingFace Hub
+        required_files: List of file paths to include in the repo
+    """
+    # Create temporary directory for the repo
+    os.makedirs(repo_name, exist_ok=True)
+
+    # Save the model
+    model.save_pretrained(repo_name)
+
+    # Copy all required files
+    for file_path in required_files:
+        if os.path.exists(file_path):
+            shutil.copy2(file_path, repo_name)
+            print(f"Added {file_path} to repository")
+        else:
+            print(f"Warning: {file_path} not found, skipping")
+
+    # Push to hub
+    model.push_to_hub(repo_name)
+    print(f"Successfully pushed model and files to {repo_name}")
 def gaussian_kernel(size=11, sigma=1.5):
     """Generate Gaussian kernel for SSIM"""
     coords = torch.arange(size, dtype=torch.float32)
@@ -207,16 +235,10 @@ def train():
             model.load_state_dict(checkpoint)
             if is_main:
                 print("Loaded model weights")
-                model_cpu = model.cpu()
-                model_cpu.save_pretrained("IVF-Model")
-                model_cpu.push_to_hub("IVF-Model")
         except Exception as e:
             if is_main:
                 print(f"Error loading weights: {e}")
                 torch.save(model.state_dict(), "model_weights.pth")
-                model_cpu = model.cpu()
-                model_cpu.save_pretrained("IVF-Model")
-                model_cpu.push_to_hub("IVF-Model")
     else:
         if is_main:
             torch.save(model.state_dict(), "model_weights.pth")
@@ -379,11 +401,18 @@ def train():
             model_cpu = type(model_to_save)()  # Create new instance
             model_cpu.load_state_dict(model_to_save.state_dict())
 
-            # Save with date label
+            # Save with descriptive name
             date_label = datetime.now().strftime("%Y-%m-%d")
-            repo_name = f"IVF-Model-{date_label}"
-            model_cpu.save_pretrained(repo_name)
-            model_cpu.push_to_hub(repo_name)
+            repo_name = f"embryo-vision-msssim-{date_label}"
+
+            # Required files for this model
+            required_files = [
+                "train.py",
+                "model.py",
+                "dataset_ivf.py",
+            ]
+
+            save_and_push_model(model_cpu, repo_name, required_files)
             del model_cpu  # Clean up the CPU copy
 
     if is_main:
@@ -572,13 +601,20 @@ def train_mse_distributed():
             model_to_save = model.module if hasattr(model, 'module') else model
             torch.save(model_to_save.state_dict(), "model_weights_mse.pth")
 
-            # Save to HuggingFace with date label
+            # Save to HuggingFace with descriptive name
             model_cpu = type(model_to_save)()
             model_cpu.load_state_dict(model_to_save.state_dict())
             date_label = datetime.now().strftime("%Y-%m-%d")
-            repo_name = f"IVF-Model-MSE-{date_label}"
-            model_cpu.save_pretrained(repo_name)
-            model_cpu.push_to_hub(repo_name)
+            repo_name = f"embryo-vision-mse-distributed-{date_label}"
+
+            # Required files for this model
+            required_files = [
+                "train.py",
+                "model.py",
+                "dataset_ivf.py",
+            ]
+
+            save_and_push_model(model_cpu, repo_name, required_files)
             del model_cpu
 
     if is_main:
@@ -722,11 +758,18 @@ def train_mse_single():
         print(f"epoch {epoch} avg loss={avg_loss}:.4f")
         torch.save(model.state_dict(), "model_weights_mse_single.pth")
 
-        # Save to HuggingFace with date label
+        # Save to HuggingFace with descriptive name
         date_label = datetime.now().strftime("%Y-%m-%d")
-        repo_name = f"IVF-Model-MSE-Single-{date_label}"
-        model.save_pretrained(repo_name)
-        model.push_to_hub(repo_name)
+        repo_name = f"embryo-vision-mse-{date_label}"
+
+        # Required files for this model
+        required_files = [
+            "train.py",
+            "model.py",
+            "dataset_ivf.py",
+        ]
+
+        save_and_push_model(model, repo_name, required_files)
 
     run.finish()
     gc.collect()
@@ -873,11 +916,20 @@ def train_convlstm():
         # Save the state dict
         torch.save(model.state_dict(), "convlstm_model_weights.pth")
 
-        # Save to HuggingFace with date label
+        # Save to HuggingFace with descriptive name
         date_label = datetime.now().strftime("%Y-%m-%d")
-        repo_name = f"IVF-ConvLSTM-Model-{date_label}"
-        model.save_pretrained(repo_name)
-        model.push_to_hub(repo_name)
+        repo_name = f"embryo-convlstm-temporal-{date_label}"
+
+        # Required files for ConvLSTM model
+        required_files = [
+            "train.py",
+            "raffael_model.py",
+            "raffael_losses.py",
+            "raffael_conv_lstm.py",
+            "dataset_ivf.py",
+        ]
+
+        save_and_push_model(model, repo_name, required_files)
 
     run.finish()
     gc.collect()
