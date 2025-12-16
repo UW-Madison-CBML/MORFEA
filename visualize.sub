@@ -27,7 +27,7 @@ transfer_output_files = plots.tar.gz
 # compute resources each job will need on the computer where it runs.
 request_cpus = 1
 request_memory = 32GB
-request_disk = 16GB
+request_disk = 64GB
 
 queue 1
 #queue cell_group from cell_groups.txt
