@@ -112,7 +112,7 @@ def filter_cells_by_grade(grades_df, grade_filter):
 def apply_tphate(data, n_jobs=-1):
     """Apply TPHATE to data"""
     print(f"  Applying TPHATE to {data.shape[0]} samples...")
-    tphate_op = tphate.TPHATE(n_jobs=n_jobs)
+    tphate_op = tphate.TPHATE(n_jobs=n_jobs, n_components=3)
     tphate_data = tphate_op.fit_transform(data)
     print(f"  TPHATE output shape: {tphate_data.shape}")
 
@@ -254,24 +254,30 @@ def plot_single_trajectory(ax, tphate_data, time_steps, cell_id, color='blue', a
     """Plot a single trajectory on given axes
 
     Args:
-        ax: Matplotlib axis
-        tphate_data: 2D TPHATE coordinates
+        ax: Matplotlib axis (can be 2D or 3D)
+        tphate_data: 3D TPHATE coordinates (N, 3)
         time_steps: Time step values
         cell_id: Cell ID for labeling
         color: Color for uniform coloring
         alpha: Alpha transparency
         coloring: 'uniform', 'curvature', 'velocity', or 'phase'
     """
+    is_3d = tphate_data.shape[1] == 3
+
     # Plot line
-    ax.plot(tphate_data[:, 0], tphate_data[:, 1], '-', color=color, alpha=alpha*0.5, linewidth=1.5)
+    if is_3d:
+        ax.plot(tphate_data[:, 0], tphate_data[:, 1], tphate_data[:, 2], '-',
+                color=color, alpha=alpha*0.5, linewidth=1.5)
+    else:
+        ax.plot(tphate_data[:, 0], tphate_data[:, 1], '-',
+                color=color, alpha=alpha*0.5, linewidth=1.5)
 
     # Determine colors for points
     if coloring == 'curvature':
-        # Color by curvature
-        tphate_data_3d = np.column_stack([tphate_data, np.zeros(len(tphate_data))])
+        # Color by curvature (works for 3D data now!)
         n_points = len(tphate_data)
         nbd = 2
-        curvature = compute_curvature(nbd, tphate_data_3d, n_points)
+        curvature = compute_curvature(nbd, tphate_data, n_points)
         curvature_range = np.max(curvature) - np.min(curvature)
         if curvature_range > 1e-10:
             norm_curvature = (curvature - np.min(curvature)) / curvature_range
@@ -283,7 +289,11 @@ def plot_single_trajectory(ax, tphate_data, time_steps, cell_id, color='blue', a
         # Color by velocity
         dx = np.diff(tphate_data[:, 0])
         dy = np.diff(tphate_data[:, 1])
-        distances = np.sqrt(dx**2 + dy**2)
+        if is_3d:
+            dz = np.diff(tphate_data[:, 2])
+            distances = np.sqrt(dx**2 + dy**2 + dz**2)
+        else:
+            distances = np.sqrt(dx**2 + dy**2)
         dt = np.diff(time_steps)
         dt[dt == 0] = 1e-10
         velocities = distances / dt
@@ -304,12 +314,20 @@ def plot_single_trajectory(ax, tphate_data, time_steps, cell_id, color='blue', a
         colors = [color] * len(tphate_data)
 
     # Plot points
-    ax.scatter(tphate_data[:, 0], tphate_data[:, 1], c=colors, alpha=alpha, s=30,
-               edgecolors='black', linewidth=0.3, zorder=5)
-
-    # Mark start and end
-    ax.plot(tphate_data[0, 0], tphate_data[0, 1], 'go', markersize=8, zorder=6)
-    ax.plot(tphate_data[-1, 0], tphate_data[-1, 1], 'r*', markersize=12, zorder=6)
+    if is_3d:
+        ax.scatter(tphate_data[:, 0], tphate_data[:, 1], tphate_data[:, 2],
+                   c=colors, alpha=alpha, s=30, edgecolors='black', linewidth=0.3, zorder=5)
+        # Mark start and end
+        ax.scatter(tphate_data[0, 0], tphate_data[0, 1], tphate_data[0, 2],
+                   c='green', marker='o', s=80, zorder=6, edgecolors='black', linewidth=1)
+        ax.scatter(tphate_data[-1, 0], tphate_data[-1, 1], tphate_data[-1, 2],
+                   c='red', marker='*', s=200, zorder=6, edgecolors='black', linewidth=1)
+    else:
+        ax.scatter(tphate_data[:, 0], tphate_data[:, 1], c=colors, alpha=alpha, s=30,
+                   edgecolors='black', linewidth=0.3, zorder=5)
+        # Mark start and end
+        ax.plot(tphate_data[0, 0], tphate_data[0, 1], 'go', markersize=8, zorder=6)
+        ax.plot(tphate_data[-1, 0], tphate_data[-1, 1], 'r*', markersize=12, zorder=6)
 
 
 def create_merged_plot(cell_ids, df, latent_cols, output_file, title="Merged Trajectories", coloring='uniform'):
@@ -324,9 +342,10 @@ def create_merged_plot(cell_ids, df, latent_cols, output_file, title="Merged Tra
         title: Plot title
         coloring: 'uniform', 'curvature', or 'velocity'
     """
-    print(f"\nCreating merged plot with {len(cell_ids)} cells")
+    print(f"\nCreating merged 3D plot with {len(cell_ids)} cells")
 
-    fig, ax = plt.subplots(figsize=(12, 10))
+    fig = plt.figure(figsize=(14, 12))
+    ax = fig.add_subplot(111, projection='3d')
     colors = plt.cm.tab20(np.linspace(0, 1, len(cell_ids)))
 
     for idx, cell_id in enumerate(cell_ids):
@@ -348,24 +367,25 @@ def create_merged_plot(cell_ids, df, latent_cols, output_file, title="Merged Tra
 
     ax.set_xlabel("TPHATE Dimension 1", fontsize=12)
     ax.set_ylabel("TPHATE Dimension 2", fontsize=12)
+    ax.set_zlabel("TPHATE Dimension 3", fontsize=12)
     ax.set_title(title, fontsize=14)
     ax.grid(True, alpha=0.3)
 
     # Legend
-    ax.plot([], [], 'go', markersize=8, label='Start')
-    ax.plot([], [], 'r*', markersize=12, label='End')
+    ax.scatter([], [], [], c='green', marker='o', s=80, label='Start', edgecolors='black')
+    ax.scatter([], [], [], c='red', marker='*', s=200, label='End', edgecolors='black')
     ax.legend(fontsize=10)
 
     plt.tight_layout()
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     plt.close()
 
-    print(f"  Saved merged plot: {output_file}")
+    print(f"  Saved merged 3D plot: {output_file}")
 
 
-def create_grid_plot(cell_ids, df, latent_cols, output_file, title="Grid Comparison", max_cols=8, coloring='uniform'):
+def create_grid_plot(cell_ids, df, latent_cols, output_file, title="Grid Comparison", max_cols=4, coloring='uniform'):
     """
-    Create a grid of individual trajectory plots.
+    Create a grid of individual 3D trajectory plots.
 
     Args:
         cell_ids: List of cell_ids to include
@@ -373,22 +393,22 @@ def create_grid_plot(cell_ids, df, latent_cols, output_file, title="Grid Compari
         latent_cols: List of latent column names
         output_file: Path to save the plot
         title: Plot title
-        max_cols: Maximum number of columns in grid
+        max_cols: Maximum number of columns in grid (reduced default for 3D)
         coloring: 'uniform', 'curvature', or 'velocity'
     """
-    print(f"\nCreating grid plot with {len(cell_ids)} cells")
+    print(f"\nCreating 3D grid plot with {len(cell_ids)} cells")
 
     n_cells = len(cell_ids)
     n_cols = min(max_cols, n_cells)
     n_rows = (n_cells + n_cols - 1) // n_cols
 
-    fig = plt.figure(figsize=(4*n_cols, 4*n_rows))
-    gs = GridSpec(n_rows, n_cols, figure=fig, hspace=0.3, wspace=0.3)
+    fig = plt.figure(figsize=(5*n_cols, 5*n_rows))
+    gs = GridSpec(n_rows, n_cols, figure=fig, hspace=0.35, wspace=0.35)
 
     for idx, cell_id in enumerate(cell_ids):
         row = idx // n_cols
         col = idx % n_cols
-        ax = fig.add_subplot(gs[row, col])
+        ax = fig.add_subplot(gs[row, col], projection='3d')
 
         cell_df = df[df['cell_id'] == cell_id]
         if len(cell_df) == 0:
@@ -407,15 +427,16 @@ def create_grid_plot(cell_ids, df, latent_cols, output_file, title="Grid Compari
                              color='blue', alpha=0.8, coloring=coloring)
 
         ax.set_title(f"{cell_id}", fontsize=10)
-        ax.set_xlabel("TPHATE Dim 1", fontsize=9)
-        ax.set_ylabel("TPHATE Dim 2", fontsize=9)
+        ax.set_xlabel("TPHATE Dim 1", fontsize=8)
+        ax.set_ylabel("TPHATE Dim 2", fontsize=8)
+        ax.set_zlabel("TPHATE Dim 3", fontsize=8)
         ax.grid(True, alpha=0.3)
 
     fig.suptitle(title, fontsize=16, y=0.995)
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     plt.close()
 
-    print(f"  Saved grid plot: {output_file}")
+    print(f"  Saved 3D grid plot: {output_file}")
 
 
 def is_grade_at_least(grade_str, min_grade='B'):
