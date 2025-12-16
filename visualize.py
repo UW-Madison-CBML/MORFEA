@@ -40,7 +40,7 @@ def load_latents(csv_file):
 def apply_tphate(data, n_jobs=-1):
 
     print(f"  Applying TPHATE to {data.shape[0]} samples...")
-    tphate_op = tphate.TPHATE(n_jobs=n_jobs)
+    tphate_op = tphate.TPHATE(n_jobs=n_jobs, n_components=3)
     tphate_data = tphate_op.fit_transform(data)
     print(f"  TPHATE output shape: {tphate_data.shape}")
 
@@ -128,17 +128,18 @@ def compute_curvature(nbd, traj, num_pts):
 
     return kappa
 def plot_cell_trajectory_circle(cell_id, tphate_data, time_steps, output_dir="plots"):
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig = plt.figure(figsize=(12, 10))
+    ax = fig.add_subplot(111, projection='3d')
     print("making plots with ", str(tphate_data.shape), " shape")
-    ax.plot(tphate_data[:, 0], tphate_data[:, 1], 'k-', alpha=0.3, linewidth=1.5)
 
-    # Convert 2D TPHATE data to 3D by adding a zero z-dimension for curvature calculation
-    tphate_data_3d = np.column_stack([tphate_data, np.zeros(len(tphate_data))])
+    # Plot trajectory line
+    ax.plot(tphate_data[:, 0], tphate_data[:, 1], tphate_data[:, 2],
+            'k-', alpha=0.3, linewidth=1.5)
 
     # Calculate curvature using the compute_curvature function
     n_points = len(tphate_data)
     nbd = 2  # Neighborhood size for curvature calculation
-    curvature = compute_curvature(nbd, tphate_data_3d, n_points)
+    curvature = compute_curvature(nbd, tphate_data, n_points)
 
     # Normalize curvature for color mapping
     curvature_range = np.max(curvature) - np.min(curvature)
@@ -148,107 +149,118 @@ def plot_cell_trajectory_circle(cell_id, tphate_data, time_steps, output_dir="pl
         norm_curvature = np.zeros_like(curvature)
 
     colors = plt.cm.jet(norm_curvature)
-    scatter = ax.scatter(tphate_data[:, 0], tphate_data[:, 1],
+    scatter = ax.scatter(tphate_data[:, 0], tphate_data[:, 1], tphate_data[:, 2],
                          c=colors, alpha=0.8, s=50,
                          edgecolors='black', linewidth=0.5, zorder=5)
 
-    ax.plot(tphate_data[0, 0], tphate_data[0, 1], 'go', markersize=12, label='Start', zorder=6)
-    ax.plot(tphate_data[-1, 0], tphate_data[-1, 1], 'r*', markersize=20, label='End', zorder=6)
+    # Mark start and end
+    ax.scatter(tphate_data[0, 0], tphate_data[0, 1], tphate_data[0, 2],
+               c='green', marker='o', s=120, label='Start', zorder=6, edgecolors='black', linewidth=1)
+    ax.scatter(tphate_data[-1, 0], tphate_data[-1, 1], tphate_data[-1, 2],
+               c='red', marker='*', s=300, label='End', zorder=6, edgecolors='black', linewidth=1)
 
     ax.set_xlabel("TPHATE Dimension 1", fontsize=12)
     ax.set_ylabel("TPHATE Dimension 2", fontsize=12)
-    ax.set_title(f"TPHATE Trajectory: {cell_id}", fontsize=14)
+    ax.set_zlabel("TPHATE Dimension 3", fontsize=12)
+    ax.set_title(f"TPHATE Trajectory (Colored by Curvature): {cell_id}", fontsize=14)
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=11)
 
-    cbar = plt.colorbar(scatter, ax=ax)
-    cbar.set_label("Time Step", fontsize=11)
+    cbar = plt.colorbar(scatter, ax=ax, pad=0.1, shrink=0.8)
+    cbar.set_label("Curvature", fontsize=11)
 
     plt.tight_layout()
     output_file = os.path.join(output_dir, f"circle_{cell_id}.png")
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     plt.close()
-    print(f"    Saved trajectory plot: {output_file}")
+    print(f"    Saved 3D trajectory plot: {output_file}")
 
 def plot_cell_trajectory_velocity(cell_id, tphate_data, time_steps, output_dir="plots"):
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig = plt.figure(figsize=(12, 10))
+    ax = fig.add_subplot(111, projection='3d')
     print("making plots with ", str(tphate_data.shape), " shape")
-    
+
     # Plot the trajectory line
-    ax.plot(tphate_data[:, 0], tphate_data[:, 1], 'k-', alpha=0.3, linewidth=1.5)
-    
+    ax.plot(tphate_data[:, 0], tphate_data[:, 1], tphate_data[:, 2],
+            'k-', alpha=0.3, linewidth=1.5)
+
     # Calculate velocity between consecutive points
     dx = np.diff(tphate_data[:, 0])
     dy = np.diff(tphate_data[:, 1])
-    distances = np.sqrt(dx**2 + dy**2)
-    
+    dz = np.diff(tphate_data[:, 2])
+    distances = np.sqrt(dx**2 + dy**2 + dz**2)
+
     # Calculate time differences
     dt = np.diff(time_steps)
     dt[dt == 0] = 1e-10  # Avoid division by zero
-    
+
     # Velocity is distance / time
     velocities = distances / dt
-    
+
     # Assign velocity to each point (use velocity leading INTO that point)
     # First point gets the first velocity, last point gets the last velocity
     point_velocities = np.concatenate([[velocities[0]], velocities])
-    
+
     # Normalize velocities for color mapping
     norm_velocity = (point_velocities - np.min(point_velocities)) / (np.max(point_velocities) - np.min(point_velocities) + 1e-10)
-    
+
     # Create scatter plot colored by velocity
-    scatter = ax.scatter(tphate_data[:, 0], tphate_data[:, 1],
+    scatter = ax.scatter(tphate_data[:, 0], tphate_data[:, 1], tphate_data[:, 2],
                          c=point_velocities, cmap='jet', alpha=0.8, s=50,
                          edgecolors='black', linewidth=0.5, zorder=5)
-    
+
     # Mark start and end points
-    ax.plot(tphate_data[0, 0], tphate_data[0, 1], 'go', markersize=12, label='Start', zorder=6)
-    ax.plot(tphate_data[-1, 0], tphate_data[-1, 1], 'r*', markersize=20, label='End', zorder=6)
-    
+    ax.scatter(tphate_data[0, 0], tphate_data[0, 1], tphate_data[0, 2],
+               c='green', marker='o', s=120, label='Start', zorder=6, edgecolors='black', linewidth=1)
+    ax.scatter(tphate_data[-1, 0], tphate_data[-1, 1], tphate_data[-1, 2],
+               c='red', marker='*', s=300, label='End', zorder=6, edgecolors='black', linewidth=1)
+
     # Labels and formatting
     ax.set_xlabel("TPHATE Dimension 1", fontsize=12)
     ax.set_ylabel("TPHATE Dimension 2", fontsize=12)
+    ax.set_zlabel("TPHATE Dimension 3", fontsize=12)
     ax.set_title(f"TPHATE Trajectory (Colored by Velocity): {cell_id}", fontsize=14)
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=11)
-    
+
     # Colorbar
-    cbar = plt.colorbar(scatter, ax=ax)
+    cbar = plt.colorbar(scatter, ax=ax, pad=0.1, shrink=0.8)
     cbar.set_label("Velocity (TPHATE units/time step)", fontsize=11)
-    
+
     plt.tight_layout()
     output_file = os.path.join(output_dir, f"velocity_{cell_id}.png")
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     plt.close()
-    print(f"    Saved trajectory plot: {output_file}")
+    print(f"    Saved 3D trajectory plot: {output_file}")
 
 
 def plot_cell_trajectory_timestamp(cell_id, tphate_data, time_steps, output_dir="plots"):
     import pandas as pd
     import matplotlib.patches as mpatches
-    
-    fig, ax = plt.subplots(figsize=(12, 8))
+
+    fig = plt.figure(figsize=(14, 10))
+    ax = fig.add_subplot(111, projection='3d')
     print("making plots with ", str(tphate_data.shape), " shape")
-    
+
     # Read phase annotations
     phase_file = f"embryo_dataset_annotations/{cell_id}_phases.csv"
     phases_df = pd.read_csv(phase_file, header=None, names=['phase', 'start', 'end'])
-    
+
     # Create a mapping from time step to phase
     phase_colors = plt.cm.tab20(np.linspace(0, 1, len(phases_df)))
     time_to_phase = {}
     time_to_color = {}
-    
+
     for idx, row in phases_df.iterrows():
         phase_name = row['phase']
         start_frame = row['start']
         end_frame = row['end']
         color = phase_colors[idx]
-        
+
         for t in range(start_frame, end_frame + 1):
             time_to_phase[t] = phase_name
             time_to_color[t] = color
-    
+
     # Assign phase colors to each point in trajectory
     point_colors = []
     point_phases = []
@@ -259,51 +271,55 @@ def plot_cell_trajectory_timestamp(cell_id, tphate_data, time_steps, output_dir=
         else:
             point_colors.append([0.5, 0.5, 0.5, 1.0])  # Gray for undefined
             point_phases.append('Unknown')
-    
+
     # Plot the trajectory line
-    ax.plot(tphate_data[:, 0], tphate_data[:, 1], 'k-', alpha=0.2, linewidth=1.5)
-    
+    ax.plot(tphate_data[:, 0], tphate_data[:, 1], tphate_data[:, 2],
+            'k-', alpha=0.2, linewidth=1.5)
+
     # Create scatter plot colored by phase
-    ax.scatter(tphate_data[:, 0], tphate_data[:, 1],
+    ax.scatter(tphate_data[:, 0], tphate_data[:, 1], tphate_data[:, 2],
                c=point_colors, alpha=0.8, s=50,
                edgecolors='black', linewidth=0.5, zorder=5)
-    
+
     # Mark start and end points
-    ax.plot(tphate_data[0, 0], tphate_data[0, 1], 'go', markersize=12, label='Start', zorder=6)
-    ax.plot(tphate_data[-1, 0], tphate_data[-1, 1], 'r*', markersize=20, label='End', zorder=6)
-    
+    ax.scatter(tphate_data[0, 0], tphate_data[0, 1], tphate_data[0, 2],
+               c='green', marker='o', s=120, label='Start', zorder=6, edgecolors='black', linewidth=1)
+    ax.scatter(tphate_data[-1, 0], tphate_data[-1, 1], tphate_data[-1, 2],
+               c='red', marker='*', s=300, label='End', zorder=6, edgecolors='black', linewidth=1)
+
     # Labels and formatting
     ax.set_xlabel("TPHATE Dimension 1", fontsize=12)
     ax.set_ylabel("TPHATE Dimension 2", fontsize=12)
+    ax.set_zlabel("TPHATE Dimension 3", fontsize=12)
     ax.set_title(f"TPHATE Trajectory (Colored by Phase): {cell_id}", fontsize=14)
     ax.grid(True, alpha=0.3)
-    
+
     # Create legend for phases
     legend_patches = []
     for idx, row in phases_df.iterrows():
         patch = mpatches.Patch(color=phase_colors[idx], label=row['phase'])
         legend_patches.append(patch)
-    
+
     # Add start/end to legend
     legend_patches.append(mpatches.Patch(color='green', label='Start'))
     legend_patches.append(mpatches.Patch(color='red', label='End'))
-    
+
     # Position legend outside plot area
-    ax.legend(handles=legend_patches, fontsize=9, loc='center left', 
+    ax.legend(handles=legend_patches, fontsize=9, loc='center left',
               bbox_to_anchor=(1, 0.5), framealpha=0.9)
-    
+
     plt.tight_layout()
     output_file = os.path.join(output_dir, f"timestamp_{cell_id}.png")
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     plt.close()
-    print(f"    Saved trajectory plot: {output_file}")
+    print(f"    Saved 3D trajectory plot: {output_file}")
 
 
 def create_merged_comparison_plot(cell_ids, df, latent_cols, grades_df, output_dir="plots"):
     """
-    Create a merged plot showing all cell trajectories colored by their grade category.
+    Create a merged 3D plot showing all cell trajectories colored by their grade category.
     """
-    print(f"\n  Creating merged comparison plot for {len(cell_ids)} cells")
+    print(f"\n  Creating merged 3D comparison plot for {len(cell_ids)} cells")
 
     # Group cells by grade
     grade_groups = {}
@@ -325,8 +341,9 @@ def create_merged_comparison_plot(cell_ids, df, latent_cols, grades_df, output_d
             grade_groups[grade_cat] = []
         grade_groups[grade_cat].append(cell_id)
 
-    # Create plot
-    fig, ax = plt.subplots(figsize=(14, 10))
+    # Create 3D plot
+    fig = plt.figure(figsize=(16, 12))
+    ax = fig.add_subplot(111, projection='3d')
 
     # Color palette for different grades
     unique_grades = sorted(grade_groups.keys())
@@ -347,14 +364,16 @@ def create_merged_comparison_plot(cell_ids, df, latent_cols, grades_df, output_d
             cell_tphate = apply_tphate(cell_latents)
 
             # Plot trajectory
-            ax.plot(cell_tphate[:, 0], cell_tphate[:, 1], '-',
+            ax.plot(cell_tphate[:, 0], cell_tphate[:, 1], cell_tphate[:, 2], '-',
                    color=color, alpha=0.4, linewidth=1.5)
-            ax.scatter(cell_tphate[:, 0], cell_tphate[:, 1],
+            ax.scatter(cell_tphate[:, 0], cell_tphate[:, 1], cell_tphate[:, 2],
                       c=[color], alpha=0.6, s=30, edgecolors='black', linewidth=0.3)
 
             # Mark start/end
-            ax.plot(cell_tphate[0, 0], cell_tphate[0, 1], 'go', markersize=6, alpha=0.5)
-            ax.plot(cell_tphate[-1, 0], cell_tphate[-1, 1], 'r*', markersize=10, alpha=0.5)
+            ax.scatter(cell_tphate[0, 0], cell_tphate[0, 1], cell_tphate[0, 2],
+                      c='green', marker='o', s=60, alpha=0.5, edgecolors='black', linewidth=0.5)
+            ax.scatter(cell_tphate[-1, 0], cell_tphate[-1, 1], cell_tphate[-1, 2],
+                      c='red', marker='*', s=120, alpha=0.5, edgecolors='black', linewidth=0.5)
 
     # Add legend
     import matplotlib.patches as mpatches
@@ -366,7 +385,8 @@ def create_merged_comparison_plot(cell_ids, df, latent_cols, grades_df, output_d
     ax.legend(handles=legend_patches, loc='best', fontsize=10)
     ax.set_xlabel("TPHATE Dimension 1", fontsize=12)
     ax.set_ylabel("TPHATE Dimension 2", fontsize=12)
-    ax.set_title("Merged Trajectories by Grade", fontsize=14)
+    ax.set_zlabel("TPHATE Dimension 3", fontsize=12)
+    ax.set_title("Merged Trajectories by Grade (3D)", fontsize=14)
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -374,7 +394,7 @@ def create_merged_comparison_plot(cell_ids, df, latent_cols, grades_df, output_d
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     plt.close()
 
-    print(f"    Saved merged comparison plot: {output_file}")
+    print(f"    Saved merged 3D comparison plot: {output_file}")
 
 
 def process_cell_id_batch(cell_ids, df, latent_cols, output_dir="plots", grades_df=None, create_merged=False):
