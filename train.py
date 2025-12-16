@@ -745,7 +745,7 @@ def train_convlstm():
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
         config={
-            "learning_rate": 0.005,
+            "learning_rate": 0.02,
             "architecture": "ConvLSTM Autoencoder",
             "dataset": "https://zenodo.org/records/7912264",
             "epochs": 10,
@@ -783,8 +783,8 @@ def train_convlstm():
 
     model = model.to(DEVICE)
 
-    learning_rate = 0.005
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
+    learning_rate = 2e-4
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=128, norm="minmax01")
 
