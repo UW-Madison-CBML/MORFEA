@@ -1039,12 +1039,316 @@ Model Files:
     torch.cuda.empty_cache()
 
 
+def train_convlstm_latent_split(loss_type="l1", use_temporal_smoothness=True):
+    """Training ConvLSTM Autoencoder with LATENT SPLIT enabled (single GPU)
+
+    Args:
+        loss_type: "l1" or "mse" - type of reconstruction loss to use with MS-SSIM
+        use_temporal_smoothness: bool - whether to apply temporal smoothness loss
+    """
+    print(torch.cuda.memory_summary(device=None, abbreviated=False))
+    torch.cuda.empty_cache()
+    torch.autograd.detect_anomaly(True)
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Build loss description for logging
+    loss_components = []
+    loss_components.append("MS-SSIM")
+    loss_components.append(loss_type.upper())
+    if use_temporal_smoothness:
+        loss_components.append("Temporal-Smooth")
+    loss_description = " + ".join(loss_components)
+
+    wandb.login(key=os.getenv("WANDB_KEY"))
+    run = wandb.init(
+        entity="jenslundsgaard7-uw-madison",
+        project="IVF-Training",
+        config={
+            "learning_rate": 0.02,
+            "architecture": "ConvLSTM Autoencoder with Latent Split",
+            "dataset": "https://zenodo.org/records/7912264",
+            "epochs": 10,
+            "loss": loss_description,
+            "loss_type": loss_type,
+            "use_temporal_smoothness": use_temporal_smoothness,
+            "latent_size": 4096,
+            "latent_split": True,
+            "embryo_latent_size": 2048,
+            "empty_latent_size": 2048,
+            "seq_len": 50,
+            "image_size": 128,
+            "distributed": False,
+        },
+    )
+
+    login(os.getenv("HF_KEY"))
+    print(torch.cuda.memory_summary(device=None, abbreviated=False))
+    print(DEVICE)
+    print(f"\nTraining Configuration:")
+    print(f"  Loss Type: {loss_type.upper()}")
+    print(f"  Temporal Smoothness: {'Enabled' if use_temporal_smoothness else 'Disabled'}")
+    print(f"  Latent Split: ENABLED (2048 for empty, 2048 for embryo)")
+    print(f"  Combined Loss: {loss_description}\n")
+
+    # Save detailed training configuration
+    config_content = f"""ConvLSTM Autoencoder Training Configuration (LATENT SPLIT)
+============================================
+Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+Model Architecture:
+  - Architecture: ConvLSTM Autoencoder with Residual Connections + LATENT SPLIT
+  - Sequence Length: 50
+  - Input Channels: 1
+  - Encoder Hidden Dim: 256
+  - Encoder Layers: 2
+  - Decoder Hidden Dim: 128
+  - Decoder Layers: 2
+  - Total Latent Size: 4096
+  - LATENT SPLIT ENABLED:
+    * Empty Well Latent: 2048 (first half)
+    * Embryo Latent: 2048 (second half)
+  - Use Classifier: False
+  - Image Size: 128x128
+
+Training Configuration:
+  - Loss Type: {loss_type.upper()}
+  - Temporal Smoothness Loss: {'Enabled (weight=0.1)' if use_temporal_smoothness else 'Disabled'}
+  - Combined Loss Function: {loss_description}
+  - Learning Rate: 2e-4 (CosineAnnealingLR)
+  - Weight Decay: 1e-5
+  - Optimizer: Adam
+  - Batch Size: 1
+  - Epochs: 10
+  - Gradient Clipping: 5.0
+  - Device: {DEVICE}
+
+Dataset:
+  - Dataset: https://zenodo.org/records/7912264
+  - Resize: 128x128
+  - Normalization: minmax01
+
+Loss Weights:
+  - Reconstruction Loss Weight: 0.5
+  - MS-SSIM Weight: 0.5
+  - Temporal Smoothness Weight: {0.1 if use_temporal_smoothness else 0.0}
+
+Model Files:
+  - raffael_model.py (with ResNet-style residual blocks + LATENT SPLIT)
+  - raffael_conv_lstm.py (ConvLSTM implementation)
+  - raffael_losses.py (Loss functions)
+"""
+
+    with open("training_config_latent_split.txt", "w") as f:
+        f.write(config_content)
+
+    print("Configuration saved to training_config_latent_split.txt")
+
+    # Create model with LATENT SPLIT enabled
+    model = ConvLSTMAutoencoder(
+        seq_len=50,
+        input_channels=1,
+        encoder_hidden_dim=256,
+        encoder_layers=2,
+        decoder_hidden_dim=128,
+        decoder_layers=2,
+        latent_size=4096,
+        use_classifier=False,
+        num_classes=2,
+        use_latent_split=True  # ENABLE LATENT SPLIT
+    )
+
+    if os.path.exists("convlstm_latent_split_weights.pth"):
+        try:
+            checkpoint = torch.load("convlstm_latent_split_weights.pth", map_location=DEVICE, weights_only=True)
+            model.load_state_dict(checkpoint)
+            print("Loaded ConvLSTM model weights with latent split")
+        except Exception as e:
+            print(f"Error loading weights: {e}")
+
+    model = model.to(DEVICE)
+
+    learning_rate = 2e-4
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
+
+    ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=128, norm="minmax01")
+
+    loader = DataLoader(
+        ds,
+        batch_size=1,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+        drop_last=True
+    )
+
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * 10)
+
+    for epoch in range(10):
+        model.train()
+        pbar = tqdm(loader, desc=f"epoch {epoch}")
+        total = 0.0
+        count = 0
+
+        for index, (embryo_vol, empty_well_vol, _) in enumerate(pbar):
+            optimizer.zero_grad()
+
+            # embryo_vol and empty_well_vol are (1, T, 1, H, W)
+            embryo_vol = embryo_vol.to(DEVICE)
+            empty_well_vol = empty_well_vol.to(DEVICE)
+
+            # Forward pass for embryo (uses second half of latent: 2048:4096)
+            embryo_recon, embryo_lat = model(embryo_vol, empty_well=False)
+
+            # Forward pass for empty well (uses first half of latent: 0:2048)
+            empty_recon, empty_lat = model(empty_well_vol, empty_well=True)
+
+            # Reconstruction loss for embryo
+            if loss_type == "l1":
+                rec_loss_embryo, rec_metrics_embryo = convlstm_reconstruction_loss(
+                    embryo_recon, embryo_vol, l1_weight=0.5, ms_ssim_weight=0.5
+                )
+            elif loss_type == "mse":
+                B, T, C, H, W = embryo_recon.shape
+                x_rec_flat = embryo_recon.view(B * T, C, H, W)
+                x_true_flat = embryo_vol.view(B * T, C, H, W)
+
+                mse_loss = F.mse_loss(embryo_recon, embryo_vol)
+                ms_ssim_val = ms_ssim(x_rec_flat, x_true_flat)
+                ms_ssim_loss = 1 - ms_ssim_val
+
+                rec_loss_embryo = 0.5 * mse_loss + 0.5 * ms_ssim_loss
+                rec_metrics_embryo = {
+                    "mse_loss": mse_loss.item(),
+                    "ms_ssim_loss": ms_ssim_loss.item(),
+                    "ms_ssim_value": ms_ssim_val.item()
+                }
+            else:
+                raise ValueError(f"Invalid loss_type: {loss_type}. Must be 'l1' or 'mse'")
+
+            # Reconstruction loss for empty well
+            if loss_type == "l1":
+                rec_loss_empty, rec_metrics_empty = convlstm_reconstruction_loss(
+                    empty_recon, empty_well_vol, l1_weight=0.5, ms_ssim_weight=0.5
+                )
+            elif loss_type == "mse":
+                B, T, C, H, W = empty_recon.shape
+                x_rec_flat = empty_recon.view(B * T, C, H, W)
+                x_true_flat = empty_well_vol.view(B * T, C, H, W)
+
+                mse_loss = F.mse_loss(empty_recon, empty_well_vol)
+                ms_ssim_val = ms_ssim(x_rec_flat, x_true_flat)
+                ms_ssim_loss = 1 - ms_ssim_val
+
+                rec_loss_empty = 0.5 * mse_loss + 0.5 * ms_ssim_loss
+                rec_metrics_empty = {
+                    "mse_loss": mse_loss.item(),
+                    "ms_ssim_loss": ms_ssim_loss.item(),
+                    "ms_ssim_value": ms_ssim_val.item()
+                }
+
+            # Total reconstruction loss
+            rec_loss = rec_loss_embryo + rec_loss_empty
+
+            # Temporal smoothness loss (optional)
+            if use_temporal_smoothness:
+                smooth_loss_embryo = temporal_smoothness_loss(embryo_lat, weight=0.1)
+                smooth_loss_empty = temporal_smoothness_loss(empty_lat, weight=0.1)
+                smooth_loss = smooth_loss_embryo + smooth_loss_empty
+                loss = rec_loss + smooth_loss
+            else:
+                smooth_loss = torch.tensor(0.0, device=DEVICE)
+                loss = rec_loss
+
+            if torch.isnan(loss) or torch.isinf(loss):
+                print(f"NaN/Inf detected, skipping batch")
+                continue
+
+            loss.backward()
+            total_norm = 0
+            for p in model.parameters():
+                if p.grad is not None:
+                    param_norm = p.grad.data.norm(2)
+                    total_norm += param_norm.item() ** 2
+            total_norm = total_norm ** 0.5
+
+            if total_norm > 100:
+                print(f"Warning: Large gradient norm: {total_norm:.2f}")
+
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
+            scheduler.step()
+            optimizer.step()
+            total += loss.item()
+            count += 1
+
+            if (index % 50 == 0) and run is not None:
+                log_dict = {
+                    "step": epoch * len(loader) + index,
+                    "loss": loss.item(),
+                    "rec_loss": rec_loss.item(),
+                    "rec_loss_embryo": rec_loss_embryo.item(),
+                    "rec_loss_empty": rec_loss_empty.item(),
+                    "smooth_loss": smooth_loss.item(),
+                    "ms_ssim_embryo": rec_metrics_embryo["ms_ssim_value"],
+                    "ms_ssim_empty": rec_metrics_empty["ms_ssim_value"],
+                    "lr": scheduler.get_last_lr()[0]
+                }
+
+                # Add loss-specific metrics
+                if loss_type == "l1":
+                    log_dict["l1_loss_embryo"] = rec_metrics_embryo["l1_loss"]
+                    log_dict["l1_loss_empty"] = rec_metrics_empty["l1_loss"]
+                elif loss_type == "mse":
+                    log_dict["mse_loss_embryo"] = rec_metrics_embryo["mse_loss"]
+                    log_dict["mse_loss_empty"] = rec_metrics_empty["mse_loss"]
+
+                run.log(log_dict)
+
+                pbar.set_postfix(
+                    loss=f"{loss.item():.4f}",
+                    rec_e=f"{rec_loss_embryo.item():.4f}",
+                    rec_empty=f"{rec_loss_empty.item():.4f}",
+                    smooth=f"{smooth_loss.item():.4f}"
+                )
+
+        avg_loss = total/max(1, count)
+        run.log({"avg_loss": avg_loss})
+        print(f"epoch {epoch} avg loss={avg_loss:.4f}")
+
+        # Save the state dict
+        torch.save(model.state_dict(), "convlstm_latent_split_weights.pth")
+
+        # Save to HuggingFace with descriptive name
+        date_label = datetime.now().strftime("%Y-%m-%d")
+        loss_suffix = f"{loss_type}-latent-split"
+        if use_temporal_smoothness:
+            loss_suffix += "-temporal"
+        repo_name = f"embryo-convlstm-{loss_suffix}-{date_label}"
+
+        # Required files for ConvLSTM model with latent split
+        required_files = [
+            "train.py",
+            "raffael_model.py",
+            "raffael_losses.py",
+            "raffael_conv_lstm.py",
+            "dataset_ivf.py",
+            "train_model.sh",
+            "training_config.txt",
+            "training_config_latent_split.txt",
+        ]
+
+        save_and_push_model(model, repo_name, required_files)
+
+    run.finish()
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
 if __name__ == "__main__":
     import sys
     import argparse
 
     # Check if using old command line interface
-    if len(sys.argv) > 1 and sys.argv[1] in ["mse_distributed", "mse_single", "convlstm"]:
+    if len(sys.argv) > 1 and sys.argv[1] in ["mse_distributed", "mse_single", "convlstm", "convlstm_latent_split"]:
         mode = sys.argv[1]
         if mode == "mse_distributed":
             train_mse_distributed()
@@ -1061,6 +1365,20 @@ if __name__ == "__main__":
             args = parser.parse_args()
 
             train_convlstm(
+                loss_type=args.loss_type,
+                use_temporal_smoothness=not args.no_temporal_smoothness
+            )
+        elif mode == "convlstm_latent_split":
+            # Parse additional convlstm_latent_split arguments
+            parser = argparse.ArgumentParser(description="Train ConvLSTM Autoencoder with Latent Split")
+            parser.add_argument("mode", type=str, help="Training mode")
+            parser.add_argument("--loss-type", type=str, default="l1", choices=["l1", "mse"],
+                              help="Reconstruction loss type: l1 or mse (default: l1)")
+            parser.add_argument("--no-temporal-smoothness", action="store_true",
+                              help="Disable temporal smoothness loss")
+            args = parser.parse_args()
+
+            train_convlstm_latent_split(
                 loss_type=args.loss_type,
                 use_temporal_smoothness=not args.no_temporal_smoothness
             )
