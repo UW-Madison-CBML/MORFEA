@@ -176,16 +176,20 @@ class Decoder(nn.Module):
     Output: x_rec (B, T, 1, 128, 128)
     """
 
-    def __init__(self, seq_len, latent_size=4096, latent_dim=256, hidden_dim=128, num_layers=2):
+    def __init__(self, seq_len, latent_size=4096, latent_dim=256, hidden_dim=128, num_layers=2, use_latent_split=False):
         super(Decoder, self).__init__()
         self.seq_len = seq_len
         self.latent_dim = latent_dim
         self.latent_size = latent_size
+        self.use_latent_split = use_latent_split
+
+        # If using latent split, we only use half the latent for reconstruction
+        effective_latent_size = latent_size // 2 if use_latent_split else latent_size
 
         # Linear layer to expand compressed latent to spatial dimensions
-        # Input: (B*T, latent_size)
+        # Input: (B*T, effective_latent_size)
         # Output: (B*T, latent_dim * 16 * 16)
-        self.latent_expand = nn.Linear(latent_size, latent_dim * 16 * 16)
+        self.latent_expand = nn.Linear(effective_latent_size, latent_dim * 16 * 16)
 
         # ConvLSTM decodes temporal dimension
         self.convlstm = ConvLSTM(
@@ -213,18 +217,26 @@ class Decoder(nn.Module):
             nn.Sigmoid()  # Assume pixels normalized to [0,1]
         )
 
-    def forward(self, z_seq):
+    def forward(self, z_seq, empty_well=False):
         """
         Args:
             z_seq: (B, T, latent_size) - compressed latent sequence from encoder
+            empty_well: bool - whether this is an empty well (uses first half of latent)
 
         Returns:
             x_rec: (B, T, 1, 128, 128) - reconstructed video sequence
         """
         B, T, L = z_seq.shape
 
+        # If using latent split, select which half to use
+        if self.use_latent_split:
+            if empty_well:
+                z_seq = z_seq[:, :, :L//2]  # First half for empty wells
+            else:
+                z_seq = z_seq[:, :, L//2:]  # Second half for embryos
+
         # Expand compressed latent to spatial dimensions
-        z_flat = z_seq.view(B * T, L)  # (B*T, latent_size)
+        z_flat = z_seq.view(B * T, -1)  # (B*T, effective_latent_size)
         z_expanded = self.latent_expand(z_flat)  # (B*T, latent_dim * 16 * 16)
         z_spatial = z_expanded.view(B, T, self.latent_dim, 16, 16)  # (B, T, latent_dim, 16, 16)
 
@@ -294,7 +306,8 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         decoder_layers=2,
         latent_size=4096,
         use_classifier=True,
-        num_classes=2
+        num_classes=2,
+        use_latent_split=False
     ):
         super(ConvLSTMAutoencoder, self).__init__()
 
@@ -302,6 +315,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         self.use_classifier = use_classifier
         self.encoder_hidden_dim = encoder_hidden_dim
         self.latent_size = latent_size
+        self.use_latent_split = use_latent_split
 
         # Core components
         self.encoder = Encoder(
@@ -316,7 +330,8 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
             latent_size=latent_size,
             latent_dim=encoder_hidden_dim,
             hidden_dim=decoder_hidden_dim,
-            num_layers=decoder_layers
+            num_layers=decoder_layers,
+            use_latent_split=use_latent_split
         )
 
         # Optional classifier
@@ -326,21 +341,22 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
                 num_classes=num_classes
             )
 
-    def forward(self, x, return_all=False):
+    def forward(self, x, empty_well=False, return_all=False):
         """
         Args:
             x: (B, T, 1, H, W) - input video sequence (any size, will be resized internally)
+            empty_well: bool - whether this is an empty well (for latent split)
             return_all: whether to return all intermediate results
 
         Returns:
             Tuple of (reconstruction, lat_vec_seq) where:
                 - reconstruction: (B, T, 1, H, W) - reconstructed video (same size as input)
-                - lat_vec_seq: (B, T, latent_size) - compressed latent sequence
+                - lat_vec_seq: (B, T, latent_size or latent_size//2) - compressed latent sequence
 
             If return_all is True, returns dict with keys:
                 - reconstruction: (B, T, 1, H, W) - reconstructed video
-                - z_seq: (B, T, latent_size) - compressed latent sequence
-                - z_last: (B, latent_size) - last timestep compressed latent
+                - z_seq: (B, T, latent_size) - compressed latent sequence (full)
+                - z_last: (B, latent_size) - last timestep compressed latent (full)
                 - logits: (B, num_classes) - classification logits (if enabled)
         """
         B, T, C, orig_H, orig_W = x.shape
@@ -349,7 +365,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         z_seq, z_last = self.encoder(x)
 
         # Decode (outputs 128x128)
-        x_rec = self.decoder(z_seq)
+        x_rec = self.decoder(z_seq, empty_well=empty_well)
 
         # Resize back to original input size if needed
         if orig_H != 128 or orig_W != 128:
@@ -373,13 +389,20 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
             return output
         else:
             # Return tuple: (reconstruction, latent_vector)
-            return x_rec, z_seq
+            # If using latent split, return only the relevant half
+            if self.use_latent_split:
+                if empty_well:
+                    return x_rec, z_seq[:, :, :self.latent_size//2]
+                else:
+                    return x_rec, z_seq[:, :, self.latent_size//2:]
+            else:
+                return x_rec, z_seq
 
     def encode(self, x):
         """Encode only, for extracting latent"""
         z_seq, z_last = self.encoder(x)
         return z_seq, z_last
 
-    def decode(self, z_seq):
+    def decode(self, z_seq, empty_well=False):
         """Decode only, for reconstructing from latent"""
-        return self.decoder(z_seq)
+        return self.decoder(z_seq, empty_well=empty_well)
