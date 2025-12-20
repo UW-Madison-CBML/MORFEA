@@ -6,7 +6,7 @@ universe = docker
 #  commands) and arguments to be passed to jobs. 
 #  $(Process) will be a integer number for each job, starting with "0"
 #  and increasing for the relevant number of jobs.
-shell = ./get_latent_npy.py
+shell = ./get_latent_npy.sh
    		
 # Specify the name of the log, standard error, and standard output (or
 # "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
@@ -25,8 +25,9 @@ transfer_output_files = latents.csv, latents.npy
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
 request_cpus = 1
-request_memory = 16GB
-request_disk = 32GB
+request_memory = 64GB
+
+request_disk = 64GB
 
 
 queue 1
