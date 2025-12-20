@@ -776,12 +776,27 @@ def train_mse_single():
     torch.cuda.empty_cache()
 
 
-def train_convlstm(loss_type="l1", use_temporal_smoothness=True):
+def train_convlstm(
+    loss_type="l1",
+    ms_ssim_weight=0.5,
+    rec_weight=0.5,
+    temporal_weight=0.1,
+    dropout_rate=0.1,
+    use_convlstm=True,
+    use_residual=True,
+    use_batchnorm=True
+):
     """Training ConvLSTM Autoencoder with configurable loss (single GPU)
 
     Args:
         loss_type: "l1" or "mse" - type of reconstruction loss to use with MS-SSIM
-        use_temporal_smoothness: bool - whether to apply temporal smoothness loss
+        ms_ssim_weight: float - weight for MS-SSIM loss (0 to disable)
+        rec_weight: float - weight for reconstruction loss L1/MSE (0 to disable)
+        temporal_weight: float - weight for temporal smoothness loss (0 to disable)
+        dropout_rate: float - dropout rate (0 to disable)
+        use_convlstm: bool - whether to use ConvLSTM (False = no temporal modeling)
+        use_residual: bool - whether to use residual connections
+        use_batchnorm: bool - whether to use batch normalization
     """
     print(torch.cuda.memory_summary(device=None, abbreviated=False))
     torch.cuda.empty_cache()
@@ -790,11 +805,25 @@ def train_convlstm(loss_type="l1", use_temporal_smoothness=True):
 
     # Build loss description for logging
     loss_components = []
-    loss_components.append("MS-SSIM")
-    loss_components.append(loss_type.upper())
-    if use_temporal_smoothness:
-        loss_components.append("Temporal-Smooth")
-    loss_description = " + ".join(loss_components)
+    if ms_ssim_weight > 0:
+        loss_components.append(f"MS-SSIM({ms_ssim_weight})")
+    if rec_weight > 0:
+        loss_components.append(f"{loss_type.upper()}({rec_weight})")
+    if temporal_weight > 0:
+        loss_components.append(f"Temporal({temporal_weight})")
+    loss_description = " + ".join(loss_components) if loss_components else "None"
+
+    # Build model description for logging
+    model_features = []
+    if use_convlstm:
+        model_features.append("ConvLSTM")
+    if use_residual:
+        model_features.append("Residual")
+    if use_batchnorm:
+        model_features.append("BatchNorm")
+    if dropout_rate > 0:
+        model_features.append(f"Dropout({dropout_rate})")
+    model_description = "+".join(model_features) if model_features else "Baseline"
 
     wandb.login(key=os.getenv("WANDB_KEY"))
     run = wandb.init(
@@ -803,11 +832,18 @@ def train_convlstm(loss_type="l1", use_temporal_smoothness=True):
         config={
             "learning_rate": 0.02,
             "architecture": "ConvLSTM Autoencoder",
+            "model_features": model_description,
             "dataset": "https://zenodo.org/records/7912264",
             "epochs": 10,
             "loss": loss_description,
             "loss_type": loss_type,
-            "use_temporal_smoothness": use_temporal_smoothness,
+            "ms_ssim_weight": ms_ssim_weight,
+            "rec_weight": rec_weight,
+            "temporal_weight": temporal_weight,
+            "dropout_rate": dropout_rate,
+            "use_convlstm": use_convlstm,
+            "use_residual": use_residual,
+            "use_batchnorm": use_batchnorm,
             "latent_size": 4096,
             "seq_len": 50,
             "image_size": 128,
@@ -818,18 +854,47 @@ def train_convlstm(loss_type="l1", use_temporal_smoothness=True):
     login(os.getenv("HF_KEY"))
     print(torch.cuda.memory_summary(device=None, abbreviated=False))
     print(DEVICE)
-    print(f"\nTraining Configuration:")
-    print(f"  Loss Type: {loss_type.upper()}")
-    print(f"  Temporal Smoothness: {'Enabled' if use_temporal_smoothness else 'Disabled'}")
-    print(f"  Combined Loss: {loss_description}\n")
+    print(f"\n{'='*60}")
+    print(f"ABLATION STUDY - Training Configuration")
+    print(f"{'='*60}")
+    print(f"\nLoss Configuration:")
+    print(f"  Base Loss Type: {loss_type.upper()}")
+    print(f"  MS-SSIM Weight: {ms_ssim_weight} {'(DISABLED)' if ms_ssim_weight == 0 else ''}")
+    print(f"  Reconstruction Weight: {rec_weight} {'(DISABLED)' if rec_weight == 0 else ''}")
+    print(f"  Temporal Smoothness Weight: {temporal_weight} {'(DISABLED)' if temporal_weight == 0 else ''}")
+    print(f"  Combined Loss: {loss_description}")
+    print(f"\nModel Architecture Configuration:")
+    print(f"  ConvLSTM: {'ENABLED' if use_convlstm else 'DISABLED'}")
+    print(f"  Residual Connections: {'ENABLED' if use_residual else 'DISABLED'}")
+    print(f"  Batch Normalization: {'ENABLED' if use_batchnorm else 'DISABLED'}")
+    print(f"  Dropout Rate: {dropout_rate} {'(DISABLED)' if dropout_rate == 0 else ''}")
+    print(f"  Model Features: {model_description}")
+    print(f"{'='*60}\n")
 
     # Save detailed training configuration
-    config_content = f"""ConvLSTM Autoencoder Training Configuration
-============================================
+    config_content = f"""ConvLSTM Autoencoder Training Configuration (ABLATION)
+================================================================================
 Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
+ABLATION STUDY CONFIGURATION
+================================================================================
+
+Loss Configuration:
+  - Base Loss Type: {loss_type.upper()}
+  - MS-SSIM Weight: {ms_ssim_weight} {'(DISABLED)' if ms_ssim_weight == 0 else ''}
+  - Reconstruction Weight: {rec_weight} {'(DISABLED)' if rec_weight == 0 else ''}
+  - Temporal Smoothness Weight: {temporal_weight} {'(DISABLED)' if temporal_weight == 0 else ''}
+  - Combined Loss Function: {loss_description}
+
+Model Architecture Ablations:
+  - ConvLSTM: {'ENABLED' if use_convlstm else 'DISABLED'}
+  - Residual Connections: {'ENABLED' if use_residual else 'DISABLED'}
+  - Batch Normalization: {'ENABLED' if use_batchnorm else 'DISABLED'}
+  - Dropout Rate: {dropout_rate} {'(DISABLED)' if dropout_rate == 0 else ''}
+  - Model Features: {model_description}
+
 Model Architecture:
-  - Architecture: ConvLSTM Autoencoder with Residual Connections
+  - Architecture: ConvLSTM Autoencoder
   - Sequence Length: 50
   - Input Channels: 1
   - Encoder Hidden Dim: 256
@@ -841,9 +906,6 @@ Model Architecture:
   - Image Size: 128x128
 
 Training Configuration:
-  - Loss Type: {loss_type.upper()}
-  - Temporal Smoothness Loss: {'Enabled (weight=0.1)' if use_temporal_smoothness else 'Disabled'}
-  - Combined Loss Function: {loss_description}
   - Learning Rate: 2e-4 (CosineAnnealingLR)
   - Weight Decay: 1e-5
   - Optimizer: Adam
@@ -857,15 +919,15 @@ Dataset:
   - Resize: 128x128
   - Normalization: minmax01
 
-Loss Weights:
-  - Reconstruction Loss Weight: 0.5
-  - MS-SSIM Weight: 0.5
-  - Temporal Smoothness Weight: {0.1 if use_temporal_smoothness else 0.0}
-
 Model Files:
-  - raffael_model.py (with ResNet-style residual blocks)
+  - raffael_model.py (with ablation support)
   - raffael_conv_lstm.py (ConvLSTM implementation)
   - raffael_losses.py (Loss functions)
+
+Reproducibility:
+  - All ablation settings are logged in wandb config
+  - Model stores ablation parameters for inference
+  - Configuration saved to training_config_detailed.txt
 """
 
     with open("training_config_detailed.txt", "w") as f:
@@ -882,7 +944,13 @@ Model Files:
         decoder_layers=2,
         latent_size=4096,
         use_classifier=False,
-        num_classes=2
+        num_classes=2,
+        use_latent_split=False,
+        # Ablation parameters
+        dropout_rate=dropout_rate,
+        use_convlstm=use_convlstm,
+        use_residual=use_residual,
+        use_batchnorm=use_batchnorm
     )
 
     if os.path.exists("convlstm_model_weights.pth"):
@@ -926,10 +994,10 @@ Model Files:
             # Forward pass - returns (reconstruction, latent_seq)
             embryo_recon, embryo_lat = model(embryo_vol)
 
-            # Reconstruction loss using MS-SSIM + L1 or MSE
+            # Reconstruction loss using MS-SSIM + L1 or MSE (with configurable weights)
             if loss_type == "l1":
                 rec_loss, rec_metrics = convlstm_reconstruction_loss(
-                    embryo_recon, embryo_vol, l1_weight=0.5, ms_ssim_weight=0.5
+                    embryo_recon, embryo_vol, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight
                 )
             elif loss_type == "mse":
                 # MS-SSIM + MSE loss
@@ -941,7 +1009,7 @@ Model Files:
                 ms_ssim_val = ms_ssim(x_rec_flat, x_true_flat)
                 ms_ssim_loss = 1 - ms_ssim_val
 
-                rec_loss = 0.5 * mse_loss + 0.5 * ms_ssim_loss
+                rec_loss = rec_weight * mse_loss + ms_ssim_weight * ms_ssim_loss
                 rec_metrics = {
                     "mse_loss": mse_loss.item(),
                     "ms_ssim_loss": ms_ssim_loss.item(),
@@ -950,10 +1018,10 @@ Model Files:
             else:
                 raise ValueError(f"Invalid loss_type: {loss_type}. Must be 'l1' or 'mse'")
 
-            # Temporal smoothness loss (optional)
+            # Temporal smoothness loss (with configurable weight)
             # embryo_lat is (1, T, 4096) - encourages smooth transitions between frames
-            if use_temporal_smoothness:
-                smooth_loss = temporal_smoothness_loss(embryo_lat, weight=0.1)
+            if temporal_weight > 0:
+                smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
                 loss = rec_loss + smooth_loss
             else:
                 smooth_loss = torch.tensor(0.0, device=DEVICE)
@@ -1423,18 +1491,41 @@ if __name__ == "__main__":
         elif mode == "mse_single":
             train_mse_single()
         elif mode == "convlstm":
-            # Parse additional convlstm arguments
-            parser = argparse.ArgumentParser(description="Train ConvLSTM Autoencoder")
+            # Parse additional convlstm arguments with ablation support
+            parser = argparse.ArgumentParser(description="Train ConvLSTM Autoencoder with Ablation Studies")
             parser.add_argument("mode", type=str, help="Training mode")
+
+            # Loss ablation arguments
             parser.add_argument("--loss-type", type=str, default="l1", choices=["l1", "mse"],
                               help="Reconstruction loss type: l1 or mse (default: l1)")
-            parser.add_argument("--no-temporal-smoothness", action="store_true",
-                              help="Disable temporal smoothness loss")
+            parser.add_argument("--ms-ssim-weight", type=float, default=0.5,
+                              help="Weight for MS-SSIM loss (default: 0.5, set to 0 to disable)")
+            parser.add_argument("--rec-weight", type=float, default=0.5,
+                              help="Weight for reconstruction loss (default: 0.5, set to 0 to disable)")
+            parser.add_argument("--temporal-weight", type=float, default=0.1,
+                              help="Weight for temporal smoothness loss (default: 0.1, set to 0 to disable)")
+
+            # Model ablation arguments
+            parser.add_argument("--dropout-rate", type=float, default=0.1,
+                              help="Dropout rate (default: 0.1, set to 0 to disable)")
+            parser.add_argument("--no-convlstm", action="store_true",
+                              help="Disable ConvLSTM (no temporal modeling)")
+            parser.add_argument("--no-residual", action="store_true",
+                              help="Disable residual connections")
+            parser.add_argument("--no-batchnorm", action="store_true",
+                              help="Disable batch normalization")
+
             args = parser.parse_args()
 
             train_convlstm(
                 loss_type=args.loss_type,
-                use_temporal_smoothness=not args.no_temporal_smoothness
+                ms_ssim_weight=args.ms_ssim_weight,
+                rec_weight=args.rec_weight,
+                temporal_weight=args.temporal_weight,
+                dropout_rate=args.dropout_rate,
+                use_convlstm=not args.no_convlstm,
+                use_residual=not args.no_residual,
+                use_batchnorm=not args.no_batchnorm
             )
         elif mode == "convlstm_latent_split":
             # Parse additional convlstm_latent_split arguments with ablation support
