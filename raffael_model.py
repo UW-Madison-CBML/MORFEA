@@ -17,29 +17,31 @@ from huggingface_hub import PyTorchModelHubMixin
 class ResidualBlock(nn.Module):
     """
     Residual block for encoder with optional downsampling
+    Supports ablation: can disable residual connections and batch normalization
     """
-    def __init__(self, in_channels, out_channels, downsample=False):
+    def __init__(self, in_channels, out_channels, downsample=False, use_residual=True, use_batchnorm=True):
         super(ResidualBlock, self).__init__()
 
+        self.use_residual = use_residual
         stride = 2 if downsample else 1
 
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1)
-        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.bn1 = nn.BatchNorm2d(out_channels) if use_batchnorm else nn.Identity()
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.bn2 = nn.BatchNorm2d(out_channels) if use_batchnorm else nn.Identity()
 
-        # Projection shortcut if channels change or downsampling
-        if in_channels != out_channels or downsample:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride),
-                nn.BatchNorm2d(out_channels)
-            )
+        # Projection shortcut if channels change or downsampling (only if using residual)
+        if use_residual and (in_channels != out_channels or downsample):
+            shortcut_layers = [nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride)]
+            if use_batchnorm:
+                shortcut_layers.append(nn.BatchNorm2d(out_channels))
+            self.shortcut = nn.Sequential(*shortcut_layers)
         else:
             self.shortcut = nn.Identity()
 
     def forward(self, x):
-        identity = self.shortcut(x)
+        identity = self.shortcut(x) if self.use_residual else 0
 
         out = self.conv1(x)
         out = self.bn1(out)
@@ -48,7 +50,8 @@ class ResidualBlock(nn.Module):
         out = self.conv2(out)
         out = self.bn2(out)
 
-        out += identity
+        if self.use_residual:
+            out += identity
         out = self.relu(out)
 
         return out
@@ -57,21 +60,27 @@ class ResidualBlock(nn.Module):
 class ResidualUpBlock(nn.Module):
     """
     Residual block for decoder with upsampling
+    Supports ablation: can disable residual connections and batch normalization
     """
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, use_residual=True, use_batchnorm=True):
         super(ResidualUpBlock, self).__init__()
 
+        self.use_residual = use_residual
+
         self.upsample = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1)
-        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.bn1 = nn.BatchNorm2d(out_channels) if use_batchnorm else nn.Identity()
         self.relu = nn.ReLU(inplace=True)
         self.conv = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.bn2 = nn.BatchNorm2d(out_channels) if use_batchnorm else nn.Identity()
 
-        # Shortcut with upsampling
-        self.shortcut = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1)
+        # Shortcut with upsampling (only if using residual)
+        if use_residual:
+            self.shortcut = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1)
+        else:
+            self.shortcut = nn.Identity()
 
     def forward(self, x):
-        identity = self.shortcut(x)
+        identity = self.shortcut(x) if self.use_residual else 0
 
         out = self.upsample(x)
         out = self.bn1(out)
@@ -80,7 +89,8 @@ class ResidualUpBlock(nn.Module):
         out = self.conv(out)
         out = self.bn2(out)
 
-        out += identity
+        if self.use_residual:
+            out += identity
         out = self.relu(out)
 
         return out
@@ -88,48 +98,59 @@ class ResidualUpBlock(nn.Module):
 
 class Encoder(nn.Module):
     """
-    Encoder: 2D CNN spatial compression + ConvLSTM temporal modeling + flatten to (B, T, N)
+    Encoder: 2D CNN spatial compression + optional ConvLSTM temporal modeling + flatten to (B, T, N)
     Output: z_seq (B, T, latent_size) and z_last (B, latent_size)
+    Supports ablation: dropout rate, ConvLSTM on/off, residual connections, batch normalization
     """
 
-    def __init__(self, input_channels=1, hidden_dim=256, num_layers=2, latent_size=4096):
+    def __init__(self, input_channels=1, hidden_dim=256, num_layers=2, latent_size=4096,
+                 dropout_rate=0.1, use_convlstm=True, use_residual=True, use_batchnorm=True):
         super(Encoder, self).__init__()
 
         self.hidden_dim = hidden_dim
         self.latent_size = latent_size
+        self.use_convlstm = use_convlstm
 
         # Spatial convolution with residual connections: process each frame separately
         # 128x128 -> 64x64 -> 32x32 -> 16x16
         self.spatial_cnn = nn.Sequential(
             # Layer 1: 128 -> 64 (with downsampling)
-            ResidualBlock(input_channels, 64, downsample=True),
+            ResidualBlock(input_channels, 64, downsample=True, use_residual=use_residual, use_batchnorm=use_batchnorm),
 
             # Layer 2: 64 -> 32 (with downsampling)
-            ResidualBlock(64, 128, downsample=True),
+            ResidualBlock(64, 128, downsample=True, use_residual=use_residual, use_batchnorm=use_batchnorm),
 
             # Layer 3: 32 -> 16 (with downsampling)
-            ResidualBlock(128, 256, downsample=True),
+            ResidualBlock(128, 256, downsample=True, use_residual=use_residual, use_batchnorm=use_batchnorm),
         )
 
-        # ConvLSTM: process temporal sequence
-        # Input: (B, T, 256, 16, 16)
-        # Output: (B, T, hidden_dim, 16, 16)
-        self.convlstm = ConvLSTM(
-            input_dim=256,
-            hidden_dim=hidden_dim,
-            kernel_size=(3, 3),
-            num_layers=num_layers,
-            batch_first=True,
-            return_all_layers=False
-        )
+        if use_convlstm:
+            # ConvLSTM: process temporal sequence
+            # Input: (B, T, 256, 16, 16)
+            # Output: (B, T, hidden_dim, 16, 16)
+            self.convlstm = ConvLSTM(
+                input_dim=256,
+                hidden_dim=hidden_dim,
+                kernel_size=(3, 3),
+                num_layers=num_layers,
+                batch_first=True,
+                return_all_layers=False
+            )
+            # Compress from hidden_dim * 16 * 16
+            compress_size = hidden_dim * 16 * 16
+        else:
+            # No ConvLSTM - just pass through spatial features
+            self.convlstm = None
+            # Compress from 256 * 16 * 16 (spatial CNN output)
+            compress_size = 256 * 16 * 16
 
         # Dropout before latent compression
-        self.dropout = nn.Dropout(0.1)
+        self.dropout = nn.Dropout(dropout_rate)
 
         # Linear layer to compress spatial latent to fixed size
-        # Input: (B*T, hidden_dim * 16 * 16)
+        # Input: (B*T, compress_size)
         # Output: (B*T, latent_size)
-        self.latent_compress = nn.Linear(hidden_dim * 16 * 16, latent_size)
+        self.latent_compress = nn.Linear(compress_size, latent_size)
 
     def forward(self, x):
         """
@@ -152,13 +173,17 @@ class Encoder(nn.Module):
         _, C2, H2, W2 = x.shape
         x = x.view(B, T, C2, H2, W2)  # (B, T, 256, 16, 16)
 
-        # ConvLSTM processes temporal sequence
-        lstm_out, _ = self.convlstm(x)  # list of (B, T, hidden_dim, 16, 16)
-        h_seq = lstm_out[0]             # (B, T, hidden_dim, 16, 16)
+        if self.use_convlstm:
+            # ConvLSTM processes temporal sequence
+            lstm_out, _ = self.convlstm(x)  # list of (B, T, hidden_dim, 16, 16)
+            h_seq = lstm_out[0]             # (B, T, hidden_dim, 16, 16)
+        else:
+            # No temporal processing - just pass through spatial features
+            h_seq = x  # (B, T, 256, 16, 16)
 
         # Flatten and compress spatial dimensions with linear layer
         B, T, C, H, W = h_seq.shape
-        h_flat = h_seq.view(B * T, C * H * W)  # (B*T, hidden_dim * 16 * 16)
+        h_flat = h_seq.view(B * T, C * H * W)  # (B*T, C * 16 * 16)
         h_flat = self.dropout(h_flat)  # Apply dropout
         z_compressed = self.latent_compress(h_flat)  # (B*T, latent_size)
         z_seq = z_compressed.view(B, T, self.latent_size)  # (B, T, latent_size)
@@ -171,17 +196,20 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     """
-    Decoder: Linear expansion + ConvLSTM temporal decoding + ConvTranspose spatial reconstruction
+    Decoder: Linear expansion + optional ConvLSTM temporal decoding + ConvTranspose spatial reconstruction
     Input: z_seq (B, T, latent_size)
     Output: x_rec (B, T, 1, 128, 128)
+    Supports ablation: ConvLSTM on/off, residual connections, batch normalization
     """
 
-    def __init__(self, seq_len, latent_size=4096, latent_dim=256, hidden_dim=128, num_layers=2, use_latent_split=False):
+    def __init__(self, seq_len, latent_size=4096, latent_dim=256, hidden_dim=128, num_layers=2,
+                 use_latent_split=False, use_convlstm=True, use_residual=True, use_batchnorm=True):
         super(Decoder, self).__init__()
         self.seq_len = seq_len
         self.latent_dim = latent_dim
         self.latent_size = latent_size
         self.use_latent_split = use_latent_split
+        self.use_convlstm = use_convlstm
 
         # If using latent split, we only use half the latent for reconstruction
         effective_latent_size = latent_size // 2 if use_latent_split else latent_size
@@ -191,26 +219,34 @@ class Decoder(nn.Module):
         # Output: (B*T, latent_dim * 16 * 16)
         self.latent_expand = nn.Linear(effective_latent_size, latent_dim * 16 * 16)
 
-        # ConvLSTM decodes temporal dimension
-        self.convlstm = ConvLSTM(
-            input_dim=latent_dim,
-            hidden_dim=hidden_dim,
-            kernel_size=(3, 3),
-            num_layers=num_layers,
-            batch_first=True,
-            return_all_layers=False
-        )
+        if use_convlstm:
+            # ConvLSTM decodes temporal dimension
+            self.convlstm = ConvLSTM(
+                input_dim=latent_dim,
+                hidden_dim=hidden_dim,
+                kernel_size=(3, 3),
+                num_layers=num_layers,
+                batch_first=True,
+                return_all_layers=False
+            )
+            # Spatial decoder input channels
+            spatial_input_channels = hidden_dim
+        else:
+            # No ConvLSTM - just pass through expanded latent
+            self.convlstm = None
+            # Spatial decoder input channels
+            spatial_input_channels = latent_dim
 
         # Spatial decoding with residual connections: 16x16 -> 32x32 -> 64x64 -> 128x128
         self.spatial_decoder = nn.Sequential(
             # 16 -> 32 (with upsampling)
-            ResidualUpBlock(hidden_dim, 128),
+            ResidualUpBlock(spatial_input_channels, 128, use_residual=use_residual, use_batchnorm=use_batchnorm),
 
             # 32 -> 64 (with upsampling)
-            ResidualUpBlock(128, 64),
+            ResidualUpBlock(128, 64, use_residual=use_residual, use_batchnorm=use_batchnorm),
 
             # 64 -> 128 (with upsampling)
-            ResidualUpBlock(64, 32),
+            ResidualUpBlock(64, 32, use_residual=use_residual, use_batchnorm=use_batchnorm),
 
             # Final output layer
             nn.Conv2d(32, 1, kernel_size=3, padding=1),
@@ -240,13 +276,17 @@ class Decoder(nn.Module):
         z_expanded = self.latent_expand(z_flat)  # (B*T, latent_dim * 16 * 16)
         z_spatial = z_expanded.view(B, T, self.latent_dim, 16, 16)  # (B, T, latent_dim, 16, 16)
 
-        # ConvLSTM decodes temporal dimension
-        lstm_out, _ = self.convlstm(z_spatial)  # list of (B, T, hidden_dim, 16, 16)
-        h_seq = lstm_out[0]                 # (B, T, hidden_dim, 16, 16)
+        if self.use_convlstm:
+            # ConvLSTM decodes temporal dimension
+            lstm_out, _ = self.convlstm(z_spatial)  # list of (B, T, hidden_dim, 16, 16)
+            h_seq = lstm_out[0]                 # (B, T, hidden_dim, 16, 16)
+        else:
+            # No temporal processing - just pass through expanded latent
+            h_seq = z_spatial  # (B, T, latent_dim, 16, 16)
 
         # Spatial decoding: process each timestep separately
         B, T, C, H, W = h_seq.shape
-        h_seq = h_seq.view(B * T, C, H, W)  # (B*T, hidden_dim, 16, 16)
+        h_seq = h_seq.view(B * T, C, H, W)  # (B*T, C, 16, 16)
         x_rec = self.spatial_decoder(h_seq)  # (B*T, 1, 128, 128)
         x_rec = x_rec.view(B, T, 1, 128, 128)  # (B, T, 1, 128, 128)
 
@@ -294,6 +334,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
     Includes Encoder, Decoder, and optional Classifier
     Compatible with HuggingFace Hub
     Works with 128x128 images
+    Supports ablation studies: dropout, ConvLSTM, residual connections, batch normalization
     """
 
     def __init__(
@@ -307,7 +348,12 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         latent_size=4096,
         use_classifier=True,
         num_classes=2,
-        use_latent_split=False
+        use_latent_split=False,
+        # Ablation parameters
+        dropout_rate=0.1,
+        use_convlstm=True,
+        use_residual=True,
+        use_batchnorm=True
     ):
         super(ConvLSTMAutoencoder, self).__init__()
 
@@ -316,13 +362,22 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         self.encoder_hidden_dim = encoder_hidden_dim
         self.latent_size = latent_size
         self.use_latent_split = use_latent_split
+        # Store ablation settings for reproducibility
+        self.dropout_rate = dropout_rate
+        self.use_convlstm = use_convlstm
+        self.use_residual = use_residual
+        self.use_batchnorm = use_batchnorm
 
         # Core components
         self.encoder = Encoder(
             input_channels=input_channels,
             hidden_dim=encoder_hidden_dim,
             num_layers=encoder_layers,
-            latent_size=latent_size
+            latent_size=latent_size,
+            dropout_rate=dropout_rate,
+            use_convlstm=use_convlstm,
+            use_residual=use_residual,
+            use_batchnorm=use_batchnorm
         )
 
         self.decoder = Decoder(
@@ -331,7 +386,10 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
             latent_dim=encoder_hidden_dim,
             hidden_dim=decoder_hidden_dim,
             num_layers=decoder_layers,
-            use_latent_split=use_latent_split
+            use_latent_split=use_latent_split,
+            use_convlstm=use_convlstm,
+            use_residual=use_residual,
+            use_batchnorm=use_batchnorm
         )
 
         # Optional classifier
