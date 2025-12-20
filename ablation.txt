@@ -1,0 +1,4 @@
+convlstm l1 --ms_ssim_weight 1.0 --rec_weight 0.0 --temporal_weight 0.0
+convlstm l1 --no-convlstm
+convlstm l1 --no-batchnorm
+convlstm l1 --dropout-rate 0.0 
