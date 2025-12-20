@@ -8,8 +8,12 @@ This guide explains how to conduct ablation studies with the ConvLSTM Autoencode
 ```bash
 ./train_model.sh <MODE> <LOSS_TYPE> [OPTIONS]
 
-# Example:
-./train_model.sh convlstm_latent_split l1 --ms-ssim-weight 0.0 --no-convlstm
+# MODE can be: convlstm or convlstm_latent_split
+# LOSS_TYPE can be: l1 or mse
+
+# Examples:
+./train_model.sh convlstm l1 --ms-ssim-weight 0.0 --no-convlstm
+./train_model.sh convlstm_latent_split l1 --temporal-weight 0.0
 ```
 
 ### Available Options
@@ -33,6 +37,21 @@ MS_SSIM_WEIGHT=0.0 USE_CONVLSTM=false ./train_model.sh convlstm_latent_split l1
 ## Overview
 
 The training pipeline supports ablations for both **loss components** and **model architecture features**. You can disable any component by setting its weight to 0 (for losses) or using the appropriate flag (for model features).
+
+### Training Modes
+
+**Two training modes are available**, both supporting full ablation functionality:
+
+1. **`convlstm`** - Standard ConvLSTM Autoencoder
+   - Single latent space (4096 dimensions)
+   - Processes embryo sequences only
+
+2. **`convlstm_latent_split`** - ConvLSTM with Latent Split
+   - Splits latent space: 2048 for empty wells, 2048 for embryos
+   - Processes both embryo and empty well sequences
+   - Better disentanglement of embryo vs background features
+
+Both modes support identical ablation parameters.
 
 ## Loss Ablations
 
@@ -88,6 +107,15 @@ Control key architectural components:
 
 #### Baseline (all features enabled)
 ```bash
+# Standard mode
+python train.py convlstm \
+  --loss-type l1 \
+  --ms-ssim-weight 0.5 \
+  --rec-weight 0.5 \
+  --temporal-weight 0.1 \
+  --dropout-rate 0.1
+
+# Latent split mode
 python train.py convlstm_latent_split \
   --loss-type l1 \
   --ms-ssim-weight 0.5 \
@@ -98,6 +126,14 @@ python train.py convlstm_latent_split \
 
 #### Ablate MS-SSIM Loss
 ```bash
+# Standard mode
+python train.py convlstm \
+  --loss-type l1 \
+  --ms-ssim-weight 0.0 \
+  --rec-weight 1.0 \
+  --temporal-weight 0.1
+
+# Latent split mode
 python train.py convlstm_latent_split \
   --loss-type l1 \
   --ms-ssim-weight 0.0 \
@@ -157,28 +193,52 @@ The `train_model.sh` script accepts ablation parameters directly as command-line
 
 **Syntax**: `./train_model.sh <MODE> <LOSS_TYPE> [ablation arguments...]`
 
-#### Baseline
+#### Baseline (Standard ConvLSTM)
+```bash
+./train_model.sh convlstm l1
+```
+
+#### Baseline (Latent Split)
 ```bash
 ./train_model.sh convlstm_latent_split l1
 ```
 
 #### Ablate MS-SSIM Loss
 ```bash
+# Standard mode
+./train_model.sh convlstm l1 --ms-ssim-weight 0.0 --rec-weight 1.0
+
+# Latent split mode
 ./train_model.sh convlstm_latent_split l1 --ms-ssim-weight 0.0 --rec-weight 1.0
 ```
 
 #### Ablate ConvLSTM
 ```bash
+# Standard mode
+./train_model.sh convlstm l1 --no-convlstm
+
+# Latent split mode
 ./train_model.sh convlstm_latent_split l1 --no-convlstm
 ```
 
 #### Ablate Residual Connections and Batch Norm
 ```bash
+# Standard mode
+./train_model.sh convlstm l1 --no-residual --no-batchnorm
+
+# Latent split mode
 ./train_model.sh convlstm_latent_split l1 --no-residual --no-batchnorm
 ```
 
 #### Multiple Ablations
 ```bash
+# Standard mode
+./train_model.sh convlstm mse \
+  --ms-ssim-weight 0.0 \
+  --temporal-weight 0.0 \
+  --no-convlstm
+
+# Latent split mode
 ./train_model.sh convlstm_latent_split mse \
   --ms-ssim-weight 0.0 \
   --temporal-weight 0.0 \
