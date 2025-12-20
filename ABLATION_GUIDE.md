@@ -18,6 +18,8 @@ This guide explains how to conduct ablation studies with the ConvLSTM Autoencode
 
 ### Available Options
 
+**IMPORTANT**: Use dashes (`-`) in argument names, NOT underscores (`_`)
+
 **Loss Ablations:**
 - `--ms-ssim-weight <float>` - MS-SSIM loss weight (default: 0.5, disable: 0.0)
 - `--rec-weight <float>` - Reconstruction loss weight (default: 0.5, disable: 0.0)
@@ -28,6 +30,8 @@ This guide explains how to conduct ablation studies with the ConvLSTM Autoencode
 - `--no-convlstm` - Disable ConvLSTM temporal modeling
 - `--no-residual` - Disable residual connections
 - `--no-batchnorm` - Disable batch normalization
+
+**Common Mistake**: ❌ `--ms_ssim_weight` → ✅ `--ms-ssim-weight`
 
 **Alternative: Environment Variables**
 ```bash
