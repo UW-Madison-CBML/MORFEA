@@ -1084,7 +1084,7 @@ Reproducibility:
         # Save to HuggingFace with descriptive name
         date_label = datetime.now().strftime("%Y-%m-%d")
         loss_suffix = f"{loss_type}"
-        if use_temporal_smoothness:
+        if temporal_weight > 0:
             loss_suffix += "-temporal"
         repo_name = f"embryo-convlstm-{loss_suffix}-{date_label}"
 
@@ -1456,7 +1456,7 @@ Reproducibility:
         # Save to HuggingFace with descriptive name
         date_label = datetime.now().strftime("%Y-%m-%d")
         loss_suffix = f"{loss_type}-latent-split"
-        if use_temporal_smoothness:
+        if temporal_weight > 0:
             loss_suffix += "-temporal"
         repo_name = f"embryo-convlstm-{loss_suffix}-{date_label}"
 
