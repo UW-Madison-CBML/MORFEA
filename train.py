@@ -31,6 +31,8 @@ from torch.utils.data.distributed import DistributedSampler
 import os
 from huggingface_hub import login
 import shutil
+import hashlib
+import json
 def setup_distributed():
     """Initialize distributed training"""
     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
@@ -51,6 +53,54 @@ def setup_distributed():
 def cleanup_distributed():
     if dist.is_initialized():
         dist.destroy_process_group()
+
+def generate_repo_name(mode, config_dict, file_paths, date_str):
+    """
+    Generate a unique, deterministic repository name based on configuration and code.
+
+    Args:
+        mode: Training mode (e.g., "convlstm", "convlstm_latent_split")
+        config_dict: Dictionary of all configuration parameters
+        file_paths: List of file paths to hash
+        date_str: Date string (YYYY-MM-DD)
+
+    Returns:
+        str: Repository name (max 96 chars)
+    """
+    # Create hash input from config
+    config_str = json.dumps(config_dict, sort_keys=True)
+
+    # Hash all file contents
+    file_hasher = hashlib.sha256()
+    for file_path in file_paths:
+        if os.path.exists(file_path):
+            with open(file_path, 'rb') as f:
+                file_hasher.update(f.read())
+        else:
+            # If file doesn't exist, add its name to the hash anyway
+            file_hasher.update(file_path.encode())
+
+    # Combine everything into final hash
+    combined_hasher = hashlib.sha256()
+    combined_hasher.update(config_str.encode())
+    combined_hasher.update(file_hasher.digest())
+    combined_hasher.update(date_str.encode())
+
+    # Get short hash (first 8 characters is enough for uniqueness)
+    short_hash = combined_hasher.hexdigest()[:8]
+
+    # Build repo name: embryo-{mode}-{hash}-{date}
+    # Example: embryo-convlstm-a3f2b1c9-2025-12-21
+    repo_name = f"embryo-{mode}-{short_hash}-{date_str}"
+
+    # Ensure it's under 96 characters
+    if len(repo_name) > 96:
+        # Truncate mode if needed
+        max_mode_len = 96 - len(f"embryo--{short_hash}-{date_str}")
+        truncated_mode = mode[:max_mode_len]
+        repo_name = f"embryo-{truncated_mode}-{short_hash}-{date_str}"
+
+    return repo_name
 
 def save_and_push_model(model, repo_name, required_files):
     """
@@ -75,9 +125,29 @@ def save_and_push_model(model, repo_name, required_files):
         else:
             print(f"Warning: {file_path} not found, skipping")
 
-    # Push to hub
+    # Push model to hub (this uploads model weights and config)
     model.push_to_hub(repo_name)
-    print(f"Successfully pushed model and files to {repo_name}")
+    print(f"Pushed model weights and config to {repo_name}")
+
+    # Upload additional files using HfApi
+    api = HfApi()
+    for file_path in required_files:
+        local_file = os.path.join(repo_name, os.path.basename(file_path))
+        if os.path.exists(local_file):
+            try:
+                api.upload_file(
+                    path_or_fileobj=local_file,
+                    path_in_repo=os.path.basename(file_path),
+                    repo_id=f"jenslundsgaard7-uw-madison/{repo_name}",
+                    repo_type="model"
+                )
+                print(f"Uploaded {file_path} to HuggingFace Hub")
+            except Exception as e:
+                print(f"Warning: Failed to upload {file_path}: {e}")
+        else:
+            print(f"Warning: {local_file} not found, skipping upload")
+
+    print(f"Successfully pushed all files to {repo_name}")
 def gaussian_kernel(size=11, sigma=1.5):
     """Generate Gaussian kernel for SSIM"""
     coords = torch.arange(size, dtype=torch.float32)
@@ -1081,12 +1151,29 @@ Reproducibility:
         # Save the state dict
         torch.save(model.state_dict(), "convlstm_model_weights.pth")
 
-        # Save to HuggingFace with descriptive name
+        # Generate unique repo name based on config and code
         date_label = datetime.now().strftime("%Y-%m-%d")
-        loss_suffix = f"{loss_type}"
-        if temporal_weight > 0:
-            loss_suffix += "-temporal"
-        repo_name = f"embryo-convlstm-{loss_suffix}-{date_label}"
+
+        # Collect all config for hashing
+        config_for_hash = {
+            "mode": "convlstm",
+            "loss_type": loss_type,
+            "ms_ssim_weight": ms_ssim_weight,
+            "rec_weight": rec_weight,
+            "temporal_weight": temporal_weight,
+            "dropout_rate": dropout_rate,
+            "use_convlstm": use_convlstm,
+            "use_residual": use_residual,
+            "use_batchnorm": use_batchnorm,
+            "learning_rate": 2e-4,
+            "encoder_hidden_dim": 256,
+            "encoder_layers": 2,
+            "decoder_hidden_dim": 128,
+            "decoder_layers": 2,
+            "latent_size": 4096,
+            "seq_len": 50,
+            "image_size": 128,
+        }
 
         # Required files for ConvLSTM model
         required_files = [
@@ -1096,9 +1183,13 @@ Reproducibility:
             "raffael_conv_lstm.py",
             "dataset_ivf.py",
             "train_model.sh",
-            "training_config.txt",  # Shell script training configuration
-            "training_config_detailed.txt",  # Detailed training configuration
+            "training_config.txt",
+            "training_config_detailed.txt",
         ]
+
+        # Generate unique repo name
+        repo_name = generate_repo_name("convlstm", config_for_hash, required_files, date_label)
+        print(f"Repository name: {repo_name} (length: {len(repo_name)})")
 
         save_and_push_model(model, repo_name, required_files)
 
@@ -1453,12 +1544,32 @@ Reproducibility:
         # Save the state dict
         torch.save(model.state_dict(), "convlstm_latent_split_weights.pth")
 
-        # Save to HuggingFace with descriptive name
+        # Generate unique repo name based on config and code
         date_label = datetime.now().strftime("%Y-%m-%d")
-        loss_suffix = f"{loss_type}-latent-split"
-        if temporal_weight > 0:
-            loss_suffix += "-temporal"
-        repo_name = f"embryo-convlstm-{loss_suffix}-{date_label}"
+
+        # Collect all config for hashing
+        config_for_hash = {
+            "mode": "convlstm_latent_split",
+            "loss_type": loss_type,
+            "ms_ssim_weight": ms_ssim_weight,
+            "rec_weight": rec_weight,
+            "temporal_weight": temporal_weight,
+            "dropout_rate": dropout_rate,
+            "use_convlstm": use_convlstm,
+            "use_residual": use_residual,
+            "use_batchnorm": use_batchnorm,
+            "use_latent_split": True,
+            "learning_rate": 2e-4,
+            "encoder_hidden_dim": 256,
+            "encoder_layers": 2,
+            "decoder_hidden_dim": 128,
+            "decoder_layers": 2,
+            "latent_size": 4096,
+            "embryo_latent_size": 2048,
+            "empty_latent_size": 2048,
+            "seq_len": 50,
+            "image_size": 128,
+        }
 
         # Required files for ConvLSTM model with latent split
         required_files = [
@@ -1471,6 +1582,10 @@ Reproducibility:
             "training_config.txt",
             "training_config_latent_split.txt",
         ]
+
+        # Generate unique repo name
+        repo_name = generate_repo_name("convlstm-ls", config_for_hash, required_files, date_label)
+        print(f"Repository name: {repo_name} (length: {len(repo_name)})")
 
         save_and_push_model(model, repo_name, required_files)
 
