@@ -1168,7 +1168,6 @@ Reproducibility:
         for index, (embryo_vol, _, _) in enumerate(pbar):
             optimizer.zero_grad()
 
-            # embryo_vol is (T, 1, 500, 500), we need (1, T, 1, 500, 500)
             embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, 500, 500)
 
             # Forward pass - returns (reconstruction, latent_seq)
@@ -1352,7 +1351,7 @@ Reproducibility:
         model.eval() # Set model to evaluation mode
         with torch.no_grad():
             for embryo_vol, _, _ in val_loader:
-                val_recon, _ = model(embryo_vol)
+                val_recon, _ = model(embryo_vol.to(DEVICE))
                 val_loss += torch.nn.functional.mse_loss(embryo_vol, val_recon).item()
                 val_count += 1
         run.log({"val_mse": val_loss/val_count})
@@ -1820,7 +1819,7 @@ Reproducibility:
         model.eval() # Set model to evaluation mode
         with torch.no_grad():
             for embryo_vol, _, _ in val_loader:
-                val_recon, _ = model(embryo_vol)
+                val_recon, _ = model(embryo_vol.to(DEVICE))
                 val_loss += torch.nn.functional.mse_loss(embryo_vol, val_recon).item()
                 val_count += 1
         run.log({"val_mse": val_loss/val_count})
