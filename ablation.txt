@@ -1,1 +1,2 @@
-convlstm l1 --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.0
+convlstm l1 --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.05
+convlstm_latent_split l1 --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.05

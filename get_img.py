@@ -17,12 +17,12 @@ def main():
     login(os.getenv("HF_TOKEN"))
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=128, norm="minmax01")
     loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=4, pin_memory=True)
-
+    model = None
+    if(model_name == None):
     # Search for model going back up to 30 days
     api = HfApi()
-    model = None
     model_loaded = False
-
+    
     for days_back in range(31):
         date_label = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
         model_name = f"JensLundsgaard/IVF-ConvLSTM-Model-{date_label}"
