@@ -1352,6 +1352,7 @@ Reproducibility:
         with torch.no_grad():
             for embryo_vol, _, _ in val_loader:
                 val_recon, _ = model(embryo_vol.to(DEVICE))
+                val_recon = val_recon.to(DEVICE)
                 val_loss += torch.nn.functional.mse_loss(embryo_vol, val_recon).item()
                 val_count += 1
         run.log({"val_mse": val_loss/val_count})
@@ -1820,6 +1821,7 @@ Reproducibility:
         with torch.no_grad():
             for embryo_vol, _, _ in val_loader:
                 val_recon, _ = model(embryo_vol.to(DEVICE))
+                val_recon = val_recon.to(DEVICE)
                 val_loss += torch.nn.functional.mse_loss(embryo_vol, val_recon).item()
                 val_count += 1
         run.log({"val_mse": val_loss/val_count})
