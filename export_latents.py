@@ -125,7 +125,7 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
 
     print(f"Extracting latent embeddings from {len(ds)} sequences...")
     print(f"{'='*60}")
-
+    num_latents = 0
     for idx, (embryo_vol, _, _) in enumerate(loader):
         if (idx + 1) % 10 == 0:
             print(f"  Processed {idx + 1}/{len(ds)} sequences")
@@ -140,6 +140,8 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
 
         with torch.no_grad():
             _, z_seq = model(embryo_vol)  # z_seq: (B=1, T, 4096)
+        if(num_latents != z_seq.shape[2]):
+            num_latents = z_seq.shape[2] 
 
         # Extract the batch dimension
         z = z_seq[0].cpu().numpy()  # Shape: (T, 4096)
@@ -153,7 +155,7 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
     # Create DataFrame
     print(f"\n{'='*60}")
     print(f"Creating CSV with {len(all_latents)} samples...")
-    latent_columns = [f"z_{i}" for i in range(4096)]
+    latent_columns = [f"z_{i}" for i in range(num_latents)]
 
     latents_array = np.array(all_latents)  # Shape: (num_samples, 4096)
     df = pd.DataFrame(latents_array, columns=latent_columns)
@@ -164,11 +166,19 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
     # (due to sequence overlap in the dataset)
     print("De-duplicating overlapping sequences...")
     normed_df = df.groupby(['cell_id', 'time_step']).agg({
-        **{f'z_{i}': 'mean' for i in range(4096)}
+        **{f'z_{i}': 'mean' for i in range(num_latents)}
     }).reset_index().sort_values(by=['cell_id', 'time_step'], ascending=[True, True])
+    latent_data = normed_df[lat_columns].values  # Shape: (num_rows, 4096)
+
+    # Save the latent data as npy
+    np.save(model_name + '.npy', latent_data)
+
+    # Save cell_id and timestep as CSV
+    metadata = df[['cell_id', 'time_step']]
+    metadata.to_csv(model_name + '.csv', index=False)
 
     # Save to CSV
-    normed_df.to_csv(output_csv, index=False)
+    # normed_df.to_csv(output_csv, index=False)
     print(f"{'='*60}")
     print(f"✓ Latent embeddings saved to: {output_csv}")
     print(f"  Total samples (after deduplication): {len(normed_df)}")
@@ -179,8 +189,14 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
 
 
 if __name__ == "__main__":
-    # Hard-coded default model, but will search for recent models if it fails
+    import argparse
+
+    parser = argparse.ArgumentParser(description="A simple script using argparse.")
+
+    parser.add_argument("--name", type=str, help="Name of the model", default="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-15")
+
+    args = parser.parse_args()
     export_latents_to_csv(
-        model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-15",
+        model_name=args.name,
         output_csv="latents.csv"
     )
