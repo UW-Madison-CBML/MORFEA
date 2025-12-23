@@ -1036,17 +1036,33 @@ Reproducibility:
     learning_rate = 2e-4
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
-    ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=128, norm="minmax01")
 
+    ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=128, norm="minmax01")
+    total_size = len(ds)
+
+    train_size = int(0.95 * total_size)
+    val_size = total_size - train_size
+
+    generator = torch.Generator().manual_seed(42)
+    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size], generator=generator)
+
+    # Create DataLoaders
     loader = DataLoader(
-        ds,
+        train_dataset,
         batch_size=1,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
         drop_last=True
     )
-
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=1,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+        drop_last=True
+    )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * 10)
 
     for epoch in range(10):
@@ -1192,6 +1208,15 @@ Reproducibility:
         print(f"Repository name: {repo_name} (length: {len(repo_name)})")
 
         save_and_push_model(model, repo_name, required_files)
+        val_loss = 0
+        val_count = 0
+        model.eval() # Set model to evaluation mode
+        with torch.no_grad():
+            for embryo_vol, _, _ in val_loader:
+                val_recon, _ = model(embryo_vol)
+                val_loss += torch.nn.functional.mse_loss(embryo_vol, val_recon).item()
+                val_count += 1
+        run.log({"val_mse": val_loss/val_count})
 
     run.finish()
     gc.collect()
@@ -1398,9 +1423,25 @@ Reproducibility:
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=128, norm="minmax01")
+    total_size = len(ds)
 
+    train_size = int(0.95 * total_size)
+    val_size = total_size - train_size
+
+    generator = torch.Generator().manual_seed(42)
+    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size], generator=generator)
+
+    # Create DataLoaders
     loader = DataLoader(
-        ds,
+        train_dataset,
+        batch_size=1,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+        drop_last=True
+    )
+    val_loader = DataLoader(
+        val_dataset,
         batch_size=1,
         shuffle=True,
         num_workers=4,
@@ -1588,6 +1629,16 @@ Reproducibility:
         print(f"Repository name: {repo_name} (length: {len(repo_name)})")
 
         save_and_push_model(model, repo_name, required_files)
+        val_loss = 0
+        val_count = 0
+        model.eval() # Set model to evaluation mode
+        with torch.no_grad():
+            for embryo_vol, _, _ in val_loader:
+                val_recon, _ = model(embryo_vol)
+                val_loss += torch.nn.functional.mse_loss(embryo_vol, val_recon).item()
+                val_count += 1
+        run.log({"val_mse": val_loss/val_count})
+            
 
     run.finish()
     gc.collect()
