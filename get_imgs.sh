@@ -9,7 +9,7 @@ pip install huggingface_hub wandb safetensors
 HF_KEY=$(head -n 1 api_keys.txt)
 export HF_TOKEN=$HF_KEY
 
-python get_img.py 
+python get_img.py --name JensLundsgaard/embryo-convlstm-ls-084cf5d1-2025-12-23
 tar -czvf imgs.tar.gz imgs
 
 rm -r embryo_dataset
