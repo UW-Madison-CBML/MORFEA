@@ -13,54 +13,55 @@ from datetime import datetime, timedelta
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(DEVICE)
-def main():
+def main(model_name):
     login(os.getenv("HF_TOKEN"))
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=128, norm="minmax01")
     loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=4, pin_memory=True)
     model = None
     if(model_name == None):
     # Search for model going back up to 30 days
-    api = HfApi()
-    model_loaded = False
-    
-    for days_back in range(31):
-        date_label = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
-        model_name = f"JensLundsgaard/IVF-ConvLSTM-Model-{date_label}"
-        try:
-            print(f"Attempting to load model: {model_name}")
-            model = ConvLSTMAutoencoder.from_pretrained(model_name)
-            print(f"Successfully loaded model from {date_label}")
-            model_loaded = True
-            break
-        except Exception as e:
-            if days_back < 30:
-                continue
-            else:
-                print(f"Failed to find model within 30 days. Last error: {e}")
-                raise
-
-    if not model_loaded or model is None:
-        print("Could not find any model within the last 30 days, using local weights...")
-        model = ConvLSTMAutoencoder(
-            seq_len=50,
-            input_channels=1,
-            encoder_hidden_dim=256,
-            encoder_layers=2,
-            decoder_hidden_dim=128,
-            decoder_layers=2,
-            latent_size=4096,
-            use_classifier=False,
-            num_classes=2
-        )
-        if os.path.exists("convlstm_model_weights.pth"):
+        api = HfApi()
+        model_loaded = False
+        
+        for days_back in range(31):
+            date_label = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+            model_name = f"JensLundsgaard/IVF-ConvLSTM-Model-{date_label}"
             try:
-                model.load_state_dict(torch.load("convlstm_model_weights.pth", weights_only=True))
-                print("Loaded local convlstm_model_weights.pth")
+                print(f"Attempting to load model: {model_name}")
+                model = ConvLSTMAutoencoder.from_pretrained(model_name)
+                print(f"Successfully loaded model from {date_label}")
+                model_loaded = True
+                break
             except Exception as e:
-                print(f"Failed to load local weights: {e}")
-                print("Using untrained model - results will be poor!")
+                if days_back < 30:
+                    continue
+                else:
+                    print(f"Failed to find model within 30 days. Last error: {e}")
+                    raise
 
+        if not model_loaded or model is None:
+            print("Could not find any model within the last 30 days, using local weights...")
+            model = ConvLSTMAutoencoder(
+                seq_len=50,
+                input_channels=1,
+                encoder_hidden_dim=256,
+                encoder_layers=2,
+                decoder_hidden_dim=128,
+                decoder_layers=2,
+                latent_size=4096,
+                use_classifier=False,
+                num_classes=2
+            )
+            if os.path.exists("convlstm_model_weights.pth"):
+                try:
+                    model.load_state_dict(torch.load("convlstm_model_weights.pth", weights_only=True))
+                    print("Loaded local convlstm_model_weights.pth")
+                except Exception as e:
+                    print(f"Failed to load local weights: {e}")
+                    print("Using untrained model - results will be poor!")
 
+    else:
+        model = ConvLSTMAutoencoder.from_pretrained(model_name)
     model = model.to(DEVICE)
     for idx, (embryo_vol, _, _) in enumerate(loader):
         model.eval()
@@ -89,5 +90,13 @@ def main():
         plt.close()
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="A simple script using argparse.")
+
+    parser.add_argument("--name", type=str, help="Name of the model", default="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-15")
+
+    args = parser.parse_args()
+ 
+    main(args.name)
 
