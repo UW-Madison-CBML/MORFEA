@@ -102,7 +102,7 @@ def generate_repo_name(mode, config_dict, file_paths, date_str):
 
     return repo_name
 
-def save_and_push_model(model, repo_name, required_files):
+def save_and_push_model(model, repo_name, required_files, model_config=None):
     """
     Save model and push it along with required training files to HuggingFace Hub
 
@@ -110,12 +110,26 @@ def save_and_push_model(model, repo_name, required_files):
         model: The model to save
         repo_name: Repository name on HuggingFace Hub
         required_files: List of file paths to include in the repo
+        model_config: Optional dictionary with model configuration to save as config.json
     """
     # Create temporary directory for the repo
     os.makedirs(repo_name, exist_ok=True)
 
-    # Save the model
-    model.save_pretrained(repo_name)
+    # Save the model weights
+    try:
+        model.save_pretrained(repo_name)
+        print(f"Saved model using save_pretrained")
+    except Exception as e:
+        # If save_pretrained fails, just save the state dict
+        print(f"save_pretrained failed ({e}), saving state dict only")
+        torch.save(model.state_dict(), os.path.join(repo_name, "pytorch_model.bin"))
+
+    # Save custom config.json with all ablation parameters
+    if model_config is not None:
+        config_path = os.path.join(repo_name, "config.json")
+        with open(config_path, 'w') as f:
+            json.dump(model_config, f, indent=2)
+        print(f"Saved config.json with ablation parameters")
 
     # Copy all required files
     for file_path in required_files:
@@ -126,11 +140,44 @@ def save_and_push_model(model, repo_name, required_files):
             print(f"Warning: {file_path} not found, skipping")
 
     # Push model to hub (this uploads model weights and config)
-    model.push_to_hub(repo_name)
-    print(f"Pushed model weights and config to {repo_name}")
+    try:
+        model.push_to_hub(repo_name)
+        print(f"Pushed model weights to {repo_name}")
+    except Exception as e:
+        print(f"Warning: push_to_hub failed ({e}), will upload manually")
 
-    # Upload additional files using HfApi
+    # Upload all files using HfApi (including config.json)
     api = HfApi()
+
+    # Upload config.json first if it exists
+    config_file = os.path.join(repo_name, "config.json")
+    if os.path.exists(config_file):
+        try:
+            api.upload_file(
+                path_or_fileobj=config_file,
+                path_in_repo="config.json",
+                repo_id=f"jenslundsgaard7-uw-madison/{repo_name}",
+                repo_type="model"
+            )
+            print(f"Uploaded config.json to HuggingFace Hub")
+        except Exception as e:
+            print(f"Warning: Failed to upload config.json: {e}")
+
+    # Upload model weights if they exist
+    model_file = os.path.join(repo_name, "pytorch_model.bin")
+    if os.path.exists(model_file):
+        try:
+            api.upload_file(
+                path_or_fileobj=model_file,
+                path_in_repo="pytorch_model.bin",
+                repo_id=f"jenslundsgaard7-uw-madison/{repo_name}",
+                repo_type="model"
+            )
+            print(f"Uploaded pytorch_model.bin to HuggingFace Hub")
+        except Exception as e:
+            print(f"Warning: Failed to upload pytorch_model.bin: {e}")
+
+    # Upload additional required files
     for file_path in required_files:
         local_file = os.path.join(repo_name, os.path.basename(file_path))
         if os.path.exists(local_file):
@@ -482,7 +529,23 @@ def train():
                 "dataset_ivf.py",
             ]
 
-            save_and_push_model(model_cpu, repo_name, required_files)
+            # Create config for HuggingFace
+            hf_config = {
+                "model_type": "Model",
+                "architecture": "Conv LSTM Autoencoder",
+                "loss": "MS-SSIM + L1",
+                "learning_rate": 0.005,
+                "optimizer": "Adam",
+                "epochs": 10,
+                "dataset": "https://zenodo.org/records/7912264",
+                "l1_weight": 0.5,
+                "ms_ssim_weight": 0.5,
+                "tcl_weight": 0.03,
+                "repo_name": repo_name,
+                "date": date_label,
+            }
+
+            save_and_push_model(model_cpu, repo_name, required_files, model_config=hf_config)
             del model_cpu  # Clean up the CPU copy
 
     if is_main:
@@ -684,7 +747,23 @@ def train_mse_distributed():
                 "dataset_ivf.py",
             ]
 
-            save_and_push_model(model_cpu, repo_name, required_files)
+            # Create config for HuggingFace
+            hf_config = {
+                "model_type": "Model",
+                "architecture": "Conv LSTM Autoencoder",
+                "loss": "MSE",
+                "learning_rate": 0.005,
+                "optimizer": "Adam",
+                "epochs": 10,
+                "world_size": world_size,
+                "dataset": "https://zenodo.org/records/7912264",
+                "tcl_weight": 0.03,
+                "distributed": True,
+                "repo_name": repo_name,
+                "date": date_label,
+            }
+
+            save_and_push_model(model_cpu, repo_name, required_files, model_config=hf_config)
             del model_cpu
 
     if is_main:
@@ -839,7 +918,22 @@ def train_mse_single():
             "dataset_ivf.py",
         ]
 
-        save_and_push_model(model, repo_name, required_files)
+        # Create config for HuggingFace
+        hf_config = {
+            "model_type": "Model",
+            "architecture": "Conv LSTM Autoencoder",
+            "loss": "MSE",
+            "learning_rate": 0.005,
+            "optimizer": "Adam",
+            "epochs": 10,
+            "dataset": "https://zenodo.org/records/7912264",
+            "tcl_weight": 0.05,
+            "distributed": False,
+            "repo_name": repo_name,
+            "date": date_label,
+        }
+
+        save_and_push_model(model, repo_name, required_files, model_config=hf_config)
 
     run.finish()
     gc.collect()
@@ -1044,7 +1138,7 @@ Reproducibility:
     val_size = total_size - train_size
 
     generator = torch.Generator().manual_seed(42)
-    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size], generator=generator)
+    train_dataset, val_dataset = torch.utils.data.random_split(ds, [train_size, val_size], generator=generator)
 
     # Create DataLoaders
     loader = DataLoader(
@@ -1207,7 +1301,52 @@ Reproducibility:
         repo_name = generate_repo_name("convlstm", config_for_hash, required_files, date_label)
         print(f"Repository name: {repo_name} (length: {len(repo_name)})")
 
-        save_and_push_model(model, repo_name, required_files)
+        # Create comprehensive config for HuggingFace
+        hf_config = {
+            "model_type": "ConvLSTMAutoencoder",
+            "architecture": "ConvLSTM Autoencoder",
+            # Model architecture parameters
+            "seq_len": 50,
+            "input_channels": 1,
+            "encoder_hidden_dim": 256,
+            "encoder_layers": 2,
+            "decoder_hidden_dim": 128,
+            "decoder_layers": 2,
+            "latent_size": 4096,
+            "use_classifier": False,
+            "num_classes": 2,
+            "use_latent_split": False,
+            "image_size": 128,
+            # Ablation parameters
+            "dropout_rate": dropout_rate,
+            "use_convlstm": use_convlstm,
+            "use_residual": use_residual,
+            "use_batchnorm": use_batchnorm,
+            # Loss configuration
+            "loss_type": loss_type,
+            "ms_ssim_weight": ms_ssim_weight,
+            "rec_weight": rec_weight,
+            "temporal_weight": temporal_weight,
+            "loss_description": loss_description,
+            # Training configuration
+            "learning_rate": 2e-4,
+            "weight_decay": 1e-5,
+            "optimizer": "Adam",
+            "scheduler": "CosineAnnealingLR",
+            "batch_size": 1,
+            "epochs": 10,
+            "gradient_clip": 5.0,
+            # Dataset
+            "dataset": "https://zenodo.org/records/7912264",
+            "resize": 128,
+            "normalization": "minmax01",
+            # Reproducibility
+            "repo_name": repo_name,
+            "date": date_label,
+            "hash": repo_name.split("-")[-2] if "-" in repo_name else "",
+        }
+
+        save_and_push_model(model, repo_name, required_files, model_config=hf_config)
         val_loss = 0
         val_count = 0
         model.eval() # Set model to evaluation mode
@@ -1429,7 +1568,7 @@ Reproducibility:
     val_size = total_size - train_size
 
     generator = torch.Generator().manual_seed(42)
-    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size], generator=generator)
+    train_dataset, val_dataset = torch.utils.data.random_split(ds, [train_size, val_size], generator=generator)
 
     # Create DataLoaders
     loader = DataLoader(
@@ -1628,7 +1767,54 @@ Reproducibility:
         repo_name = generate_repo_name("convlstm-ls", config_for_hash, required_files, date_label)
         print(f"Repository name: {repo_name} (length: {len(repo_name)})")
 
-        save_and_push_model(model, repo_name, required_files)
+        # Create comprehensive config for HuggingFace
+        hf_config = {
+            "model_type": "ConvLSTMAutoencoder",
+            "architecture": "ConvLSTM Autoencoder with Latent Split",
+            # Model architecture parameters
+            "seq_len": 50,
+            "input_channels": 1,
+            "encoder_hidden_dim": 256,
+            "encoder_layers": 2,
+            "decoder_hidden_dim": 128,
+            "decoder_layers": 2,
+            "latent_size": 4096,
+            "use_classifier": False,
+            "num_classes": 2,
+            "use_latent_split": True,
+            "embryo_latent_size": 2048,
+            "empty_latent_size": 2048,
+            "image_size": 128,
+            # Ablation parameters
+            "dropout_rate": dropout_rate,
+            "use_convlstm": use_convlstm,
+            "use_residual": use_residual,
+            "use_batchnorm": use_batchnorm,
+            # Loss configuration
+            "loss_type": loss_type,
+            "ms_ssim_weight": ms_ssim_weight,
+            "rec_weight": rec_weight,
+            "temporal_weight": temporal_weight,
+            "loss_description": loss_description,
+            # Training configuration
+            "learning_rate": 2e-4,
+            "weight_decay": 1e-5,
+            "optimizer": "Adam",
+            "scheduler": "CosineAnnealingLR",
+            "batch_size": 1,
+            "epochs": 10,
+            "gradient_clip": 5.0,
+            # Dataset
+            "dataset": "https://zenodo.org/records/7912264",
+            "resize": 128,
+            "normalization": "minmax01",
+            # Reproducibility
+            "repo_name": repo_name,
+            "date": date_label,
+            "hash": repo_name.split("-")[-2] if "-" in repo_name else "",
+        }
+
+        save_and_push_model(model, repo_name, required_files, model_config=hf_config)
         val_loss = 0
         val_count = 0
         model.eval() # Set model to evaluation mode
