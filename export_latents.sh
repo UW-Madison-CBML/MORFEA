@@ -19,9 +19,10 @@ fi
 
 # Run export script
 echo "Running export_latents.py..."
-python export_latents.py
-mv *.csv latents/
-mv *.npy latents/
+python export_latents.py --name embryo-convlstm-bd3640a9-2025-12-23
+python export_latents.py --name embryo-convlstm-ls-60aa659c-2025-12-23
+mv *.csv latents
+mv *.npy latents
 tar -czvf latents latents.tar.gz
 # Cleanup
 echo "Cleaning up..."

@@ -33,7 +33,7 @@ def load_model(model_name=None, days_back=30):
     if model_name:
         try:
             print(f"Attempting to load model: {model_name}")
-            model = ConvLSTMAutoencoder.from_pretrained(model_name)
+            model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/"+model_name)
             print(f"Successfully loaded model: {model_name}")
             model_loaded = True
         except Exception as e:
@@ -168,25 +168,17 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
     normed_df = df.groupby(['cell_id', 'time_step']).agg({
         **{f'z_{i}': 'mean' for i in range(num_latents)}
     }).reset_index().sort_values(by=['cell_id', 'time_step'], ascending=[True, True])
-    latent_data = normed_df[lat_columns].values  # Shape: (num_rows, 4096)
+    latent_data = normed_df[latent_columns].values  # Shape: (num_rows, 4096)
 
     # Save the latent data as npy
     np.save(model_name + '.npy', latent_data)
 
     # Save cell_id and timestep as CSV
-    metadata = df[['cell_id', 'time_step']]
+    metadata = normed_df[['cell_id', 'time_step']]
     metadata.to_csv(model_name + '.csv', index=False)
 
     # Save to CSV
     # normed_df.to_csv(output_csv, index=False)
-    print(f"{'='*60}")
-    print(f"✓ Latent embeddings saved to: {output_csv}")
-    print(f"  Total samples (after deduplication): {len(normed_df)}")
-    print(f"  Original samples (before deduplication): {len(df)}")
-    print(f"  Columns: cell_id, time_step, z_0...z_4095 ({len(normed_df.columns)} total)")
-    print(f"  File size: {os.path.getsize(output_csv) / 1024 / 1024:.2f} MB")
-    print(f"{'='*60}\n")
-
 
 if __name__ == "__main__":
     import argparse
