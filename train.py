@@ -950,6 +950,7 @@ def train_convlstm(
     use_residual=True,
     use_batchnorm=True
 ):
+    gc.collect()
     """Training ConvLSTM Autoencoder with configurable loss (single GPU)
 
     Args:
@@ -1373,6 +1374,7 @@ def train_convlstm_latent_split(
     use_residual=True,
     use_batchnorm=True
 ):
+    gc.collect()
     """Training ConvLSTM Autoencoder with LATENT SPLIT enabled (single GPU)
 
     Args:
