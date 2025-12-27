@@ -23,12 +23,12 @@ Requirements = (Target.HasCHTCStaging == true)
 transfer_input_files = export_signatures.sh, export_signatures.py, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz
 #Requirements = (Machine == "bhaskargpu4000.chtc.wisc.edu") && (DriverVersion == "12.8") && (DeviceName == "NVIDIA H200")
  
-#transfer_output_files = latents.tar.gz
+transfer_output_files = latents_sigs.csv
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
 request_cpus = 1
-request_memory = 64GB
-request_disk = 80GB
+request_memory = 100GB
+request_disk = 100GB
 
 
 queue 1
