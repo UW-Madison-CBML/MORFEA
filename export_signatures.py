@@ -50,7 +50,7 @@ def get_new_row(group, cell_id):
     cols = [f"s_{i}" for i in range(signature.shape[0])]
     signature_row = pd.DataFrame(signature.reshape(1, -1), columns=cols)
     cell_id_row = pd.DataFrame([cell_id], columns=["cell_id"])
-    return pd.concat([cell_id_row, signature_row], axis = 0) 
+    return pd.concat([cell_id_row, signature_row], axis = 1) 
 def main(model_name):
     file_name = "latents/"+ model_name
     #file_name =
@@ -60,9 +60,10 @@ def main(model_name):
         raise ValueError("keys and values sizes do not match")
     lat_columns = [f"z_{i}" for i in range(values.shape[1])]
     values_df = pd.DataFrame(values, columns=lat_columns)
-    df = pd.concat([keys, values_df], axis = 0)
-    signatures_df = df.groupby('cell_id').apply(lambda group: get_new_row(group[lat_columns].to_numpy(), group.name))
-    df.to_csv(model_name + "_sigs.csv")
+    df = pd.concat([keys, values_df], axis = 1)
+    signatures_df = df.groupby('cell_id').apply(lambda group: get_new_row(group[lat_columns].to_numpy(), group.name)).reset_index(drop=True)
+    signatures_df = pd.concat(signatures_df.tolist(), ignore_index=True)
+    signatures_df.to_csv("signatures/" + model_name + "_sigs.csv", index=False)
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="A simple script using argparse to greet a user.")
