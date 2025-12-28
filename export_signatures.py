@@ -47,10 +47,11 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3):
 def get_new_row(group, cell_id):
     (_,_,_,_,_, signature) = compute_path_signature(get_quad_tphate_interp(group))
     signature = signature.reshape(-1)
-    cols = [f"s_{i}" for i in range(signature.shape[0])]
-    signature_row = pd.DataFrame(signature.reshape(1, -1), columns=cols)
-    cell_id_row = pd.DataFrame([cell_id], columns=["cell_id"])
-    return pd.concat([cell_id_row, signature_row], axis = 1) 
+    # Return a Series instead of DataFrame for proper groupby handling
+    result = pd.Series({'cell_id': cell_id})
+    for i, val in enumerate(signature):
+        result[f"s_{i}"] = val
+    return result 
 def main(model_name):
     file_name = "latents/"+ model_name
     #file_name =
@@ -61,9 +62,17 @@ def main(model_name):
     lat_columns = [f"z_{i}" for i in range(values.shape[1])]
     values_df = pd.DataFrame(values, columns=lat_columns)
     df = pd.concat([keys, values_df], axis = 1)
-    signatures_df = df.groupby('cell_id').apply(lambda group: get_new_row(group[lat_columns].to_numpy(), group.name)).reset_index(drop=True)
-    signatures_df = pd.concat(signatures_df.tolist(), ignore_index=True)
+
+    # Apply signature computation per cell_id
+    # This returns a DataFrame where each row is a cell_id with its signature
+    signatures_df = df.groupby('cell_id').apply(
+        lambda group: get_new_row(group[lat_columns].to_numpy(), group.name)
+    ).reset_index(drop=True)
+
+    # Save to CSV
     signatures_df.to_csv("signatures/" + model_name + "_sigs.csv", index=False)
+    print(f"Saved signatures to signatures/{model_name}_sigs.csv")
+    print(f"Shape: {signatures_df.shape}")
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="A simple script using argparse to greet a user.")
