@@ -1000,6 +1000,8 @@ def train_convlstm(
             "model_features": model_description,
             "dataset": "https://zenodo.org/records/7912264",
             "epochs": 10,
+            "train_split": 0.85,
+            "val_split": 0.15,
             "loss": loss_description,
             "loss_type": loss_type,
             "ms_ssim_weight": ms_ssim_weight,
@@ -1135,7 +1137,7 @@ Reproducibility:
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=128, norm="minmax01")
     total_size = len(ds)
 
-    train_size = int(0.95 * total_size)
+    train_size = int(0.85 * total_size)
     val_size = total_size - train_size
 
     generator = torch.Generator().manual_seed(42)
@@ -1153,10 +1155,10 @@ Reproducibility:
     val_loader = DataLoader(
         val_dataset,
         batch_size=1,
-        shuffle=True,
+        shuffle=False,  # No shuffle for validation
         num_workers=4,
         pin_memory=True,
-        drop_last=True
+        drop_last=False  # Don't drop last for validation
     )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * 10)
 
@@ -1347,17 +1349,60 @@ Reproducibility:
         }
 
         save_and_push_model(model, repo_name, required_files, model_config=hf_config)
-        val_loss = 0
+
+        # Comprehensive validation with multiple metrics
+        val_metrics = {
+            'mse': 0.0,
+            'l1': 0.0,
+            'ms_ssim_value': 0.0,
+            'ms_ssim_loss': 0.0,
+            'temporal_smoothness': 0.0
+        }
         val_count = 0
-        model.eval() # Set model to evaluation mode
+
+        model.eval()  # Set model to evaluation mode
         with torch.no_grad():
             for embryo_vol, _, _ in val_loader:
-                embryo_vol = embryo_vol.to(DEVICE)
-                val_recon, _ = model(embryo_vol)
-                val_recon = val_recon.to(DEVICE)
-                val_loss += torch.nn.functional.mse_loss(embryo_vol, val_recon).item()
+                embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, H, W)
+                val_recon, val_lat = model(embryo_vol)
+
+                B, T, C, H, W = embryo_vol.shape
+
+                # MSE
+                val_metrics['mse'] += F.mse_loss(val_recon, embryo_vol).item()
+
+                # L1
+                val_metrics['l1'] += F.l1_loss(val_recon, embryo_vol).item()
+
+                # MS-SSIM
+                val_recon_flat = val_recon.view(B * T, C, H, W)
+                embryo_vol_flat = embryo_vol.view(B * T, C, H, W)
+                ms_ssim_val = ms_ssim(val_recon_flat, embryo_vol_flat)
+                val_metrics['ms_ssim_value'] += ms_ssim_val.item()
+                val_metrics['ms_ssim_loss'] += (1 - ms_ssim_val).item()
+
+                # Temporal smoothness of latents
+                # val_lat is (B, T, latent_size)
+                if T > 1:
+                    lat_diff = torch.diff(val_lat, dim=1)  # (B, T-1, latent_size)
+                    temporal_smooth = lat_diff.norm(dim=-1).mean()  # Average L2 norm of differences
+                    val_metrics['temporal_smoothness'] += temporal_smooth.item()
+
                 val_count += 1
-        run.log({"val_mse": val_loss/val_count})
+
+        # Average all metrics
+        for key in val_metrics:
+            val_metrics[key] /= max(1, val_count)
+
+        # Log to wandb with val_ prefix
+        val_log_dict = {
+            f"val_{key}": value for key, value in val_metrics.items()
+        }
+        val_log_dict['val_epoch'] = epoch
+        run.log(val_log_dict)
+
+        print(f"Validation - MSE: {val_metrics['mse']:.4f}, L1: {val_metrics['l1']:.4f}, "
+              f"MS-SSIM: {val_metrics['ms_ssim_value']:.4f}, Temporal Smoothness: {val_metrics['temporal_smoothness']:.4f}")
 
     run.finish()
     gc.collect()
@@ -1424,6 +1469,8 @@ def train_convlstm_latent_split(
             "model_features": model_description,
             "dataset": "https://zenodo.org/records/7912264",
             "epochs": 10,
+            "train_split": 0.85,
+            "val_split": 0.15,
             "loss": loss_description,
             "loss_type": loss_type,
             "ms_ssim_weight": ms_ssim_weight,
@@ -1567,7 +1614,7 @@ Reproducibility:
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=128, norm="minmax01")
     total_size = len(ds)
 
-    train_size = int(0.95 * total_size)
+    train_size = int(0.85 * total_size)
     val_size = total_size - train_size
 
     generator = torch.Generator().manual_seed(42)
@@ -1585,10 +1632,10 @@ Reproducibility:
     val_loader = DataLoader(
         val_dataset,
         batch_size=1,
-        shuffle=True,
+        shuffle=False,  # No shuffle for validation
         num_workers=4,
         pin_memory=True,
-        drop_last=True
+        drop_last=False  # Don't drop last for validation
     )
 
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * 10)
@@ -1818,18 +1865,85 @@ Reproducibility:
         }
 
         save_and_push_model(model, repo_name, required_files, model_config=hf_config)
-        val_loss = 0
+
+        # Comprehensive validation with multiple metrics (for latent split model)
+        val_metrics = {
+            'mse': 0.0,
+            'l1': 0.0,
+            'ms_ssim_value': 0.0,
+            'ms_ssim_loss': 0.0,
+            'temporal_smoothness': 0.0,
+            'mse_embryo': 0.0,
+            'ms_ssim_embryo': 0.0,
+            'mse_empty': 0.0,
+            'ms_ssim_empty': 0.0
+        }
         val_count = 0
-        model.eval() # Set model to evaluation mode
+
+        model.eval()  # Set model to evaluation mode
         with torch.no_grad():
-            for embryo_vol, _, _ in val_loader:
-                embryo_vol = embryo_vol.to(DEVICE)
-                val_recon, _ = model(embryo_vol)
-                val_recon = val_recon.to(DEVICE)
-                val_loss += torch.nn.functional.mse_loss(embryo_vol, val_recon).item()
+            for embryo_vol, empty_well_vol, _ in val_loader:
+                embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, H, W)
+                empty_well_vol = empty_well_vol.to(DEVICE)
+
+                # Forward pass for embryo (uses second half of latent)
+                embryo_recon, embryo_lat = model(embryo_vol, empty_well=False)
+
+                # Forward pass for empty well (uses first half of latent)
+                empty_recon, empty_lat = model(empty_well_vol, empty_well=True)
+
+                B, T, C, H, W = embryo_vol.shape
+
+                # === Embryo metrics ===
+                val_metrics['mse_embryo'] += F.mse_loss(embryo_recon, embryo_vol).item()
+                val_metrics['l1'] += F.l1_loss(embryo_recon, embryo_vol).item()
+
+                # MS-SSIM for embryo
+                embryo_recon_flat = embryo_recon.view(B * T, C, H, W)
+                embryo_vol_flat = embryo_vol.view(B * T, C, H, W)
+                ms_ssim_embryo = ms_ssim(embryo_recon_flat, embryo_vol_flat)
+                val_metrics['ms_ssim_embryo'] += ms_ssim_embryo.item()
+
+                # === Empty well metrics ===
+                val_metrics['mse_empty'] += F.mse_loss(empty_recon, empty_well_vol).item()
+
+                # MS-SSIM for empty well
+                empty_recon_flat = empty_recon.view(B * T, C, H, W)
+                empty_well_flat = empty_well_vol.view(B * T, C, H, W)
+                ms_ssim_empty = ms_ssim(empty_recon_flat, empty_well_flat)
+                val_metrics['ms_ssim_empty'] += ms_ssim_empty.item()
+
+                # === Combined metrics ===
+                combined_mse = (val_metrics['mse_embryo'] + val_metrics['mse_empty']) / 2
+                val_metrics['mse'] += combined_mse
+
+                combined_ms_ssim = (ms_ssim_embryo + ms_ssim_empty) / 2
+                val_metrics['ms_ssim_value'] += combined_ms_ssim.item()
+                val_metrics['ms_ssim_loss'] += (1 - combined_ms_ssim).item()
+
+                # Temporal smoothness of latents (for embryo)
+                if T > 1:
+                    lat_diff = torch.diff(embryo_lat, dim=1)  # (B, T-1, latent_size)
+                    temporal_smooth = lat_diff.norm(dim=-1).mean()
+                    val_metrics['temporal_smoothness'] += temporal_smooth.item()
+
                 val_count += 1
-        run.log({"val_mse": val_loss/val_count})
-            
+
+        # Average all metrics
+        for key in val_metrics:
+            val_metrics[key] /= max(1, val_count)
+
+        # Log to wandb with val_ prefix
+        val_log_dict = {
+            f"val_{key}": value for key, value in val_metrics.items()
+        }
+        val_log_dict['val_epoch'] = epoch
+        run.log(val_log_dict)
+
+        print(f"Validation - MSE: {val_metrics['mse']:.4f} (Embryo: {val_metrics['mse_embryo']:.4f}, Empty: {val_metrics['mse_empty']:.4f}), "
+              f"L1: {val_metrics['l1']:.4f}, MS-SSIM: {val_metrics['ms_ssim_value']:.4f} "
+              f"(Embryo: {val_metrics['ms_ssim_embryo']:.4f}, Empty: {val_metrics['ms_ssim_empty']:.4f}), "
+              f"Temporal Smoothness: {val_metrics['temporal_smoothness']:.4f}")
 
     run.finish()
     gc.collect()
