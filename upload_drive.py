@@ -64,9 +64,37 @@ def upload_file(file_path):
     # 3. Prepare File Metadata
     file_name = os.path.basename(file_path)
     file_metadata = {'name': file_name}
-    
+
     if FOLDER_ID:
         file_metadata['parents'] = [FOLDER_ID]
+        print(f"Target folder ID: {FOLDER_ID}")
+
+        # Verify we can access the folder
+        try:
+            folder_info = service.files().get(
+                fileId=FOLDER_ID,
+                fields='id, name, capabilities',
+                supportsAllDrives=True
+            ).execute()
+            print(f"Folder found: '{folder_info.get('name')}'")
+
+            # Check if we can edit
+            caps = folder_info.get('capabilities', {})
+            if not caps.get('canAddChildren', False):
+                print("\n⚠ WARNING: Service account cannot add files to this folder!")
+                print("Make sure the folder is shared with 'Editor' permission, not 'Viewer'")
+                return
+        except Exception as e:
+            print(f"\n✗ Cannot access folder {FOLDER_ID}")
+            print(f"Error: {e}")
+            print("\nMake sure:")
+            print("1. The folder ID is correct")
+            print("2. The folder is shared with: jens-serv@chicago-transit-379219.iam.gserviceaccount.com")
+            print("3. The service account has 'Editor' permission")
+            return
+    else:
+        print("ERROR: No folder ID - this shouldn't happen (should have been caught earlier)")
+        return
 
     # 4. Perform Upload
     print(f"Uploading '{file_name}' to Google Drive folder...")
@@ -76,7 +104,8 @@ def upload_file(file_path):
         file = service.files().create(
             body=file_metadata,
             media_body=media,
-            fields='id, name, webViewLink'
+            fields='id, name, webViewLink',
+            supportsAllDrives=True  # Enable support for Shared Drives
         ).execute()
 
         print(f"\n✓ Successfully uploaded!")
