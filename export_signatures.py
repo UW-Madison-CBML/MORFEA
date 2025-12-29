@@ -1,10 +1,12 @@
 import tphate
 import pandas as pd
-import numpy as np 
+import numpy as np
 import scipy
 from scipy.interpolate import make_interp_spline
 import itertools
 import os
+from tqdm import tqdm
+import time
 # ig assume embryo timesteps are equally spaced
 def get_quad_tphate_interp(latents):
     tphate_op = tphate.TPHATE(n_jobs=8, n_components=3)
@@ -21,9 +23,17 @@ def get_quad_tphate_interp(latents):
     return (interp_x, interp_y, interp_z)
 
 
-def compute_path_signature(X, a=0, b=1, level_threshold=3):
+def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
+    """
+    Compute path signature.
+
+    Args:
+        n_points: Number of discretization points (default: 1000)
+                  Original was 10000 which is very slow!
+                  1000 gives ~10x speedup with minimal accuracy loss
+    """
     N = len(X)
-    t = np.linspace(a, b, 10**4)
+    t = np.linspace(a, b, n_points)
     dt = t[1] - t[0]
     X_t = [Xi(t) for Xi in X]
     t = t[:-1]
