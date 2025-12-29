@@ -18,9 +18,7 @@ output = model_$(Cluster)_$(Process).out
 #
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
-transfer_input_files = model.py, model.sh
-+WantGPULab = true
-+GPUJobLength = "short"
+transfer_input_files = raffael_model_summary.py, raffael_conv_lstm.py, model.sh, raffael_model.py
 #gpus_minimum_capability = 7.0
 #Requirements = (Machine == "bhaskargpu4000.chtc.wisc.edu") && (DriverVersion == "12.8") && (DeviceName == "NVIDIA H200")
  
@@ -31,7 +29,6 @@ transfer_input_files = model.py, model.sh
 request_cpus = 4
 request_memory = 64GB
 request_disk = 80GB
-request_gpus = 1 
 
 
 queue 1

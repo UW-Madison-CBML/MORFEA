@@ -7,7 +7,7 @@ import itertools
 import os
 # ig assume embryo timesteps are equally spaced
 def get_quad_tphate_interp(latents):
-    tphate_op = tphate.TPHATE(n_jobs=1, n_components=3)
+    tphate_op = tphate.TPHATE(n_jobs=8, n_components=3)
     tphate_data = tphate_op.fit_transform(latents) 
     timesteps = np.linspace(0, 1, tphate_data.shape[0])
     x_data = tphate_data[:, 0]

@@ -156,27 +156,14 @@ def save_and_push_model(model, repo_name, required_files, model_config=None):
             api.upload_file(
                 path_or_fileobj=config_file,
                 path_in_repo="config.json",
-                repo_id=f"jenslundsgaard7-uw-madison/{repo_name}",
+                repo_id=f"JensLundsgaard/{repo_name}",
                 repo_type="model"
             )
             print(f"Uploaded config.json to HuggingFace Hub")
         except Exception as e:
             print(f"Warning: Failed to upload config.json: {e}")
 
-    # Upload model weights if they exist
-    model_file = os.path.join(repo_name, "pytorch_model.bin")
-    if os.path.exists(model_file):
-        try:
-            api.upload_file(
-                path_or_fileobj=model_file,
-                path_in_repo="pytorch_model.bin",
-                repo_id=f"jenslundsgaard7-uw-madison/{repo_name}",
-                repo_type="model"
-            )
-            print(f"Uploaded pytorch_model.bin to HuggingFace Hub")
-        except Exception as e:
-            print(f"Warning: Failed to upload pytorch_model.bin: {e}")
-
+    
     # Upload additional required files
     for file_path in required_files:
         local_file = os.path.join(repo_name, os.path.basename(file_path))
@@ -185,7 +172,7 @@ def save_and_push_model(model, repo_name, required_files, model_config=None):
                 api.upload_file(
                     path_or_fileobj=local_file,
                     path_in_repo=os.path.basename(file_path),
-                    repo_id=f"jenslundsgaard7-uw-madison/{repo_name}",
+                    repo_id=f"JensLundsgaard/{repo_name}",
                     repo_type="model"
                 )
                 print(f"Uploaded {file_path} to HuggingFace Hub")
@@ -314,632 +301,6 @@ def reconstruction_loss(x_rec, x_true, l1_weight=0.5, ms_ssim_weight=0.5):
     }
 
 
-def train():
-    """Original training with MS-SSIM loss and distributed training"""
-    print(torch.cuda.memory_summary(device=None, abbreviated=False))
-    torch.cuda.empty_cache()
-    torch.autograd.detect_anomaly(True)
-    rank, world_size, local_rank = setup_distributed()
-    DEVICE = torch.device(f"cuda:{local_rank}")
-
-    # Only print on main process
-    is_main = rank == 0
-    run = None
-    # Initialize wandb only on main process
-    if is_main:
-        wandb.login(key=os.getenv("WANDB_KEY"))
-        run = wandb.init(
-            entity="jenslundsgaard7-uw-madison",
-            project="IVF-Training",
-            config={
-                "learning_rate": 0.005,
-                "architecture": "Conv LSTM Autoencoder",
-                "dataset": "https://zenodo.org/records/7912264",
-                "epochs": 10,
-                "world_size": world_size,
-                "loss": "MS-SSIM + L1",
-            },
-        )
-
-        login(os.getenv("HF_KEY"))
-        print(torch.cuda.memory_summary(device=None, abbreviated=False))
-        print(DEVICE)
-
-    model = Model()
-    if os.path.exists("model_weights.pth"):
-        try:
-            checkpoint = torch.load("model_weights.pth", map_location=DEVICE, weights_only=True)
-            model.load_state_dict(checkpoint)
-            if is_main:
-                print("Loaded model weights")
-        except Exception as e:
-            if is_main:
-                print(f"Error loading weights: {e}")
-                torch.save(model.state_dict(), "model_weights.pth")
-    else:
-        if is_main:
-            torch.save(model.state_dict(), "model_weights.pth")
-    model = model.to(DEVICE)
-
-    if world_size > 1:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank)
-
-    learning_rate = 0.005
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4,weight_decay = 1e-5 )
-
-    ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
-
-    if world_size > 1:
-        sampler = DistributedSampler(ds, num_replicas=world_size, rank=rank, shuffle=True)
-        shuffle = False
-    else:
-        sampler = None
-        shuffle = True
-
-    num_workers = max(4, 16 // world_size)
-
-    loader = DataLoader(
-        ds,
-        batch_size=1,
-        shuffle=shuffle,
-        sampler=sampler,
-        num_workers=num_workers,
-        pin_memory=True,
-        drop_last=True  # Important for DDP
-    )
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer, max_lr=learning_rate, steps_per_epoch=len(loader), epochs=10
-    )
-    for epoch in range(10):
-        model.train()
-        pbar = tqdm(loader, desc=f"epoch {epoch}")
-        if sampler is not None:
-            sampler.set_epoch(epoch)
-
-        if is_main:
-            pbar = tqdm(loader, desc=f"epoch {epoch}")
-        else:
-            pbar = loader
-        total = 0.0
-        count = 0
-        for index, (embryo_vol, empty_well_vol, sample_vol) in enumerate(pbar):
-
-            optimizer.zero_grad()
-
-            embryo_vol = embryo_vol.view(-1,1,500,500)
-            empty_well_vol = empty_well_vol.view(-1,1,500,500)
-            sample_vol = sample_vol.view(-1,1,500,500)
-
-            embryo_size = embryo_vol.shape[0]
-            embryo_size = embryo_vol.shape[0]
-            sample_size = sample_vol.shape[0]
-
-            vol = torch.cat((embryo_vol, sample_vol), 0).to(DEVICE)
-            empty_well_vol = empty_well_vol.to(DEVICE)
-
-
-            recon, _ = model(vol, empty_well = False)
-            empty_well_recon, _ = model(empty_well_vol, empty_well=True)
-
-            # Use SSIM-based reconstruction loss
-            # Reshape for reconstruction_loss function: (B, T, C, H, W)
-            rec_loss_vol, rec_metrics_vol = reconstruction_loss(
-                recon.unsqueeze(1), vol.unsqueeze(1), l1_weight=0.5, ms_ssim_weight=0.5
-            )
-            rec_loss_empty, rec_metrics_empty = reconstruction_loss(
-                empty_well_recon.unsqueeze(1), empty_well_vol.unsqueeze(1), l1_weight=0.5, ms_ssim_weight=0.5
-            )
-            rec_loss = rec_loss_vol + rec_loss_empty
-
-
-            _, lat = model(vol, empty_well=False)
-
-            embryo_lat = lat[:embryo_size].clone()
-            sample_lat = lat[embryo_size:].clone()
-
-            embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0).to(DEVICE)
-            embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0).to(DEVICE)
-            temp_adj_sim = F.cosine_similarity(embryo_lat1, embryo_lat2).mean()
-            rand_sample_sim = F.cosine_similarity(embryo_lat, sample_lat).mean()
-            tcl = rand_sample_sim - temp_adj_sim
-            loss = rec_loss + (0.03 * tcl)
-
-            if torch.isnan(loss) or torch.isinf(loss):
-                if is_main:
-                    print(f"NaN/Inf detected, skipping batch")
-                continue
-
-            loss.backward()
-            total_norm = 0
-            for p in model.parameters():
-                if p.grad is not None:
-                    param_norm = p.grad.data.norm(2)
-                    total_norm += param_norm.item() ** 2
-            total_norm = total_norm ** 0.5
-
-            if total_norm > 100:  # Warning threshold
-                print(f"Warning: Large gradient norm: {total_norm:.2f}")
-
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
-            scheduler.step()
-            optimizer.step()
-            total += loss.item()
-            count += 1
-            if is_main and (index % 50 == 0) and run is not None:
-                run.log({
-                    "step": epoch * len(loader) + index,
-                    "loss": loss.item(),
-                    "rec_loss": rec_loss.item(),
-                    "tcl": tcl.item(),
-                    "temp_adj_sim": temp_adj_sim.item(),
-                    "rand_sample_sim": rand_sample_sim.item(),
-                    "ms_ssim_vol": rec_metrics_vol["ms_ssim_value"],
-                    "ms_ssim_empty": rec_metrics_empty["ms_ssim_value"],
-                    "l1_loss_vol": rec_metrics_vol["l1_loss"],
-                    "l1_loss_empty": rec_metrics_empty["l1_loss"],
-                    "lr": scheduler.get_last_lr()[0]
-                })
-
-                if isinstance(pbar, tqdm):
-                    pbar.set_postfix(
-                        loss=f"{loss.item():.4f}",
-                        rec=f"{rec_loss.item():.4f}",
-                        tcl=f"{tcl.item():.4f}"
-                    )
-            del embryo_vol
-            del empty_well_vol
-            del sample_vol
-            del vol
-            del recon
-            del lat
-            del empty_well_recon
-            del embryo_lat
-            del sample_lat
-            del embryo_lat1
-            del embryo_lat2
-            del rec_metrics_vol
-            del rec_metrics_empty
-            torch.cuda.empty_cache()
-
-        avg_loss = total/max(1,count)
-        if world_size > 1:
-            avg_loss_tensor = torch.tensor([avg_loss], device=DEVICE)
-            dist.all_reduce(avg_loss_tensor, op=dist.ReduceOp.AVG)
-            avg_loss = avg_loss_tensor.item()
-        if is_main:
-            run.log({"avg_loss": avg_loss})
-            print(f"epoch {epoch} avg loss={avg_loss}:.4f")
-            model_to_save = model.module if hasattr(model, 'module') else model
-            # Save the state dict without moving the model to CPU
-            torch.save(model_to_save.state_dict(), "model_weights.pth")
-
-            # Create a temporary CPU copy for HuggingFace upload
-            model_cpu = type(model_to_save)()  # Create new instance
-            model_cpu.load_state_dict(model_to_save.state_dict())
-
-            # Save with descriptive name
-            date_label = datetime.now().strftime("%Y-%m-%d")
-            repo_name = f"embryo-vision-msssim-{date_label}"
-
-            # Required files for this model
-            required_files = [
-                "train.py",
-                "model.py",
-                "dataset_ivf.py",
-            ]
-
-            # Create config for HuggingFace
-            hf_config = {
-                "model_type": "Model",
-                "architecture": "Conv LSTM Autoencoder",
-                "loss": "MS-SSIM + L1",
-                "learning_rate": 0.005,
-                "optimizer": "Adam",
-                "epochs": 10,
-                "dataset": "https://zenodo.org/records/7912264",
-                "l1_weight": 0.5,
-                "ms_ssim_weight": 0.5,
-                "tcl_weight": 0.03,
-                "repo_name": repo_name,
-                "date": date_label,
-            }
-
-            save_and_push_model(model_cpu, repo_name, required_files, model_config=hf_config)
-            del model_cpu  # Clean up the CPU copy
-
-    if is_main:
-        run.finish()
-    cleanup_distributed()
-    del model
-    gc.collect()
-    torch.cuda.empty_cache()
-
-
-def train_mse_distributed():
-    """Training with MSE loss and distributed training"""
-    print(torch.cuda.memory_summary(device=None, abbreviated=False))
-    torch.cuda.empty_cache()
-    torch.autograd.detect_anomaly(True)
-    rank, world_size, local_rank = setup_distributed()
-    DEVICE = torch.device(f"cuda:{local_rank}")
-
-    is_main = rank == 0
-    run = None
-    if is_main:
-        wandb.login(key=os.getenv("WANDB_KEY"))
-        run = wandb.init(
-            entity="jenslundsgaard7-uw-madison",
-            project="IVF-Training",
-            config={
-                "learning_rate": 0.005,
-                "architecture": "Conv LSTM Autoencoder",
-                "dataset": "https://zenodo.org/records/7912264",
-                "epochs": 10,
-                "world_size": world_size,
-                "loss": "MSE",
-            },
-        )
-
-        login(os.getenv("HF_KEY"))
-        print(torch.cuda.memory_summary(device=None, abbreviated=False))
-        print(DEVICE)
-
-    model = Model()
-    if os.path.exists("model_weights.pth"):
-        try:
-            checkpoint = torch.load("model_weights.pth", map_location=DEVICE, weights_only=True)
-            model.load_state_dict(checkpoint)
-            if is_main:
-                print("Loaded model weights")
-        except Exception as e:
-            if is_main:
-                print(f"Error loading weights: {e}")
-    model = model.to(DEVICE)
-
-    if world_size > 1:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank)
-
-    learning_rate = 0.005
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
-
-    ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
-
-    if world_size > 1:
-        sampler = DistributedSampler(ds, num_replicas=world_size, rank=rank, shuffle=True)
-        shuffle = False
-    else:
-        sampler = None
-        shuffle = True
-
-    num_workers = max(4, 16 // world_size)
-
-    loader = DataLoader(
-        ds,
-        batch_size=1,
-        shuffle=shuffle,
-        sampler=sampler,
-        num_workers=num_workers,
-        pin_memory=True,
-        drop_last=True
-    )
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer, max_lr=learning_rate, steps_per_epoch=len(loader), epochs=10
-    )
-    for epoch in range(10):
-        model.train()
-        if sampler is not None:
-            sampler.set_epoch(epoch)
-
-        if is_main:
-            pbar = tqdm(loader, desc=f"epoch {epoch}")
-        else:
-            pbar = loader
-        total = 0.0
-        count = 0
-        for index, (embryo_vol, empty_well_vol, sample_vol) in enumerate(pbar):
-
-            optimizer.zero_grad()
-
-            embryo_vol = embryo_vol.view(-1,1,500,500)
-            empty_well_vol = empty_well_vol.view(-1,1,500,500)
-            sample_vol = sample_vol.view(-1,1,500,500)
-
-            embryo_size = embryo_vol.shape[0]
-            sample_size = sample_vol.shape[0]
-
-            vol = torch.cat((embryo_vol, sample_vol), 0).to(DEVICE)
-            empty_well_vol = empty_well_vol.to(DEVICE)
-
-            recon, _ = model(vol, empty_well=False)
-            empty_well_recon, _ = model(empty_well_vol, empty_well=True)
-
-            # MSE-based reconstruction loss
-            rec_loss_vol = F.mse_loss(recon, vol)
-            rec_loss_empty = F.mse_loss(empty_well_recon, empty_well_vol)
-            rec_loss = rec_loss_vol + rec_loss_empty
-
-            _, lat = model(vol, empty_well=False)
-
-            embryo_lat = lat[:embryo_size].clone()
-            sample_lat = lat[embryo_size:].clone()
-
-            embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0).to(DEVICE)
-            embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0).to(DEVICE)
-            temp_adj_sim = F.cosine_similarity(embryo_lat1, embryo_lat2).mean()
-            rand_sample_sim = F.cosine_similarity(embryo_lat, sample_lat).mean()
-            tcl = rand_sample_sim - temp_adj_sim
-            loss = rec_loss + (0.03 * tcl)
-
-            if torch.isnan(loss) or torch.isinf(loss):
-                if is_main:
-                    print(f"NaN/Inf detected, skipping batch")
-                continue
-
-            loss.backward()
-            total_norm = 0
-            for p in model.parameters():
-                if p.grad is not None:
-                    param_norm = p.grad.data.norm(2)
-                    total_norm += param_norm.item() ** 2
-            total_norm = total_norm ** 0.5
-
-            if total_norm > 100:
-                print(f"Warning: Large gradient norm: {total_norm:.2f}")
-
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
-            scheduler.step()
-            optimizer.step()
-            total += loss.item()
-            count += 1
-            if is_main and (index % 50 == 0) and run is not None:
-                run.log({
-                    "step": epoch * len(loader) + index,
-                    "loss": loss.item(),
-                    "rec_loss": rec_loss.item(),
-                    "tcl": tcl.item(),
-                    "temp_adj_sim": temp_adj_sim.item(),
-                    "rand_sample_sim": rand_sample_sim.item(),
-                    "lr": scheduler.get_last_lr()[0]
-                })
-
-                if isinstance(pbar, tqdm):
-                    pbar.set_postfix(
-                        loss=f"{loss.item():.4f}",
-                        rec=f"{rec_loss.item():.4f}",
-                        tcl=f"{tcl.item():.4f}"
-                    )
-            del embryo_vol
-            del empty_well_vol
-            del sample_vol
-            del vol
-            del recon
-            del lat
-            del empty_well_recon
-            del embryo_lat
-            del sample_lat
-            del embryo_lat1
-            del embryo_lat2
-            torch.cuda.empty_cache()
-
-        avg_loss = total/max(1,count)
-        if world_size > 1:
-            avg_loss_tensor = torch.tensor([avg_loss], device=DEVICE)
-            dist.all_reduce(avg_loss_tensor, op=dist.ReduceOp.AVG)
-            avg_loss = avg_loss_tensor.item()
-        if is_main:
-            run.log({"avg_loss": avg_loss})
-            print(f"epoch {epoch} avg loss={avg_loss}:.4f")
-            model_to_save = model.module if hasattr(model, 'module') else model
-            torch.save(model_to_save.state_dict(), "model_weights_mse.pth")
-
-            # Save to HuggingFace with descriptive name
-            model_cpu = type(model_to_save)()
-            model_cpu.load_state_dict(model_to_save.state_dict())
-            date_label = datetime.now().strftime("%Y-%m-%d")
-            repo_name = f"embryo-vision-mse-distributed-{date_label}"
-
-            # Required files for this model
-            required_files = [
-                "train.py",
-                "model.py",
-                "dataset_ivf.py",
-            ]
-
-            # Create config for HuggingFace
-            hf_config = {
-                "model_type": "Model",
-                "architecture": "Conv LSTM Autoencoder",
-                "loss": "MSE",
-                "learning_rate": 0.005,
-                "optimizer": "Adam",
-                "epochs": 10,
-                "world_size": world_size,
-                "dataset": "https://zenodo.org/records/7912264",
-                "tcl_weight": 0.03,
-                "distributed": True,
-                "repo_name": repo_name,
-                "date": date_label,
-            }
-
-            save_and_push_model(model_cpu, repo_name, required_files, model_config=hf_config)
-            del model_cpu
-
-    if is_main:
-        run.finish()
-    cleanup_distributed()
-    del model
-    gc.collect()
-    torch.cuda.empty_cache()
-
-
-def train_mse_single():
-    """Training with MSE loss without distributed training"""
-    print(torch.cuda.memory_summary(device=None, abbreviated=False))
-    torch.cuda.empty_cache()
-    torch.autograd.detect_anomaly(True)
-    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-    wandb.login(key=os.getenv("WANDB_KEY"))
-    run = wandb.init(
-        entity="jenslundsgaard7-uw-madison",
-        project="IVF-Training",
-        config={
-            "learning_rate": 0.005,
-            "architecture": "Conv LSTM Autoencoder",
-            "dataset": "https://zenodo.org/records/7912264",
-            "epochs": 10,
-            "world_size": 1,
-            "loss": "MSE",
-            "distributed": False,
-        },
-    )
-
-    login(os.getenv("HF_KEY"))
-    print(torch.cuda.memory_summary(device=None, abbreviated=False))
-    print(DEVICE)
-
-    model = Model()
-    if os.path.exists("model_weights.pth"):
-        try:
-            checkpoint = torch.load("model_weights.pth", map_location=DEVICE, weights_only=True)
-            model.load_state_dict(checkpoint)
-            print("Loaded model weights")
-        except Exception as e:
-            print(f"Error loading weights: {e}")
-    model = model.to(DEVICE)
-
-    learning_rate = 0.005
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
-
-    ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=500, norm="minmax01")
-
-    loader = DataLoader(
-        ds,
-        batch_size=1,
-        shuffle=True,
-        num_workers=4,
-        pin_memory=True,
-        drop_last=True
-    )
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer, max_lr=learning_rate, steps_per_epoch=len(loader), epochs=10
-    )
-    for epoch in range(10):
-        model.train()
-        pbar = tqdm(loader, desc=f"epoch {epoch}")
-        total = 0.0
-        count = 0
-        for index, (embryo_vol, empty_well_vol, sample_vol) in enumerate(pbar):
-
-            optimizer.zero_grad()
-
-            embryo_vol = embryo_vol.view(-1,1,500,500)
-            empty_well_vol = empty_well_vol.view(-1,1,500,500)
-            sample_vol = sample_vol.view(-1,1,500,500)
-
-            embryo_size = embryo_vol.shape[0]
-            sample_size = sample_vol.shape[0]
-
-            vol = torch.cat((embryo_vol, sample_vol), 0).to(DEVICE)
-            empty_well_vol = empty_well_vol.to(DEVICE)
-
-            recon, _ = model(vol, empty_well=False)
-            empty_well_recon, _ = model(empty_well_vol, empty_well=True)
-
-            # MSE-based reconstruction loss
-            rec_loss_vol = F.mse_loss(recon, vol)
-            rec_loss_empty = F.mse_loss(empty_well_recon, empty_well_vol)
-            rec_loss = rec_loss_vol + rec_loss_empty
-
-            _, lat = model(vol, empty_well=False)
-
-            embryo_lat = lat[:embryo_size].clone()
-            sample_lat = lat[embryo_size:].clone()
-
-            embryo_lat1 = torch.cat((embryo_lat[1:], embryo_lat[5:], embryo_lat[10:], embryo_lat[20:]), 0).to(DEVICE)
-            embryo_lat2 = torch.cat((embryo_lat[:-1], embryo_lat[:-5], embryo_lat[:-10], embryo_lat[:-20]), 0).to(DEVICE)
-            temp_adj_sim = F.cosine_similarity(embryo_lat1, embryo_lat2).mean()
-            rand_sample_sim = F.cosine_similarity(embryo_lat, sample_lat).mean()
-            tcl = rand_sample_sim - temp_adj_sim
-            loss = rec_loss + (0.05 * tcl)
-
-            if torch.isnan(loss) or torch.isinf(loss):
-                print(f"NaN/Inf detected, skipping batch")
-                continue
-
-            loss.backward()
-            total_norm = 0
-            for p in model.parameters():
-                if p.grad is not None:
-                    param_norm = p.grad.data.norm(2)
-                    total_norm += param_norm.item() ** 2
-            total_norm = total_norm ** 0.5
-
-            if total_norm > 100:
-                print(f"Warning: Large gradient norm: {total_norm:.2f}")
-
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
-            scheduler.step()
-            optimizer.step()
-            total += loss.item()
-            count += 1
-            if (index % 50 == 0) and run is not None:
-                run.log({
-                    "step": epoch * len(loader) + index,
-                    "loss": loss.item(),
-                    "rec_loss": rec_loss.item(),
-                    "tcl": tcl.item(),
-                    "temp_adj_sim": temp_adj_sim.item(),
-                    "rand_sample_sim": rand_sample_sim.item(),
-                    "lr": scheduler.get_last_lr()[0]
-                })
-
-                pbar.set_postfix(
-                    loss=f"{loss.item():.4f}",
-                    rec=f"{rec_loss.item():.4f}",
-                    tcl=f"{tcl.item():.4f}"
-                )
-
-        avg_loss = total/max(1,count)
-        run.log({"avg_loss": avg_loss})
-        print(f"epoch {epoch} avg loss={avg_loss}:.4f")
-        torch.save(model.state_dict(), "model_weights_mse_single.pth")
-
-        # Save to HuggingFace with descriptive name
-        date_label = datetime.now().strftime("%Y-%m-%d")
-        repo_name = f"embryo-vision-mse-{date_label}"
-
-        # Required files for this model
-        required_files = [
-            "train.py",
-            "model.py",
-            "dataset_ivf.py",
-        ]
-
-        # Create config for HuggingFace
-        hf_config = {
-            "model_type": "Model",
-            "architecture": "Conv LSTM Autoencoder",
-            "loss": "MSE",
-            "learning_rate": 0.005,
-            "optimizer": "Adam",
-            "epochs": 10,
-            "dataset": "https://zenodo.org/records/7912264",
-            "tcl_weight": 0.05,
-            "distributed": False,
-            "repo_name": repo_name,
-            "date": date_label,
-        }
-
-        save_and_push_model(model, repo_name, required_files, model_config=hf_config)
-
-    run.finish()
-    gc.collect()
-    torch.cuda.empty_cache()
-
-
 def train_convlstm(
     loss_type="l1",
     ms_ssim_weight=0.5,
@@ -1046,55 +407,6 @@ Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 ABLATION STUDY CONFIGURATION
 ================================================================================
 
-Loss Configuration:
-  - Base Loss Type: {loss_type.upper()}
-  - MS-SSIM Weight: {ms_ssim_weight} {'(DISABLED)' if ms_ssim_weight == 0 else ''}
-  - Reconstruction Weight: {rec_weight} {'(DISABLED)' if rec_weight == 0 else ''}
-  - Temporal Smoothness Weight: {temporal_weight} {'(DISABLED)' if temporal_weight == 0 else ''}
-  - Combined Loss Function: {loss_description}
-
-Model Architecture Ablations:
-  - ConvLSTM: {'ENABLED' if use_convlstm else 'DISABLED'}
-  - Residual Connections: {'ENABLED' if use_residual else 'DISABLED'}
-  - Batch Normalization: {'ENABLED' if use_batchnorm else 'DISABLED'}
-  - Dropout Rate: {dropout_rate} {'(DISABLED)' if dropout_rate == 0 else ''}
-  - Model Features: {model_description}
-
-Model Architecture:
-  - Architecture: ConvLSTM Autoencoder
-  - Sequence Length: 50
-  - Input Channels: 1
-  - Encoder Hidden Dim: 256
-  - Encoder Layers: 2
-  - Decoder Hidden Dim: 128
-  - Decoder Layers: 2
-  - Latent Size: 4096
-  - Use Classifier: False
-  - Image Size: 128x128
-
-Training Configuration:
-  - Learning Rate: 2e-4 (CosineAnnealingLR)
-  - Weight Decay: 1e-5
-  - Optimizer: Adam
-  - Batch Size: 1
-  - Epochs: 10
-  - Gradient Clipping: 5.0
-  - Device: {DEVICE}
-
-Dataset:
-  - Dataset: https://zenodo.org/records/7912264
-  - Resize: 128x128
-  - Normalization: minmax01
-
-Model Files:
-  - raffael_model.py (with ablation support)
-  - raffael_conv_lstm.py (ConvLSTM implementation)
-  - raffael_losses.py (Loss functions)
-
-Reproducibility:
-  - All ablation settings are logged in wandb config
-  - Model stores ablation parameters for inference
-  - Configuration saved to training_config_detailed.txt
 """
 
     with open("training_config_detailed.txt", "w") as f:
@@ -1119,14 +431,6 @@ Reproducibility:
         use_residual=use_residual,
         use_batchnorm=use_batchnorm
     )
-
-    if os.path.exists("convlstm_model_weights.pth"):
-        try:
-            checkpoint = torch.load("convlstm_model_weights.pth", map_location=DEVICE, weights_only=True)
-            model.load_state_dict(checkpoint)
-            print("Loaded ConvLSTM model weights")
-        except Exception as e:
-            print(f"Error loading weights: {e}")
 
     model = model.to(DEVICE)
 
@@ -1520,58 +824,6 @@ Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 ABLATION STUDY CONFIGURATION
 ================================================================================
 
-Loss Configuration:
-  - Base Loss Type: {loss_type.upper()}
-  - MS-SSIM Weight: {ms_ssim_weight} {'(DISABLED)' if ms_ssim_weight == 0 else ''}
-  - Reconstruction Weight: {rec_weight} {'(DISABLED)' if rec_weight == 0 else ''}
-  - Temporal Smoothness Weight: {temporal_weight} {'(DISABLED)' if temporal_weight == 0 else ''}
-  - Combined Loss Function: {loss_description}
-
-Model Architecture Ablations:
-  - ConvLSTM: {'ENABLED' if use_convlstm else 'DISABLED'}
-  - Residual Connections: {'ENABLED' if use_residual else 'DISABLED'}
-  - Batch Normalization: {'ENABLED' if use_batchnorm else 'DISABLED'}
-  - Dropout Rate: {dropout_rate} {'(DISABLED)' if dropout_rate == 0 else ''}
-  - Model Features: {model_description}
-
-Model Architecture:
-  - Architecture: ConvLSTM Autoencoder with LATENT SPLIT
-  - Sequence Length: 50
-  - Input Channels: 1
-  - Encoder Hidden Dim: 256
-  - Encoder Layers: 2
-  - Decoder Hidden Dim: 128
-  - Decoder Layers: 2
-  - Total Latent Size: 4096
-  - LATENT SPLIT ENABLED:
-    * Empty Well Latent: 2048 (first half)
-    * Embryo Latent: 2048 (second half)
-  - Use Classifier: False
-  - Image Size: 128x128
-
-Training Configuration:
-  - Learning Rate: 2e-4 (CosineAnnealingLR)
-  - Weight Decay: 1e-5
-  - Optimizer: Adam
-  - Batch Size: 1
-  - Epochs: 10
-  - Gradient Clipping: 5.0
-  - Device: {DEVICE}
-
-Dataset:
-  - Dataset: https://zenodo.org/records/7912264
-  - Resize: 128x128
-  - Normalization: minmax01
-
-Model Files:
-  - raffael_model.py (with ablation support)
-  - raffael_conv_lstm.py (ConvLSTM implementation)
-  - raffael_losses.py (Loss functions)
-
-Reproducibility:
-  - All ablation settings are logged in wandb config
-  - Model stores ablation parameters for inference
-  - Configuration saved to training_config_latent_split.txt
 """
 
     with open("training_config_latent_split.txt", "w") as f:
@@ -1597,14 +849,6 @@ Reproducibility:
         use_residual=use_residual,
         use_batchnorm=use_batchnorm
     )
-
-    if os.path.exists("convlstm_latent_split_weights.pth"):
-        try:
-            checkpoint = torch.load("convlstm_latent_split_weights.pth", map_location=DEVICE, weights_only=True)
-            model.load_state_dict(checkpoint)
-            print("Loaded ConvLSTM model weights with latent split")
-        except Exception as e:
-            print(f"Error loading weights: {e}")
 
     model = model.to(DEVICE)
 
@@ -1865,66 +1109,41 @@ Reproducibility:
         }
 
         save_and_push_model(model, repo_name, required_files, model_config=hf_config)
-
-        # Comprehensive validation with multiple metrics (for latent split model)
         val_metrics = {
             'mse': 0.0,
             'l1': 0.0,
             'ms_ssim_value': 0.0,
             'ms_ssim_loss': 0.0,
-            'temporal_smoothness': 0.0,
-            'mse_embryo': 0.0,
-            'ms_ssim_embryo': 0.0,
-            'mse_empty': 0.0,
-            'ms_ssim_empty': 0.0
+            'temporal_smoothness': 0.0
         }
         val_count = 0
 
         model.eval()  # Set model to evaluation mode
         with torch.no_grad():
-            for embryo_vol, empty_well_vol, _ in val_loader:
+            for embryo_vol, _, _ in val_loader:
                 embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, H, W)
-                empty_well_vol = empty_well_vol.to(DEVICE)
-
-                # Forward pass for embryo (uses second half of latent)
-                embryo_recon, embryo_lat = model(embryo_vol, empty_well=False)
-
-                # Forward pass for empty well (uses first half of latent)
-                empty_recon, empty_lat = model(empty_well_vol, empty_well=True)
+                val_recon, val_lat = model(embryo_vol, empty_well=False)
 
                 B, T, C, H, W = embryo_vol.shape
 
-                # === Embryo metrics ===
-                val_metrics['mse_embryo'] += F.mse_loss(embryo_recon, embryo_vol).item()
-                val_metrics['l1'] += F.l1_loss(embryo_recon, embryo_vol).item()
+                # MSE
+                val_metrics['mse'] += F.mse_loss(val_recon, embryo_vol).item()
 
-                # MS-SSIM for embryo
-                embryo_recon_flat = embryo_recon.view(B * T, C, H, W)
+                # L1
+                val_metrics['l1'] += F.l1_loss(val_recon, embryo_vol).item()
+
+                # MS-SSIM
+                val_recon_flat = val_recon.view(B * T, C, H, W)
                 embryo_vol_flat = embryo_vol.view(B * T, C, H, W)
-                ms_ssim_embryo = ms_ssim(embryo_recon_flat, embryo_vol_flat)
-                val_metrics['ms_ssim_embryo'] += ms_ssim_embryo.item()
+                ms_ssim_val = ms_ssim(val_recon_flat, embryo_vol_flat)
+                val_metrics['ms_ssim_value'] += ms_ssim_val.item()
+                val_metrics['ms_ssim_loss'] += (1 - ms_ssim_val).item()
 
-                # === Empty well metrics ===
-                val_metrics['mse_empty'] += F.mse_loss(empty_recon, empty_well_vol).item()
-
-                # MS-SSIM for empty well
-                empty_recon_flat = empty_recon.view(B * T, C, H, W)
-                empty_well_flat = empty_well_vol.view(B * T, C, H, W)
-                ms_ssim_empty = ms_ssim(empty_recon_flat, empty_well_flat)
-                val_metrics['ms_ssim_empty'] += ms_ssim_empty.item()
-
-                # === Combined metrics ===
-                combined_mse = (val_metrics['mse_embryo'] + val_metrics['mse_empty']) / 2
-                val_metrics['mse'] += combined_mse
-
-                combined_ms_ssim = (ms_ssim_embryo + ms_ssim_empty) / 2
-                val_metrics['ms_ssim_value'] += combined_ms_ssim.item()
-                val_metrics['ms_ssim_loss'] += (1 - combined_ms_ssim).item()
-
-                # Temporal smoothness of latents (for embryo)
+                # Temporal smoothness of latents
+                # val_lat is (B, T, latent_size)
                 if T > 1:
-                    lat_diff = torch.diff(embryo_lat, dim=1)  # (B, T-1, latent_size)
-                    temporal_smooth = lat_diff.norm(dim=-1).mean()
+                    lat_diff = torch.diff(val_lat, dim=1)  # (B, T-1, latent_size)
+                    temporal_smooth = lat_diff.norm(dim=-1).mean()  # Average L2 norm of differences
                     val_metrics['temporal_smoothness'] += temporal_smooth.item()
 
                 val_count += 1
@@ -1940,15 +1159,17 @@ Reproducibility:
         val_log_dict['val_epoch'] = epoch
         run.log(val_log_dict)
 
-        print(f"Validation - MSE: {val_metrics['mse']:.4f} (Embryo: {val_metrics['mse_embryo']:.4f}, Empty: {val_metrics['mse_empty']:.4f}), "
-              f"L1: {val_metrics['l1']:.4f}, MS-SSIM: {val_metrics['ms_ssim_value']:.4f} "
-              f"(Embryo: {val_metrics['ms_ssim_embryo']:.4f}, Empty: {val_metrics['ms_ssim_empty']:.4f}), "
-              f"Temporal Smoothness: {val_metrics['temporal_smoothness']:.4f}")
 
     run.finish()
     gc.collect()
     torch.cuda.empty_cache()
 
+def train_mse_distributed():
+    print("hi")
+def train_mse_single():
+    print("hi")
+def train():
+    print("hi")
 
 if __name__ == "__main__":
     import sys
