@@ -19,5 +19,5 @@ fi
 
 echo "Setup complete."
 
-python upload_drive.py latents.csv
-python upload_drive.py latents.npy
+python upload_drive.py latents/latents.csv
+python upload_drive.py latents/latents.npy

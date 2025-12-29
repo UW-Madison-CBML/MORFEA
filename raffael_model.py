@@ -186,6 +186,7 @@ class Encoder(nn.Module):
         h_flat = h_seq.view(B * T, C * H * W)  # (B*T, C * 16 * 16)
         h_flat = self.dropout(h_flat)  # Apply dropout
         z_compressed = self.latent_compress(h_flat)  # (B*T, latent_size)
+        z_compressed = torch.nn.functional.relu(z_compressed)
         z_seq = z_compressed.view(B, T, self.latent_size)  # (B, T, latent_size)
 
         # Take last timestep
@@ -274,6 +275,7 @@ class Decoder(nn.Module):
         # Expand compressed latent to spatial dimensions
         z_flat = z_seq.view(B * T, -1)  # (B*T, effective_latent_size)
         z_expanded = self.latent_expand_empty(z_flat) if self.use_latent_split and empty_well else self.latent_expand(z_flat)
+        z_expanded = torch.nn.functional.relu(z_expanded)
         z_spatial = z_expanded.view(B, T, self.latent_dim, 16, 16)  # (B, T, latent_dim, 16, 16)
 
         if self.use_convlstm:
