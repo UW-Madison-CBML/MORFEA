@@ -1,13 +1,13 @@
 import argparse
 import os
-from google import auth
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 # 1. Configuration
 # Optional: Set a specific folder ID if you want to upload into a folder
 # Otherwise, it uploads to the service account's root drive.
-FOLDER_ID = None  
+FOLDER_ID = None
 
 def upload_file(file_path):
     # Ensure the file exists locally
@@ -15,10 +15,23 @@ def upload_file(file_path):
         print(f"Error: File '{file_path}' not found.")
         return
 
-    # 2. Authenticate using Application Default Credentials (ADC)
-    # The bash script sets the GOOGLE_APPLICATION_CREDENTIALS env var
+    # 2. Authenticate using Service Account credentials
+    # Get credentials path from environment variable
+    creds_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+    if not creds_path:
+        print("Error: GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
+        return
+
+    if not os.path.exists(creds_path):
+        print(f"Error: Credentials file not found at '{creds_path}'")
+        return
+
+    # Load service account credentials with proper scopes
     SCOPES = ['https://www.googleapis.com/auth/drive.file']
-    creds, _ = auth.default(scopes=SCOPES)
+    creds = service_account.Credentials.from_service_account_file(
+        creds_path, scopes=SCOPES)
+
+    # Build the Drive service
     service = build('drive', 'v3', credentials=creds)
 
     # 3. Prepare File Metadata
