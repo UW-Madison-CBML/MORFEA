@@ -5,14 +5,41 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 # 1. Configuration
-# Optional: Set a specific folder ID if you want to upload into a folder
-# Otherwise, it uploads to the service account's root drive.
-FOLDER_ID = None
+# REQUIRED: Set the folder ID of a folder shared with your service account
+#
+# HOW TO SET THIS UP:
+# 1. Create a folder in your Google Drive
+# 2. Right-click the folder -> Share -> Add the service account email:
+#    jens-serv@chicago-transit-379219.iam.gserviceaccount.com
+#    (Give it "Editor" permission)
+# 3. Open the folder in Drive, copy the ID from the URL:
+#    https://drive.google.com/drive/folders/FOLDER_ID_HERE
+# 4. Paste the ID below:
+FOLDER_ID = os.environ.get('GOOGLE_DRIVE_FOLDER_ID', None)
 
 def upload_file(file_path):
     # Ensure the file exists locally
     if not os.path.exists(file_path):
         print(f"Error: File '{file_path}' not found.")
+        return
+
+    # Check if folder ID is set
+    if not FOLDER_ID:
+        print("\n" + "="*70)
+        print("ERROR: Google Drive Folder ID not set!")
+        print("="*70)
+        print("\nService accounts cannot upload to 'My Drive' (no storage quota).")
+        print("You must upload to a shared folder instead.\n")
+        print("SETUP INSTRUCTIONS:")
+        print("1. Go to Google Drive and create a folder for uploads")
+        print("2. Right-click the folder -> Share")
+        print("3. Add this email with 'Editor' permission:")
+        print("   jens-serv@chicago-transit-379219.iam.gserviceaccount.com")
+        print("4. Open the folder, copy the ID from the URL:")
+        print("   https://drive.google.com/drive/folders/YOUR_FOLDER_ID_HERE")
+        print("5. Set the environment variable:")
+        print("   export GOOGLE_DRIVE_FOLDER_ID='your_folder_id_here'")
+        print("="*70 + "\n")
         return
 
     # 2. Authenticate using Service Account credentials
@@ -42,18 +69,32 @@ def upload_file(file_path):
         file_metadata['parents'] = [FOLDER_ID]
 
     # 4. Perform Upload
-    print(f"Uploading {file_name}...")
+    print(f"Uploading '{file_name}' to Google Drive folder...")
     media = MediaFileUpload(file_path, resumable=True)
-    
+
     try:
         file = service.files().create(
             body=file_metadata,
             media_body=media,
-            fields='id'
+            fields='id, name, webViewLink'
         ).execute()
-        print(f"Successfully uploaded! File ID: {file.get('id')}")
+
+        print(f"\n✓ Successfully uploaded!")
+        print(f"  File Name: {file.get('name')}")
+        print(f"  File ID: {file.get('id')}")
+        print(f"  View Link: {file.get('webViewLink')}")
+
     except Exception as e:
-        print(f"An error occurred during upload: {e}")
+        print(f"\n✗ Upload failed!")
+        print(f"Error: {e}")
+        if 'storageQuotaExceeded' in str(e):
+            print("\nThis error means the folder isn't properly shared with the service account.")
+            print("Make sure you shared the folder with:")
+            print("  jens-serv@chicago-transit-379219.iam.gserviceaccount.com")
+        elif '404' in str(e):
+            print("\nFolder not found. Check that FOLDER_ID is correct.")
+        elif '403' in str(e):
+            print("\nPermission denied. Make sure the service account has 'Editor' access.")
 
 if __name__ == '__main__':
     # Set up command line argument parsing
