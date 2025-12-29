@@ -273,7 +273,7 @@ class Decoder(nn.Module):
 
         # Expand compressed latent to spatial dimensions
         z_flat = z_seq.view(B * T, -1)  # (B*T, effective_latent_size)
-        z_expanded = self.latent_expand_empty(z_flat) if self.use_latent_split and empty_well else self.latent_expand(empty(z_flat)
+        z_expanded = self.latent_expand_empty(z_flat) if self.use_latent_split and empty_well else self.latent_expand(z_flat)
         z_spatial = z_expanded.view(B, T, self.latent_dim, 16, 16)  # (B, T, latent_dim, 16, 16)
 
         if self.use_convlstm:
