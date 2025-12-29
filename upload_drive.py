@@ -54,9 +54,12 @@ def upload_file(file_path):
         return
 
     # Load service account credentials with proper scopes
-    SCOPES = ['https://www.googleapis.com/auth/drive.file']
+    # Using full drive scope to access shared folders
+    SCOPES = ['https://www.googleapis.com/auth/drive']
     creds = service_account.Credentials.from_service_account_file(
         creds_path, scopes=SCOPES)
+
+    print(f"Authenticated with scopes: {SCOPES}")
 
     # Build the Drive service
     service = build('drive', 'v3', credentials=creds)
