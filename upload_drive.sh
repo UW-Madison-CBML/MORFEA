@@ -6,7 +6,7 @@ pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-
 
 # 3. Set the Environment Variable for credentials
 # REPLACE 'your-service-account-file.json' with your actual filename
-export GOOGLE_DRIVE_FOLDER_ID='1uZc530obxVnj5WZVKp5PZrMr78IYQx9e'
+export GOOGLE_DRIVE_FOLDER_ID="0AABJos17r17TUk9PVA"
 export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/googlecloud.json"
 echo "GOOGLE_APPLICATION_CREDENTIALS set to: $GOOGLE_APPLICATION_CREDENTIALS"
 
@@ -20,5 +20,4 @@ fi
 
 echo "Setup complete."
 
-python upload_drive.py latents/latents.csv
 python upload_drive.py latents/latents.npy
