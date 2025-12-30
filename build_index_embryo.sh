@@ -10,7 +10,7 @@ if [ -f "embryo_dataset.tar.gz" ]; then
 fi
 
 echo "Building embryo index..."
-python build_index_embryo.py "$@"
+python build_index_embryo.py --limit 50
 
 if [ -f "index_embryo.csv" ]; then
     echo "Successfully created index_embryo.csv"
