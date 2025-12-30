@@ -5,7 +5,6 @@ import scipy
 from scipy.interpolate import make_interp_spline
 import itertools
 import os
-from tqdm import tqdm
 import time
 # ig assume embryo timesteps are equally spaced
 def get_quad_tphate_interp(latents):
