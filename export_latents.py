@@ -181,8 +181,31 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
     # Save the latent data as npy
     np.save(model_name + '.npy', latent_data)
 
-    # Save embryo_id and timestep as CSV
+    # Save embryo_id and timestep as CSV, optionally joined with grades
     metadata = normed_df[['embryo_id', 'time_step']]
+
+    # Try to load and join with embryo grades
+    grades_file = "embryo_dataset_grades.csv"
+    if os.path.exists(grades_file):
+        print(f"Loading grades from {grades_file}...")
+        grades_df = pd.read_csv(grades_file)
+
+        # Join on embryo_id = video_name
+        metadata = metadata.merge(
+            grades_df,
+            left_on='embryo_id',
+            right_on='video_name',
+            how='left'
+        )
+
+        # Drop the duplicate video_name column if it exists
+        if 'video_name' in metadata.columns:
+            metadata = metadata.drop(columns=['video_name'])
+
+        print(f"Joined with grades. Columns: {list(metadata.columns)}")
+    else:
+        print(f"Grades file {grades_file} not found, skipping grade join")
+
     metadata.to_csv(model_name + '.csv', index=False)
 
     print(f"\n{'='*60}")
