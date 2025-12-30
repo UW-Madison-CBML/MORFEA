@@ -19,8 +19,9 @@ fi
 
 # Run export script
 echo "Running export_latents.py..."
-python export_latents.py --name embryo-convlstm-ls-b882c653-2025-12-30 --limit 50
-python export_latents.py --name embryo-convlstm-ls-4b322aaf-2025-12-29 --limit 50
+cat get_latents.txt | xargs -I {} sh -c 'python export_latents.py --name "{}" --limit 50'
+#python export_latents.py --name embryo-convlstm-ls-b882c653-2025-12-30 --limit 50
+#python export_latents.py --name embryo-convlstm-ls-4b322aaf-2025-12-29 --limit 50
 mv *.csv latents
 mv *.npy latents
 tar -czvf latents.tar.gz latents
