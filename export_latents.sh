@@ -23,7 +23,7 @@ python export_latents.py --name embryo-convlstm-ls-b882c653-2025-12-30 --limit 5
 python export_latents.py --name embryo-convlstm-ls-4b322aaf-2025-12-29 --limit 50
 mv *.csv latents
 mv *.npy latents
-tar -czvf latents latents.tar.gz
+tar -czvf latents.tar.gz latents
 # Cleanup
 echo "Cleaning up..."
 rm -r embryo_dataset

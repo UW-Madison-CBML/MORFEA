@@ -20,7 +20,7 @@ Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
 transfer_output_remaps = "latents.tar.gz =  file:///staging/groups/bhaskar_group/ivf/latents.tar.gz;"
-transfer_input_files = export_latents.sh, export_latents.py, raffael_model.py, raffael_conv_lstm.py, dataset_ivf.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, api_keys.txt, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz
+transfer_input_files = export_latents.sh, export_latents.py, raffael_model.py, raffael_conv_lstm.py, dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, api_keys.txt, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz
 +WantGPULab = true
 +GPUJobLength = "short"
 gpus_minimum_capability = 7.0
