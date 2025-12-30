@@ -4,7 +4,7 @@ import torch
 import pandas as pd
 import os
 from torch.utils.data import DataLoader
-from dataset_ivf import IVFSequenceDataset
+from dataset_ivf_embryo import IVFEmbryoDataset
 from raffael_model import ConvLSTMAutoencoder
 from huggingface_hub import login, HfApi
 from datetime import datetime, timedelta
@@ -86,15 +86,20 @@ def load_model(model_name=None, days_back=30):
     return model
 
 
-def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-15", output_csv="latents.csv"):
+def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-15",
+                          index_csv="index_embryo.csv",
+                          output_csv="latents.csv",
+                          limit=None):
     """
     Export latent embeddings from the ConvLSTM model to a CSV file.
 
-    Each row contains: cell_id, time_step, and 4096 latent dimensions
+    Each row contains: embryo_id, time_step, and latent dimensions
 
     Args:
         model_name: HuggingFace model name or None to search for recent models
+        index_csv: Input index CSV file (default: index_embryo.csv)
         output_csv: Output CSV filename
+        limit: Maximum number of embryos to process (None = process all)
     """
     # Login to HuggingFace
     hf_token = os.getenv("HF_TOKEN") or os.getenv("HF_KEY")
@@ -102,10 +107,16 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
         login(hf_token)
 
     # Load dataset
-    if not os.path.exists("index.csv"):
-        raise FileNotFoundError("index.csv not found. Make sure dataset index is available.")
+    if not os.path.exists(index_csv):
+        raise FileNotFoundError(f"{index_csv} not found. Run build_index_embryo.py first.")
 
-    ds = IVFSequenceDataset("index.csv", resize=128, norm="minmax01")
+    ds = IVFEmbryoDataset(index_csv, resize=128, norm="minmax01")
+
+    # Limit number of embryos if specified
+    if limit is not None and limit > 0:
+        original_len = len(ds.df)
+        ds.df = ds.df.iloc[:limit]
+        print(f"Limited dataset from {original_len} to {len(ds.df)} embryos")
     loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
 
     # Load model
@@ -120,20 +131,19 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
 
     # Collect all latent vectors
     all_latents = []
-    cell_ids = []
+    embryo_ids = []
     time_steps = []
 
-    print(f"Extracting latent embeddings from {len(ds)} sequences...")
+    print(f"Extracting latent embeddings from {len(ds)} embryos...")
     print(f"{'='*60}")
     num_latents = 0
-    for idx, (embryo_vol, _, _) in enumerate(loader):
+    for idx, embryo_vol in enumerate(loader):
         if (idx + 1) % 10 == 0:
-            print(f"  Processed {idx + 1}/{len(ds)} sequences")
+            print(f"  Processed {idx + 1}/{len(ds)} embryos")
 
         # Get metadata from dataframe
         row = ds.df.iloc[idx]
-        cell_id = row.get("cell_id", f"cell_{idx}")
-        start_idx = row.get("start_idx", 0)
+        embryo_id = row.get("embryo_id", f"embryo_{idx}")
 
         # embryo_vol is already (B=1, T, 1, 128, 128) from dataloader
         embryo_vol = embryo_vol.to(DEVICE)
@@ -149,36 +159,39 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
         # Add one row per time step
         for t in range(z.shape[0]):
             all_latents.append(z[t])
-            cell_ids.append(cell_id)
-            time_steps.append(int(t + start_idx))
+            embryo_ids.append(embryo_id)
+            time_steps.append(int(t))
 
     # Create DataFrame
     print(f"\n{'='*60}")
     print(f"Creating CSV with {len(all_latents)} samples...")
     latent_columns = [f"z_{i}" for i in range(num_latents)]
 
-    latents_array = np.array(all_latents)  # Shape: (num_samples, 4096)
+    latents_array = np.array(all_latents)  # Shape: (num_samples, latent_size)
     df = pd.DataFrame(latents_array, columns=latent_columns)
-    df.insert(0, "cell_id", cell_ids)
+    df.insert(0, "embryo_id", embryo_ids)
     df.insert(1, "time_step", time_steps)
 
-    # De-duplicate: for each (cell_id, time_step) key, average if there are duplicates
-    # (due to sequence overlap in the dataset)
-    print("De-duplicating overlapping sequences...")
-    normed_df = df.groupby(['cell_id', 'time_step']).agg({
-        **{f'z_{i}': 'mean' for i in range(num_latents)}
-    }).reset_index().sort_values(by=['cell_id', 'time_step'], ascending=[True, True])
+    # Since each embryo is loaded once, there should be no duplicates
+    print(f"Total samples: {len(df)}")
+    print(f"Unique embryos: {df['embryo_id'].nunique()}")
+    normed_df = df
     latent_data = normed_df[latent_columns].values  # Shape: (num_rows, 4096)
 
     # Save the latent data as npy
     np.save(model_name + '.npy', latent_data)
 
-    # Save cell_id and timestep as CSV
-    metadata = normed_df[['cell_id', 'time_step']]
+    # Save embryo_id and timestep as CSV
+    metadata = normed_df[['embryo_id', 'time_step']]
     metadata.to_csv(model_name + '.csv', index=False)
 
-    # Save to CSV
-    # normed_df.to_csv(output_csv, index=False)
+    print(f"\n{'='*60}")
+    print("EXPORT COMPLETE")
+    print(f"{'='*60}")
+    print(f"  Latent embeddings saved to: {model_name}.npy")
+    print(f"  Metadata saved to: {model_name}.csv")
+    print(f"  Shape: {latent_data.shape}")
+    print(f"{'='*60}\n")
 
 if __name__ == "__main__":
     import argparse
@@ -186,9 +199,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="A simple script using argparse.")
 
     parser.add_argument("--name", type=str, help="Name of the model", default="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-15")
+    parser.add_argument("--index", type=str, help="Input index CSV file", default="index_embryo.csv")
+    parser.add_argument("--limit", type=int, default=25,
+                       help="Maximum number of embryos to process (default: 25, use 0 for all)")
 
     args = parser.parse_args()
+
+    # Convert 0 to None for processing all embryos
+    limit = None if args.limit == 0 else args.limit
+
     export_latents_to_csv(
         model_name=args.name,
-        output_csv="latents.csv"
+        index_csv=args.index,
+        output_csv="latents.csv",
+        limit=limit
     )
