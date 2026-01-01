@@ -28,9 +28,8 @@ def load_latents(csv_file):
     
     """Load latent embeddings from CSV"""
     print(f"Loading latent embeddings from: {csv_file}")
-    keys_df = pd.read_csv(csv_file +".csv")
-    print(f"  Loaded {len(df)} samples with {len(df.columns)} columns")
-    values = np.load(csv_file+'.npy')
+    keys_df = pd.read_csv("latents/"+ csv_file +".csv")
+    values = np.load("latents/" + csv_file+'.npy')
     if(len(keys_df) != values.shape[0]):
         raise ValueError("keys and values sizes do not match")
     latent_cols = [f"z_{i}" for i in range(values.shape[1])]
@@ -495,7 +494,7 @@ def filter_cells_by_grade_threshold(grades_df, min_grade='B'):
     return matching_cells
 
 
-def create_grade_comparison_plots(df, latent_cols, grades_df, output_dir="comparison_plots", coloring='uniform'):
+def create_grade_comparison_plots(df, latent_cols, grades_df, model_name="", output_dir="comparison_plots", coloring='uniform'):
     """
     Create comparison plots for all grade categories.
 
@@ -529,12 +528,12 @@ def create_grade_comparison_plots(df, latent_cols, grades_df, output_dir="compar
             continue
 
         # Merged overlay plot
-        merged_file = os.path.join(output_dir, f"merged_{grade_cat}.png")
+        merged_file = os.path.join(output_dir, model_name + f"merged_{grade_cat}.png")
         create_merged_plot(cells, df, latent_cols, merged_file,
                           title=f"Merged Trajectories: Grade {grade_cat}", coloring=coloring)
 
         # Grid plot
-        grid_file = os.path.join(output_dir, f"grid_{grade_cat}.png")
+        grid_file = os.path.join(output_dir, model_name + f"grid_{grade_cat}.png")
         create_grid_plot(cells, df, latent_cols, grid_file,
                         title=f"Individual Trajectories: Grade {grade_cat}", coloring=coloring)
 
@@ -547,12 +546,12 @@ def create_grade_comparison_plots(df, latent_cols, grades_df, output_dir="compar
         print(f"\nProcessing any_{grade_letter}: {len(cells)} cells")
 
         # Merged plot
-        merged_file = os.path.join(output_dir, f"merged_any_{grade_letter}.png")
+        merged_file = os.path.join(output_dir, model_name + f"merged_any_{grade_letter}.png")
         create_merged_plot(cells, df, latent_cols, merged_file,
                           title=f"Merged Trajectories: Any Grade {grade_letter}", coloring=coloring)
 
         # Grid plot
-        grid_file = os.path.join(output_dir, f"grid_any_{grade_letter}.png")
+        grid_file = os.path.join(output_dir, model_name + f"grid_any_{grade_letter}.png")
         create_grid_plot(cells, df, latent_cols, grid_file,
                         title=f"Individual Trajectories: Any Grade {grade_letter}", coloring=coloring)
 
@@ -578,7 +577,7 @@ def main():
     args = parser.parse_args()
 
     # Validate input file
-    if not os.path.exists(args.latents_csv):
+    if not (os.path.exists("latents/" + args.latents_csv + ".csv") and os.path.exists("latents/" + args.latents_csv + ".npy")) :
         print(f"Error: Latents CSV not found: {args.latents_csv}")
         sys.exit(1)
 
@@ -596,7 +595,7 @@ def main():
     # Execute based on arguments
     if args.compare_grades:
         # Create all grade comparison plots
-        create_grade_comparison_plots(df, latent_cols, grades_df, args.output, args.coloring)
+        create_grade_comparison_plots(df, latent_cols, grades_df, args.latents_csv, args.output, args.coloring)
 
     elif args.grade_threshold:
         # Create aggregated plot for cells at grade threshold or better
