@@ -25,12 +25,19 @@ warnings.filterwarnings('ignore', message='invalid value encountered in divide',
 
 
 def load_latents(csv_file):
+    
     """Load latent embeddings from CSV"""
     print(f"Loading latent embeddings from: {csv_file}")
-    df = pd.read_csv(csv_file)
+    keys_df = pd.read_csv(csv_file +".csv")
     print(f"  Loaded {len(df)} samples with {len(df.columns)} columns")
+    values = np.load(csv_file+'.npy')
+    if(len(keys_df) != values.shape[0]):
+        raise ValueError("keys and values sizes do not match")
+    latent_cols = [f"z_{i}" for i in range(values.shape[1])]
+    values_df = pd.DataFrame(values, columns=latent_cols)
+    df = pd.concat([keys_df, values_df], axis = 1)
 
-    latent_cols = [col for col in df.columns if col.startswith('z_')]
+
     print(f"  Using {len(latent_cols)} latent dimensions")
 
     return df, latent_cols
