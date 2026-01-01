@@ -17,7 +17,7 @@ log = visualize_utils_$(Cluster)_$(Process).log
 error = visualize_utils_$(Cluster)_$(Process).err
 output = visualize_utils_$(Cluster)_$(Process).out
 # Transfer our executable script
-transfer_input_files = visualize_utils.sh, visualize_utils.py, embryo_dataset_grades.csv,   file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz,  file:///staging/groups/bhaskar_group/ivf/latents.tar.gz, visualize_models.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv
+transfer_input_files = visualize_utils.sh, visualize_utils.py, embryo_dataset_grades.csv,   file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz,  file:///staging/groups/bhaskar_group/ivf/latents.tar.gz, visualize_models.txt
 
  
 #transfer_output_remaps = "plots.tar.gz = file:///staging/groups/bhaskar_group/ivf/grades.tar.gz;"

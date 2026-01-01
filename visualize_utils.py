@@ -42,17 +42,7 @@ def load_latents(csv_file):
     return df, latent_cols
 
 
-def load_grades(grades_file="embryo_dataset_grades.csv"):
-    """Load embryo grades from CSV"""
-    if not os.path.exists(grades_file):
-        print(f"Warning: Grades file not found: {grades_file}")
-        return None
 
-    print(f"Loading grades from: {grades_file}")
-    grades_df = pd.read_csv(grades_file, header=None, names=['cell_id', 'grade1', 'grade2'])
-    print(f"  Loaded grades for {len(grades_df)} cell_ids")
-
-    return grades_df
 
 
 def get_grade_category(grade1, grade2):
@@ -507,7 +497,7 @@ def create_grade_comparison_plots(df, latent_cols, grades_df, model_name="", out
     """
     print(f"\nCreating grade comparison plots")
     os.makedirs(output_dir, exist_ok=True)
-
+    
     # Get unique grade categories
     grade_categories = {}
     for _, row in grades_df.iterrows():
@@ -583,11 +573,8 @@ def main():
 
     # Load data
     df, latent_cols = load_latents(args.latents_csv)
-    grades_df = load_grades(args.grades_file)
-
-    if grades_df is None:
-        print("Error: Cannot proceed without grades file")
-        sys.exit(1)
+    df = df.rename(columns={"embryo_id":"cell_id"})
+    grades_df = df[["cell_id","TE", "ICM"]].rename(columns={"TE":"grade1", "ICM":"grade2"})
 
     # Create output directory
     os.makedirs(args.output, exist_ok=True)
