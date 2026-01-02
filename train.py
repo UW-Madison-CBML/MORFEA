@@ -33,6 +33,7 @@ from huggingface_hub import login
 import shutil
 import hashlib
 import json
+VAL_EMBRYOS = ["CZ594-5","CJ261-10","RL747-8","TM272-9","LFA766-1","GT353-3","LGA881-2-5","LBE649-3","TH481-5","LTA908-2","BS648-7","GS955-7","HA1040-4","CM892-5","FC048-6","GC702-6","DI358-3","MM912-4","RK787-3","GSS052-2","OJ319-5","DML373-2","PS292-4","TM294-2","KT573-4","DJC641-4","FE14-020","LD400-1","MV930-2","MDCH869-4","AS662-2","LH1169-8","GA664-1","PMDPI029-1-3","DV116-3","FV709-11","GM456-3","RA361-4","LM844-1","DL020-3","VM570-4","MC833-6","LV613-2","ZS435-5","RM126-7","BK428-2","LS93-8","GS490-7","GF976-4","PMDPI029-1-11","DRL1048-1","BS294-7","CA658-12","RO793-2","GJ191-1","CC007-2","SL313-11","RC545-2-8","OJ319-9","PA289-8","TK319-10","SM686-7","KJ1077-3","BE645-10","BC167-4","VC581-1","FM162-6","PC758-2","HC459-6","DE069-10","GC340-3","BS596-5","PE256-2","LBE857-1","PH783-3","LS1045-4","CC455-3","DL617-6","BS1086-1","CK601-4","DA309-5","LTE064-1","KF460-4","LP181-1","GS349-4","LC47-8","GS205-6","EH309-8","BS1033-2","LL854-1","DHDPI042-6","BN356-6","PA145-2","GC340-1","MM334-5","AG274-2","BA518-7","BC973-4","BA1195-9","AM33-2","AB91-1","AB028-6","BC167-4","AL884-2","AM685-3"]
 def setup_distributed():
     """Initialize distributed training"""
     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
@@ -309,7 +310,8 @@ def train_convlstm(
     dropout_rate=0.1,
     use_convlstm=True,
     use_residual=True,
-    use_batchnorm=True
+    use_batchnorm=True,
+    model_name=""
 ):
     gc.collect()
     """Training ConvLSTM Autoencoder with configurable loss (single GPU)
@@ -350,11 +352,13 @@ def train_convlstm(
     if dropout_rate > 0:
         model_features.append(f"Dropout({dropout_rate})")
     model_description = "+".join(model_features) if model_features else "Baseline"
+    date_label = datetime.now().strftime("%Y-%m-%d")
 
     wandb.login(key=os.getenv("WANDB_KEY"))
     run = wandb.init(
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
+        name=model_name +"-" + date_label,
         config={
             "learning_rate": 0.02,
             "architecture": "ConvLSTM Autoencoder",
@@ -437,15 +441,16 @@ ABLATION STUDY CONFIGURATION
     learning_rate = 2e-4
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
+    df = pd.read_csv(os.path.abspath("index.csv"))
+    mask = df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
+    val_df = df[mask]
+    train_df = df[~mask]
+    train_dataset = IVFSequenceDataset(train_df, resize=128, norm="minmax01")
+    val_dataset = IVFSequenceDataset(val_df, resize=128, norm="minmax01")
+    print("val size: ", str(len(val_df) / len(df)))
 
-    ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=128, norm="minmax01")
-    total_size = len(ds)
-
-    train_size = int(0.85 * total_size)
-    val_size = total_size - train_size
-
-    generator = torch.Generator().manual_seed(42)
-    train_dataset, val_dataset = torch.utils.data.random_split(ds, [train_size, val_size], generator=generator)
+    #generator = torch.Generator().manual_seed(42)
+    #train_dataset, val_dataset = torch.utils.data.random_split(ds, [train_size, val_size], generator=generator)
 
     # Create DataLoaders
     loader = DataLoader(
@@ -604,8 +609,7 @@ ABLATION STUDY CONFIGURATION
         ]
 
         # Generate unique repo name
-        repo_name = generate_repo_name("convlstm", config_for_hash, required_files, date_label)
-        print(f"Repository name: {repo_name} (length: {len(repo_name)})")
+        #repo_name = generate_repo_name("convlstm", config_for_hash, required_files, date_label)
 
         # Create comprehensive config for HuggingFace
         hf_config = {
@@ -652,7 +656,7 @@ ABLATION STUDY CONFIGURATION
             "hash": repo_name.split("-")[-2] if "-" in repo_name else "",
         }
 
-        save_and_push_model(model, repo_name, required_files, model_config=hf_config)
+        save_and_push_model(model, model_name +"-"+ date_label, required_files, model_config=hf_config)
 
         # Comprehensive validation with multiple metrics
         val_metrics = {
@@ -721,7 +725,8 @@ def train_convlstm_latent_split(
     dropout_rate=0.1,
     use_convlstm=True,
     use_residual=True,
-    use_batchnorm=True
+    use_batchnorm=True,
+    model_name =""
 ):
     gc.collect()
     """Training ConvLSTM Autoencoder with LATENT SPLIT enabled (single GPU)
@@ -762,11 +767,13 @@ def train_convlstm_latent_split(
     if dropout_rate > 0:
         model_features.append(f"Dropout({dropout_rate})")
     model_description = "+".join(model_features) if model_features else "Baseline"
+    date_label = datetime.now().strftime("%Y-%m-%d")
 
     wandb.login(key=os.getenv("WANDB_KEY"))
     run = wandb.init(
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
+        name=model_name + "-" + date_label,
         config={
             "learning_rate": 0.02,
             "architecture": "ConvLSTM Autoencoder with Latent Split",
@@ -855,14 +862,16 @@ ABLATION STUDY CONFIGURATION
     learning_rate = 2e-4
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
-    ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=128, norm="minmax01")
-    total_size = len(ds)
+    df = pd.read_csv(os.path.abspath("index.csv"))
+    mask = df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
+    val_df = df[mask]
+    train_df = df[~mask]
+    train_dataset = IVFSequenceDataset(train_df, resize=128, norm="minmax01")
+    val_dataset = IVFSequenceDataset(val_df, resize=128, norm="minmax01")
+    print("val size: ", str(len(val_df) / len(df)))
 
-    train_size = int(0.85 * total_size)
-    val_size = total_size - train_size
-
-    generator = torch.Generator().manual_seed(42)
-    train_dataset, val_dataset = torch.utils.data.random_split(ds, [train_size, val_size], generator=generator)
+    #generator = torch.Generator().manual_seed(42)
+    #train_dataset, val_dataset = torch.utils.data.random_split(ds, [train_size, val_size], generator=generator)
 
     # Create DataLoaders
     loader = DataLoader(
@@ -1058,8 +1067,7 @@ ABLATION STUDY CONFIGURATION
         ]
 
         # Generate unique repo name
-        repo_name = generate_repo_name("convlstm-ls", config_for_hash, required_files, date_label)
-        print(f"Repository name: {repo_name} (length: {len(repo_name)})")
+        #repo_name = generate_repo_name("convlstm-ls", config_for_hash, required_files, date_label)
 
         # Create comprehensive config for HuggingFace
         hf_config = {
@@ -1108,7 +1116,7 @@ ABLATION STUDY CONFIGURATION
             "hash": repo_name.split("-")[-2] if "-" in repo_name else "",
         }
 
-        save_and_push_model(model, repo_name, required_files, model_config=hf_config)
+        save_and_push_model(model, model_name + "-" + date_label, required_files, model_config=hf_config)
         val_metrics = {
             'mse': 0.0,
             'l1': 0.0,
@@ -1207,7 +1215,7 @@ if __name__ == "__main__":
                               help="Disable residual connections")
             parser.add_argument("--no-batchnorm", action="store_true",
                               help="Disable batch normalization")
-
+            parser.add_argument("--name", type=str, default="", help="model name duhh")
             args = parser.parse_args()
 
             train_convlstm(
@@ -1218,7 +1226,9 @@ if __name__ == "__main__":
                 dropout_rate=args.dropout_rate,
                 use_convlstm=not args.no_convlstm,
                 use_residual=not args.no_residual,
-                use_batchnorm=not args.no_batchnorm
+                use_batchnorm=not args.no_batchnorm,
+                model_name = args.name
+
             )
         elif mode == "convlstm_latent_split":
             # Parse additional convlstm_latent_split arguments with ablation support
@@ -1245,6 +1255,7 @@ if __name__ == "__main__":
             parser.add_argument("--no-batchnorm", action="store_true",
                               help="Disable batch normalization")
 
+            parser.add_argument("--name", type=str, default="", help="model name duhh")
             args = parser.parse_args()
 
             train_convlstm_latent_split(
@@ -1255,7 +1266,8 @@ if __name__ == "__main__":
                 dropout_rate=args.dropout_rate,
                 use_convlstm=not args.no_convlstm,
                 use_residual=not args.no_residual,
-                use_batchnorm=not args.no_batchnorm
+                use_batchnorm=not args.no_batchnorm,
+                model_name = args.name
             )
     else:
         train()
