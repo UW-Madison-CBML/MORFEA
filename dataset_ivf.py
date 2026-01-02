@@ -2,10 +2,12 @@
 import numpy as np, pandas as pd, torch 
 from torch.utils.data import Dataset
 from PIL import Image, ImageFile
+import os
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 class IVFSequenceDataset(Dataset):
-    def __init__(self, index_csv, resize=500, norm="minmax01"):
-        self.df = pd.read_csv(index_csv)
+    def __init__(self, df, resize=500, norm="minmax01"):
+        #self.df = pd.read_csv(index_csv)
+        self.df = df
         self.resize = resize
         self.norm = norm
 
@@ -56,4 +58,18 @@ class IVFSequenceDataset(Dataset):
 
     def __len__(self):
         return len(self.df)
+
+if __name__ == "__main__":
+
+    ds = IVFSequenceDataset(pd.read_csv(os.path.abspath("index.csv")), resize=128, norm="minmax01")
+    total_size = len(ds)
+
+    train_size = int(0.85 * total_size)
+    val_size = total_size - train_size
+
+    generator = torch.Generator().manual_seed(42)
+    _, val_set = torch.utils.data.random_split(ds, [train_size, val_size], generator=generator)
+    val_df = ds.df.iloc[val_set.indices]
+    pd.set_option('display.max_rows', None)
+    print(val_df[['cell_id']])
 
