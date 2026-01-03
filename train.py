@@ -610,7 +610,7 @@ ABLATION STUDY CONFIGURATION
         ]
 
         # Generate unique repo name
-        #repo_name = generate_repo_name("convlstm", config_for_hash, required_files, date_label)
+        repo_name = generate_repo_name("convlstm", config_for_hash, required_files, date_label)
 
         # Create comprehensive config for HuggingFace
         hf_config = {
@@ -1068,7 +1068,7 @@ ABLATION STUDY CONFIGURATION
         ]
 
         # Generate unique repo name
-        #repo_name = generate_repo_name("convlstm-ls", config_for_hash, required_files, date_label)
+        repo_name = generate_repo_name("convlstm-ls", config_for_hash, required_files, date_label)
 
         # Create comprehensive config for HuggingFace
         hf_config = {
