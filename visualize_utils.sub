@@ -26,7 +26,7 @@ transfer_output_files = grades.tar.gz
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
 request_cpus = 1
-request_memory = 32GB
+request_memory = 64GB
 request_disk = 96GB
 
 queue 1

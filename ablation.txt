@@ -1,4 +1,1 @@
-convlstm_latent_split l1 --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.0  --name notemp
-convlstm_latent_split l1 --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.05  --no-convlstm --name noconvlstm
-convlstm_latent_split l1 --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.05 --no-batchnorm --name nobn
-convlstm_latent_split mse --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.05 --name mse
+convlstm_latent_split l1 --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.05  --name control
