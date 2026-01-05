@@ -21,7 +21,7 @@ when_to_transfer_output = ON_EXIT_OR_EVICT
 Requirements = (Target.HasCHTCStaging == true)
 # Transfer our executable script
 transfer_output_remaps = "latents.tar.gz =  file:///staging/groups/bhaskar_group/ivf/latents.tar.gz;"
-transfer_input_files = export_latents_scripts/${line}_latents.sh, ${line}_latents.tar.gz, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz
+transfer_input_files = export_latents_scripts/${line}_latents.sh, file:///staging/groups/bhaskar_group/ivf/${line}_latents.tar.gz, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz
 #Requirements = (Machine == "bhaskargpu4000.chtc.wisc.edu") && (DriverVersion == "12.8") && (DeviceName == "NVIDIA H200")
  
 transfer_output_files = latents.tar.gz
