@@ -1,1 +1,4 @@
-embryo-convlstm-ls-686b8856-2025-12-29
+nobn-2026-01-03,mse-2026-01-03
+notemp-2026-01-03,noconvlstm-2026-01-03
+nomsssim-2026-01-02,nodrop-2026-01-02
+norec-2026-01-02,nosplit-2026-01-02

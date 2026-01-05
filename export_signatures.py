@@ -72,7 +72,6 @@ def main(model_name):
     values_df = pd.DataFrame(values, columns=lat_columns)
     df = pd.concat([keys, values_df], axis = 1)
 
-    # Apply signature computation per cell_id
     # This returns a DataFrame where each row is a cell_id with its signature
     signatures_df = df.groupby('cell_id').apply(
         lambda group: get_new_row(group[lat_columns].to_numpy(), group.name)
@@ -80,8 +79,6 @@ def main(model_name):
 
     # Save to CSV
     signatures_df.to_csv("signatures/" + model_name + "_sigs.csv", index=False)
-    print(f"Saved signatures to signatures/{model_name}_sigs.csv")
-    print(f"Shape: {signatures_df.shape}")
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="A simple script using argparse to greet a user.")
