@@ -15,10 +15,10 @@ if [ -f "api_keys.txt" ]; then
     export HF_TOKEN=$HF_KEY
     echo "HuggingFace token loaded from api_keys.txt"
 fi
-
+ls -lh
 # Run export script
 echo "Running export_latents.py..."
-IFS="," read -ra ADDR <<< "$1"
+IFS="_" read -ra ADDR <<< "$1"
 
 for i in "${ADDR[@]}"; do
     python export_latents.py --name "$i" --limit 50
