@@ -312,7 +312,8 @@ def train_convlstm(
     use_convlstm=True,
     use_residual=True,
     use_batchnorm=True,
-    model_name=""
+    model_name="", 
+    latent_size = 4096
 ):
     gc.collect()
     """Training ConvLSTM Autoencoder with configurable loss (single GPU)
@@ -377,7 +378,7 @@ def train_convlstm(
             "use_convlstm": use_convlstm,
             "use_residual": use_residual,
             "use_batchnorm": use_batchnorm,
-            "latent_size": 4096,
+            "latent_size": latent_size,
             "seq_len": 50,
             "image_size": 128,
             "distributed": False,
@@ -426,7 +427,7 @@ ABLATION STUDY CONFIGURATION
         encoder_layers=2,
         decoder_hidden_dim=128,
         decoder_layers=2,
-        latent_size=4096,
+        latent_size=latent_size,
         use_classifier=False,
         num_classes=2,
         use_latent_split=False,
@@ -727,7 +728,8 @@ def train_convlstm_latent_split(
     use_convlstm=True,
     use_residual=True,
     use_batchnorm=True,
-    model_name =""
+    model_name ="",
+    latent_size = 4096
 ):
     gc.collect()
     """Training ConvLSTM Autoencoder with LATENT SPLIT enabled (single GPU)
@@ -792,10 +794,10 @@ def train_convlstm_latent_split(
             "use_convlstm": use_convlstm,
             "use_residual": use_residual,
             "use_batchnorm": use_batchnorm,
-            "latent_size": 4096,
+            "latent_size": latent_size,
             "latent_split": True,
-            "embryo_latent_size": 2048,
-            "empty_latent_size": 2048,
+            "embryo_latent_size": latent_size//2,
+            "empty_latent_size": latent_size//2,
             "seq_len": 50,
             "image_size": 128,
             "distributed": False,
@@ -847,7 +849,7 @@ ABLATION STUDY CONFIGURATION
         encoder_layers=2,
         decoder_hidden_dim=128,
         decoder_layers=2,
-        latent_size=4096,
+        latent_size=latent_size,
         use_classifier=False,
         num_classes=2,
         use_latent_split=True,  # ENABLE LATENT SPLIT
@@ -1217,6 +1219,7 @@ if __name__ == "__main__":
             parser.add_argument("--no-batchnorm", action="store_true",
                               help="Disable batch normalization")
             parser.add_argument("--name", type=str, default="", help="model name duhh")
+            parser.add_argument("--size", type=int, default=4096, "lat size bruh")
             args = parser.parse_args()
 
             train_convlstm(
@@ -1228,7 +1231,8 @@ if __name__ == "__main__":
                 use_convlstm=not args.no_convlstm,
                 use_residual=not args.no_residual,
                 use_batchnorm=not args.no_batchnorm,
-                model_name = args.name
+                model_name = args.name,
+                latent_size = args.size
 
             )
         elif mode == "convlstm_latent_split":
@@ -1257,6 +1261,8 @@ if __name__ == "__main__":
                               help="Disable batch normalization")
 
             parser.add_argument("--name", type=str, default="", help="model name duhh")
+            
+            parser.add_argument("--size", type=int, default=4096, "lat size bruh")
             args = parser.parse_args()
 
             train_convlstm_latent_split(
@@ -1268,7 +1274,8 @@ if __name__ == "__main__":
                 use_convlstm=not args.no_convlstm,
                 use_residual=not args.no_residual,
                 use_batchnorm=not args.no_batchnorm,
-                model_name = args.name
+                model_name = args.name,
+                latent_size = args.size
             )
     else:
         train()
