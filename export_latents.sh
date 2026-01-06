@@ -1,7 +1,5 @@
 #!/bin/bash
-echo "Hello CHTC from Job $1 running on `whoami`@`hostname`"
 echo "Starting export_latents job..."
-
 # Install dependencies
 echo "Installing dependencies..."
 pip install safetensors huggingface_hub wandb
@@ -21,7 +19,7 @@ echo "Running export_latents.py..."
 IFS="_" read -ra ADDR <<< "$1"
 
 for i in "${ADDR[@]}"; do
-    python export_latents.py --name "$i" --limit 50
+	    python export_latents.py --name "$i" --limit 50
 done
 
 #cat get_latents.txt | xargs -I {} sh -c 'python export_latents.py --name "{}" --limit 50'
@@ -34,4 +32,3 @@ echo "Cleaning up..."
 rm -r embryo_dataset
 
 echo "Export complete!" 
-

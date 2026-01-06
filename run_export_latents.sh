@@ -1,13 +1,16 @@
 #!/bin/bash
-rm export_latents_scripts/*
-cat <<EOF > "export_latents_scripts/latents.dag"
-JOB  0 export_latents.sub
-PARENT 0 CHILD 1
-EOF
 
-FILE="get_latents.txt"
+rm export_latents_scripts/*
+echo "" > export_latents_scripts/latents.dag
+#cat <<EOF > "export_latents_scripts/latents.dag"
+#JOB  0 export_latents.sub
+#PARENT 0 CHILD 1
+#EOF
+
+FILE=$(ls ../../../staging/groups/bhaskar_group/ivf | grep -P "^.+_latents\.tar\.gz" | sed 's/.\{15\}$//')
+echo "$FILE"
 index=1
-last_index=$(wc -l < "$FILE")
+last_index=$(echo "$FILE" | wc -l)
 while IFS= read -r line; do
 	cat <<EOF > "export_latents_scripts/${line}_latents.sub"
    
@@ -28,8 +31,8 @@ transfer_output_files = latents.tar.gz
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
 request_cpus = 1
-request_memory = 32GB
-request_disk = 32GB
+request_memory = 64GB
+request_disk = 64GB
 
 
 queue 1
@@ -57,9 +60,9 @@ EOF
 fi
 	((index++))
 
-done < "$FILE"
+done <<< "$FILE"
 
-chmod +x *.sh
+chmod +x export_latents_scripts/*.sh
 condor_submit_dag export_latents_scripts/latents.dag
 
 
