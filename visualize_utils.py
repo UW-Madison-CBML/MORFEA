@@ -575,6 +575,8 @@ def main():
     df, latent_cols = load_latents(args.latents_csv)
     df = df.rename(columns={"embryo_id":"cell_id"})
     grades_df = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"cell_id","TE":"grade1", "ICM":"grade2"})
+    index_df = pd.read_csv("index_embryo.csv")[["cell_id"]]
+    grades_df = grades_df.merge(index_df,how="right", left_on="cell_id", right_on="cell_id")
 
     # Create output directory
     os.makedirs(args.output, exist_ok=True)
