@@ -9,4 +9,4 @@ python visualize_utils.py "$1" --output grades --compare-grades --grades-file em
 python visualize_utils.py "$1" --output grades --compare-grades --grades-file embryo_dataset_grades.csv --plot-type grid --coloring curvature
 #' -- {}
 
-tar -cvf grades.tar.gz grades
+tar -cvf "$1"_grades.tar.gz grades
