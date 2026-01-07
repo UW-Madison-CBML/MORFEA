@@ -421,6 +421,7 @@ ABLATION STUDY CONFIGURATION
     print("Configuration saved to training_config_detailed.txt")
 
     model = ConvLSTMAutoencoder(
+        None,
         seq_len=50,
         input_channels=1,
         encoder_hidden_dim=256,
@@ -843,6 +844,7 @@ ABLATION STUDY CONFIGURATION
 
     # Create model with LATENT SPLIT and ABLATION parameters
     model = ConvLSTMAutoencoder(
+        None,
         seq_len=50,
         input_channels=1,
         encoder_hidden_dim=256,

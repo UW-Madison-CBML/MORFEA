@@ -330,6 +330,9 @@ class LatentClassifier(nn.Module):
         return self.head(z_last)
 
 
+
+
+
 class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
     """
     Complete ConvLSTM Autoencoder
@@ -341,6 +344,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
 
     def __init__(
         self,
+        config,
         seq_len=20,
         input_channels=1,
         encoder_hidden_dim=256,
@@ -358,7 +362,6 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         use_batchnorm=True
     ):
         super(ConvLSTMAutoencoder, self).__init__()
-
         self.seq_len = seq_len
         self.use_classifier = use_classifier
         self.encoder_hidden_dim = encoder_hidden_dim
@@ -369,6 +372,18 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         self.use_convlstm = use_convlstm
         self.use_residual = use_residual
         self.use_batchnorm = use_batchnorm
+        if(config != None):
+            self.seq_len = config.seq_len
+            self.use_classifier = config.use_classifier
+            self.encoder_hidden_dim = config.encoder_hidden_dim
+            self.latent_size = config.latent_size
+            self.use_latent_split = config.use_latent_split
+            # Store ablation settings for reproducibility
+            self.dropout_rate = config.dropout_rate
+            self.use_convlstm = config.use_convlstm
+            self.use_residual = config.use_residual
+            self.use_batchnorm = config.use_batchnorm
+
 
         # Core components
         self.encoder = Encoder(
