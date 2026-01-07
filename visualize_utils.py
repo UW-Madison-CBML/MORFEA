@@ -574,7 +574,8 @@ def main():
     # Load data
     df, latent_cols = load_latents(args.latents_csv)
     df = df.rename(columns={"embryo_id":"cell_id"})
-    grades_df = df[["cell_id","TE", "ICM"]].rename(columns={"TE":"grade1", "ICM":"grade2"})
+    print(df.head())
+    grades_df = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"TE":"grade1", "ICM":"grade2"})
 
     # Create output directory
     os.makedirs(args.output, exist_ok=True)
