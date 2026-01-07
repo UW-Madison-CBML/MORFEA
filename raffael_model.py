@@ -344,7 +344,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
 
     def __init__(
         self,
-        config,
+        config=None,
         seq_len=20,
         input_channels=1,
         encoder_hidden_dim=256,
