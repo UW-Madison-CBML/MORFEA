@@ -116,6 +116,7 @@ if [ -f "embryo_dataset_annotations.tar.gz" ]; then
     tar -xzvf embryo_dataset_annotations.tar.gz
 fi
 
+tar -xzvf latents.tar.gz
 # Run visualization
 echo "Running: $CMD"
 eval $CMD

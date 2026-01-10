@@ -3,6 +3,7 @@ import re
 import os
 import glob
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 
@@ -42,28 +43,39 @@ def list_frames(cell_dir: Path):
 
 
 def main(limit=None):
+    if limit == None:
+        return
     """Build an index CSV where each row represents one complete embryo sequence.
 
     Args:
         limit: Maximum number of embryos to process (None = process all)
     """
+    grades_df = pd.read_csv("embryo_dataset_grades.csv")
+    a_mask = (grades_df["TE"] == "A") & (grades_df["ICM"] == "A")
+    b_mask = (~ a_mask) & ((grades_df["TE"] == "B") | (grades_df["ICM"] == "B")) 
+    c_mask = (~ a_mask) & (~ b_mask) & ((grades_df["TE"] == "C") | (grades_df["ICM"] == "C")) 
+    na_mask = (~ a_mask) & (~ b_mask) & (~ c_mask)
+    a_df = grades_df[a_mask].head(limit // 4)
+    b_df = grades_df[b_mask].head(limit // 4)
+    c_df = grades_df[c_mask].head(limit // 4)
+    na_df = grades_df[na_mask].head(limit // 4)
+    grades_df = pd.concat([a_df, b_df, c_df, na_df])
     root = Path(DATASET_ROOT)
 
     if not root.exists():
         print(f"Error: Dataset root '{DATASET_ROOT}' does not exist")
         return
 
-    embryo_dirs = [p for p in root.iterdir() if p.is_dir()]
-
+    embryo_dirs = [p for p in root.iterdir() if p.is_dir() and p.name in grades_df['video_name'].values]
     if not embryo_dirs:
         print(f"Warning: No directories found in '{DATASET_ROOT}'")
         return
 
     # Sort and limit embryos
-    embryo_dirs = sorted(embryo_dirs, key=lambda x: x.name)
-    if limit is not None and limit > 0:
-        embryo_dirs = embryo_dirs[:limit]
-        print(f"Processing first {len(embryo_dirs)} embryos (limited by --limit {limit})")
+    #embryo_dirs = sorted(embryo_dirs, key=lambda x: grades_df.loc[grades_df['video_name'] == x.name][0]["TE"] + grades_df.loc[grades_df['video_name'] == x.name][0]["ICM"])
+    #if limit is not None and limit > 0:
+    #embryo_dirs = embryo_dirs[:limit]
+    #print(f"Processing first {len(embryo_dirs)} embryos (limited by --limit {limit})")
 
     rows = []
 

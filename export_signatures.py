@@ -64,14 +64,14 @@ def get_new_row(group, cell_id):
 def main(model_name):
     file_name = "latents/"+ model_name
     #file_name =
-    keys = pd.read_csv(file_name+".csv")
+    keys = pd.read_csv(file_name+".csv").rename({"embryo_id":"cell_id"})
     values = np.load(file_name+'.npy')
     if(len(keys) != values.shape[0]):
         raise ValueError("keys and values sizes do not match")
     lat_columns = [f"z_{i}" for i in range(values.shape[1])]
     values_df = pd.DataFrame(values, columns=lat_columns)
     df = pd.concat([keys, values_df], axis = 1)
-
+    print(df.head())
     # This returns a DataFrame where each row is a cell_id with its signature
     signatures_df = df.groupby('cell_id').apply(
         lambda group: get_new_row(group[lat_columns].to_numpy(), group.name)

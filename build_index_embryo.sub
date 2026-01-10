@@ -13,7 +13,7 @@ should_transfer_files = YES
 when_to_transfer_output = ON_EXIT
 Requirements = (Target.HasCHTCStaging == true)
 
-transfer_input_files = build_index_embryo.sh, build_index_embryo.py, dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz
+transfer_input_files = build_index_embryo.sh, build_index_embryo.py, dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz,  file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv
 
 transfer_output_remaps = "index_embryo.csv = file:///staging/groups/bhaskar_group/ivf/index_embryo.csv"
 transfer_output_files = index_embryo.csv

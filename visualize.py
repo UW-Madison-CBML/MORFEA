@@ -28,13 +28,18 @@ warnings.filterwarnings('ignore', message='invalid value encountered in divide',
 
 def load_latents(csv_file):
     print(f"Loading latent embeddings from: {csv_file}")
-    df = pd.read_csv(csv_file)
+    file_name = "latents/" + csv_file
+    df = pd.read_csv(file_name + ".csv")
+    data = np.load(file_name + ".npy")
+    
     print(f"  Loaded {len(df)} samples with {len(df.columns)} columns")
 
-    latent_cols = [col for col in df.columns if col.startswith('z_')]
+    #latent_cols = [col for col in df.columns if col.startswith('z_')]
+    latent_cols = [f"z_{i}" for i in range(data.shape[1])]
+    out_df = pd.concat([df, pd.DataFrame(data, columns=latent_cols)], axis = 1)
     print(f"  Using {len(latent_cols)} latent dimensions")
 
-    return df, latent_cols
+    return out_df, latent_cols
 
 
 def apply_tphate(data, n_jobs=-1):
@@ -174,6 +179,43 @@ def plot_cell_trajectory_circle(cell_id, tphate_data, time_steps, output_dir="pl
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"    Saved 3D trajectory plot: {output_file}")
+def plot_cell_trajectory_time(cell_id, tphate_data, time_steps, output_dir="plots"):
+    fig = plt.figure(figsize=(12, 10))
+    ax = fig.add_subplot(111, projection='3d')
+
+
+
+
+
+    # Create scatter plot colored by velocity
+    scatter = ax.scatter(tphate_data[:, 0], tphate_data[:, 1], tphate_data[:, 2],
+                         c=np.linspace(0, 1, tphate_data.shape[0]), cmap='jet', alpha=0.8, s=50,
+                         edgecolors='black', linewidth=0.5, zorder=5)
+
+    # Mark start and end points
+    ax.scatter(tphate_data[0, 0], tphate_data[0, 1], tphate_data[0, 2],
+               c='green', marker='o', s=120, label='Start', zorder=6, edgecolors='black', linewidth=1)
+    ax.scatter(tphate_data[-1, 0], tphate_data[-1, 1], tphate_data[-1, 2],
+               c='red', marker='*', s=300, label='End', zorder=6, edgecolors='black', linewidth=1)
+
+    # Labels and formatting
+    ax.set_xlabel("TPHATE Dimension 1", fontsize=12)
+    ax.set_ylabel("TPHATE Dimension 2", fontsize=12)
+    ax.set_zlabel("TPHATE Dimension 3", fontsize=12)
+    ax.set_title(f"TPHATE Trajectory (Colored by Velocity): {cell_id}", fontsize=14)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=11)
+
+    # Colorbar
+    cbar = plt.colorbar(scatter, ax=ax, pad=0.1, shrink=0.8)
+    cbar.set_label("Velocity (TPHATE units/time step)", fontsize=11)
+
+    plt.tight_layout()
+    output_file = os.path.join(output_dir, f"time_{cell_id}.png")
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"    Saved 3D trajectory plot: {output_file}")
+
 
 def plot_cell_trajectory_velocity(cell_id, tphate_data, time_steps, output_dir="plots"):
     fig = plt.figure(figsize=(12, 10))
@@ -438,6 +480,7 @@ def process_cell_id_batch(cell_ids, df, latent_cols, output_dir="plots", grades_
         plot_cell_trajectory_circle(cell_id, cell_tphate, cell_time_steps, cell_output_dir)
         plot_cell_trajectory_velocity(cell_id, cell_tphate, cell_time_steps, cell_output_dir)
         plot_cell_trajectory_timestamp(cell_id, cell_tphate, cell_time_steps, cell_output_dir)
+        plot_cell_trajectory_time(cell_id, cell_tphate, cell_time_steps, cell_output_dir)
 
 def filter_cells_by_grade(grades_df, grade_filter):
     """
@@ -568,10 +611,6 @@ Examples:
 
     args = parser.parse_args()
 
-    # Validate input file
-    if not os.path.exists(args.latents_csv):
-        print(f"Error: Latents CSV not found: {args.latents_csv}")
-        sys.exit(1)
 
     # Create output directory
     os.makedirs(args.output, exist_ok=True)
@@ -579,14 +618,18 @@ Examples:
 
     # Load latents
     df, latent_cols = load_latents(args.latents_csv)
-
+    index_df = pd.read_csv("index_embryo.csv").rename(columns={"embryo_id":"cell_id"})
     # Load grades if requested
     grades_df = None
     if args.by_grade or args.create_merged or args.grade_filter:
         if os.path.exists(args.grades_file):
             print(f"Loading grades from: {args.grades_file}")
-            grades_df = pd.read_csv(args.grades_file, header=None, names=['cell_id', 'grade1', 'grade2'])
+            grades_df = pd.read_csv(args.grades_file).rename(columns={"video_name":"cell_id", "TE":"grade1", "ICM":"grade2"})
+            print(grades_df.head())
+            print(index_df.head())
+
             print(f"  Loaded grades for {len(grades_df)} cell_ids\n")
+            grades_df = grades_df.merge(index_df,how="right", left_on="cell_id", right_on="cell_id")
         else:
             print(f"Warning: Grades file not found: {args.grades_file}")
             if args.grade_filter:
