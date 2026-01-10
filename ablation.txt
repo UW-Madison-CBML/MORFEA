@@ -1,3 +1,4 @@
-convlstm_latent_split l1 --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.05 --size 2048 --name l2048
-convlstm_latent_split l1 --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.05 --size 1024 --name l1024
-convlstm_latent_split l1 --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.05 --size 512 --name l512
+convlstm_latent_split l1 --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.00 --size 512 --name notemp
+convlstm_latent_split l1 --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.05 --size 512 --no-convlstm --name noconvlstm
+convlstm_latent_split l1 --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.05 --size 512 --no-batchnorm --name nobn
+convlstm_latent_split l1 --ms-ssim-weight 0.0 --rec-weight 1.0 --temporal-weight 0.05 --size 512 --name nomsssim

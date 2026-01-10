@@ -518,12 +518,12 @@ def create_grade_comparison_plots(df, latent_cols, grades_df, model_name="", out
             continue
 
         # Merged overlay plot
-        merged_file = os.path.join(output_dir, model_name + f"merged_{grade_cat}.png")
+        merged_file = os.path.join(output_dir, model_name + f"{coloring}_merged_{grade_cat}.png")
         create_merged_plot(cells, df, latent_cols, merged_file,
                           title=f"Merged Trajectories: Grade {grade_cat}", coloring=coloring)
 
         # Grid plot
-        grid_file = os.path.join(output_dir, model_name + f"grid_{grade_cat}.png")
+        grid_file = os.path.join(output_dir, model_name + f"{coloring}_grid_{grade_cat}.png")
         create_grid_plot(cells, df, latent_cols, grid_file,
                         title=f"Individual Trajectories: Grade {grade_cat}", coloring=coloring)
 

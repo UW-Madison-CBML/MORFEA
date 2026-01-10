@@ -8,7 +8,7 @@ universe = docker
 #  $(Process) will be a integer number for each job, starting with "0"
 #  and increasing for the relevant number of jobs.
 executable = /bin/bash
-arguments = visualize.sh latents.csv --all --by-grade
+arguments = visualize.sh $(model) --all --by-grade
 	
 # Specify the name of the log, standard error, and standard output (or
 # "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
@@ -17,10 +17,11 @@ log = visualize_$(Cluster)_$(Process).log
 error = visualize_$(Cluster)_$(Process).err
 output = visualize_$(Cluster)_$(Process).out
 # Transfer our executable script
-transfer_input_files = visualize.sh, visualize.py, file:///staging/groups/bhaskar_group/ivf/latents.csv, cell_groups.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz,  file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv
+transfer_input_files = visualize.sh, visualize.py, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz, cell_groups.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz,  file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, file:///staging/groups/bhaskar_group/ivf/index_embryo.csv
 
  
-transfer_output_remaps = "plots.tar.gz = file:///staging/groups/bhaskar_group/ivf/plots.tar.gz;"
+Requirements = (Target.HasCHTCStaging == true)
+transfer_output_remaps = "plots.tar.gz = (model)_plots.tar.gz;"
 
 transfer_output_files = plots.tar.gz
 # Requirements (e.g., operating system) your job needs, what amount of
@@ -29,5 +30,5 @@ request_cpus = 1
 request_memory = 32GB
 request_disk = 64GB
 
-queue 1
-#queue cell_group from cell_groups.txt
+#queue 1
+queue model from visualize_models.txt
