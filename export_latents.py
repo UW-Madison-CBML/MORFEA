@@ -188,7 +188,7 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
     grades_file = "embryo_dataset_grades.csv"
     if os.path.exists(grades_file):
         print(f"Loading grades from {grades_file}...")
-        grades_df = pd.read_csv(grades_file)
+        grades_df = pd.read_csv(grades_file, keep_default_na=False)
 
         # Join on embryo_id = video_name
         metadata = metadata.merge(
