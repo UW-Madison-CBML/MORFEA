@@ -66,7 +66,8 @@ def main(limit=None):
         print(f"Error: Dataset root '{DATASET_ROOT}' does not exist")
         return
 
-    embryo_dirs = [p for p in root.iterdir() if p.is_dir() and p.name in grades_df['video_name'].values]
+    #embryo_dirs = [p for p in root.iterdir() if p.is_dir() and p.name in grades_df['video_name'].values]
+    embryo_dirs = [p for p in root.iterdir()]
     if not embryo_dirs:
         print(f"Warning: No directories found in '{DATASET_ROOT}'")
         return
