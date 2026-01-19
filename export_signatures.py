@@ -8,6 +8,18 @@ import os
 import time
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+def flatten_list(nested_list):
+    """
+    Recursively flattens an arbitrarily nested list.
+    """
+    flat_list = []
+    for item in nested_list:
+        # Check if the item is a list (but not a string, which is also iterable)
+        if isinstance(item, list):
+            flat_list.extend(flatten_list(item))
+        else:
+            flat_list.append(item)
+    return flat_list
 # ig assume embryo timesteps are equally spaced
 def get_quad_tphate_interp(latents):
     #tphate_op = tphate.TPHATE(n_jobs=8, n_components=3)
@@ -20,7 +32,7 @@ def get_quad_tphate_interp(latents):
     # 3. Apply PCA
     # Since the input has 2 dimensions (features), we can set n_components=2 
     # to get all principal components, or n_components=1 to reduce dimensionality to 1D.
-    pca = PCA(n_components=16)
+    pca = PCA(n_components=2)
     pca.fit(X_scaled)
 
     # 4. Transform the data
@@ -72,13 +84,15 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
     return t, X_t, X_prime_t, signature, signature_terms, np.array(sig_flat)
 def get_new_row(group, cell_id):
     (_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group))
+    sig = flatten_list(sig)
+    terms = flatten_list(terms)
     print(signature.shape)
-    #print(sig, " ", terms)
+    print(len(sig), " ", terms)
     signature = signature.reshape(-1)
     # Return a Series instead of DataFrame for proper groupby handling
     result = pd.Series({'cell_id': cell_id})
-    for i in range(signature.shape[0]):
-        result[f"s_{i}"] = signature[i:i+1]
+    for i, val in enumerate(signature):
+        result[f"s_{i}"] = val
     return result 
 def main(model_name):
     file_name = "latents/"+ model_name
