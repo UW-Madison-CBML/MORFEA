@@ -6,20 +6,37 @@ from scipy.interpolate import make_interp_spline
 import itertools
 import os
 import time
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 # ig assume embryo timesteps are equally spaced
 def get_quad_tphate_interp(latents):
-    tphate_op = tphate.TPHATE(n_jobs=8, n_components=3)
-    tphate_data = tphate_op.fit_transform(latents) 
-    timesteps = np.linspace(0, 1, tphate_data.shape[0])
-    x_data = tphate_data[:, 0]
-    y_data = tphate_data[:, 1]
-    z_data = tphate_data[:, 2]
+    #tphate_op = tphate.TPHATE(n_jobs=8, n_components=3)
+    #tphate_data = tphate_op.fit_transform(latents) 
+    timesteps = np.linspace(0, 1, latents.shape[0])
 
-    interp_x = make_interp_spline(timesteps, x_data, k=2)
-    interp_y = make_interp_spline(timesteps, y_data, k=2)
-    interp_z = make_interp_spline(timesteps, z_data, k=2)
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(latents)
 
-    return (interp_x, interp_y, interp_z)
+    # 3. Apply PCA
+    # Since the input has 2 dimensions (features), we can set n_components=2 
+    # to get all principal components, or n_components=1 to reduce dimensionality to 1D.
+    pca = PCA(n_components=16)
+    pca.fit(X_scaled)
+
+    # 4. Transform the data
+    X_pca = pca.transform(X_scaled)
+
+    #x_data = tphate_data[:, 0]
+    #y_data = tphate_data[:, 1]
+    #z_data = tphate_data[:, 2]
+
+    #interp_x = make_interp_spline(timesteps, x_data, k=2)
+    #interp_y = make_interp_spline(timesteps, y_data, k=2)
+    #interp_z = make_interp_spline(timesteps, z_data, k=2)
+
+    interps = [make_interp_spline(timesteps, X_pca[:,i], k=2) for i in range(X_pca.shape[1])]
+
+    return interps
 
 
 def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
@@ -51,15 +68,17 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
 
     signature_terms = [list(itertools.product(*([np.arange(1, N+1).tolist()] * i)))
                        for i in range(0, level_threshold+1)]
-    
+    print(len(sig_flat))    
     return t, X_t, X_prime_t, signature, signature_terms, np.array(sig_flat)
 def get_new_row(group, cell_id):
-    (_,_,_,_,_, signature) = compute_path_signature(get_quad_tphate_interp(group))
+    (_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group))
+    print(signature.shape)
+    #print(sig, " ", terms)
     signature = signature.reshape(-1)
     # Return a Series instead of DataFrame for proper groupby handling
     result = pd.Series({'cell_id': cell_id})
-    for i, val in enumerate(signature):
-        result[f"s_{i}"] = val
+    for i in range(signature.shape[0]):
+        result[f"s_{i}"] = signature[i:i+1]
     return result 
 def main(model_name):
     file_name = "latents/"+ model_name

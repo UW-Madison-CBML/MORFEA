@@ -223,7 +223,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--name", type=str, help="Name of the model", default="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-15")
     parser.add_argument("--index", type=str, help="Input index CSV file", default="index_embryo.csv")
-    parser.add_argument("--limit", type=int, default=25,
+    parser.add_argument("--limit", type=int, default=0,
                        help="Maximum number of embryos to process (default: 25, use 0 for all)")
 
     args = parser.parse_args()

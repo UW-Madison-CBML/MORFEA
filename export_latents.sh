@@ -19,7 +19,7 @@ echo "Running export_latents.py..."
 IFS="_" read -ra ADDR <<< "$1"
 
 for i in "${ADDR[@]}"; do
-	    python export_latents.py --name "$i" --limit 50
+	    python export_latents.py --name "$i"
 done
 
 #cat get_latents.txt | xargs -I {} sh -c 'python export_latents.py --name "{}" --limit 50'

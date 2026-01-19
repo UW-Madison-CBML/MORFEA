@@ -7,8 +7,8 @@ echo "Extracting dataset..."
 tar -zxf signatures.tar.gz
 # Set HuggingFace token from api_keys.txt
 if [ -f "api_keys.txt" ]; then
-    HF_KEY=$(head -n 1 api_keys.txt)
-    export HF_TOKEN=$HF_KEY
+    WB_KEY=$(tail -n 1 api_keys.txt)
+    export WANDB_KEY=$WB_KEY
     echo "HuggingFace token loaded from api_keys.txt"
 fi
 ls -lh

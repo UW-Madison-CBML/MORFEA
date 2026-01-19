@@ -1,9 +1,12 @@
 import torch
 from signature_dataset import SignatureDataset
-from signature_model import SignatureModel
+from signature_model import SignatureClassifier
 from torch.utils.data import DataLoader
-from dataset_ivf import IVFSequenceDataset
-
+import wandb
+import os
+import pandas as pd
+import numpy as np
+import math
 class RunningStats:
     def __init__(self):
         self.n = 0
@@ -39,20 +42,20 @@ def main(model_name):
         project="IVF-Training",
     )
     
-    learning_rate = 2e-4
-    optimizer_te = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
-    optimizer_icm = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
-
+    learning_rate = 0.001
     sigs_df = pd.read_csv(os.path.abspath(f"signatures/{model_name}_sigs.csv"))
-    grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"))
+    grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"),  keep_default_na=False, na_values=[])
     dataset = SignatureDataset(sigs_df, grades_df) 
     sig_size = len([i for i in sigs_df.columns if i[:2] == "s_"])
     crit_te = torch.nn.CrossEntropyLoss()
     crit_icm = torch.nn.CrossEntropyLoss()
-    model_te = SignatureModel(sig_size)
+    model_te = SignatureClassifier(sig_size)
     model_te = model_te.to(DEVICE)
-    model_icm = SignatureModel(sig_size)
+    model_icm = SignatureClassifier(sig_size)
     model_icm = model_icm.to(DEVICE)
+    optimizer_te = torch.optim.Adam(model_te.parameters(), lr=learning_rate, weight_decay=1e-5)
+    optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=learning_rate, weight_decay=1e-5)
+
 
     loader = DataLoader(
         dataset,
@@ -63,7 +66,7 @@ def main(model_name):
         drop_last=True
     )
     for epoch in range(10):
-        model.train()
+        model_te.train(); model_icm.train()
         for sig, te, icm in loader:
             sig = sig.squeeze().to(DEVICE)
             te = te.squeeze()[:3].to(DEVICE)
@@ -87,7 +90,7 @@ def main(model_name):
     
     te_stats = RunningStats()
     icm_stats = RunningStats()
-    model.eval()
+    model_te.eval(); model_icm.eval()
     with torch.no_grad():
         for sig, te, icm in loader:
             sig = sig.squeeze().to(DEVICE)
