@@ -44,8 +44,9 @@ def main(model_name):
     
     learning_rate = 0.001
     sigs_df = pd.read_csv(os.path.abspath(f"signatures/{model_name}_sigs.csv"))
-    grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"),  keep_default_na=False, na_values=[])
-    dataset = SignatureDataset(sigs_df, grades_df) 
+    grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"))
+    dataset_te = SignatureDataset(sigs_df, grades_df, "TE") 
+    dataset_icm = SignatureDataset(sigs_df, grades_df, "ICM")
     sig_size = len([i for i in sigs_df.columns if i[:2] == "s_"])
     crit_te = torch.nn.CrossEntropyLoss()
     crit_icm = torch.nn.CrossEntropyLoss()
@@ -57,57 +58,82 @@ def main(model_name):
     optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=learning_rate, weight_decay=1e-5)
 
 
-    loader = DataLoader(
-        dataset,
-        batch_size=1,
+    loader_te = DataLoader(
+        dataset_te,
+        batch_size=32,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
         drop_last=True
     )
-    for epoch in range(10):
+    loader_icm = DataLoader(
+        dataset_icm,
+        batch_size=32,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+        drop_last=True
+    )
+
+    for epoch in range(200):
         model_te.train(); model_icm.train()
-        for sig, te, icm in loader:
-            sig = sig.squeeze().to(DEVICE)
-            te = te.squeeze()[:3].to(DEVICE)
-            icm = icm.squeeze()[:3].to(DEVICE)
-            if(not torch.all(torch.eq(te, 0))):
-                label = model_te(sig)
-                loss = crit_te(label, te)
+        for sig, te in loader_te:
+            sig = sig.to(DEVICE)
+            te = te.to(DEVICE).long()
+            label = model_te(sig)
+            loss = crit_te(label, te)
 
-                optimizer_te.zero_grad() 
-                loss.backward() 
-                optimizer_te.step()
-                run.log({"te": loss.item()})
-            if(not torch.all(torch.eq(icm, 0))):
-                label = model_te(sig)
-                loss = crit_icm(label, icm)
+            optimizer_te.zero_grad() 
+            loss.backward() 
+            optimizer_te.step()
+            run.log({"te": loss.item()})
 
-                optimizer_icm.zero_grad() 
-                loss.backward() 
-                optimizer_icm.step()
-                run.log({"icm": loss.item()})
+        for sig, icm in loader_icm:
+            sig = sig.to(DEVICE)
+            icm = icm.to(DEVICE).long()
+
+            label = model_icm(sig)
+            loss = crit_icm(label, icm)
+
+            optimizer_icm.zero_grad() 
+            loss.backward() 
+            optimizer_icm.step()
+            run.log({"icm": loss.item()})
     
-    te_stats = RunningStats()
-    icm_stats = RunningStats()
+    te_loss_stats = RunningStats()
+    icm_loss_stats = RunningStats()
+    te_acc_stats = RunningStats()
+    icm_acc_stats = RunningStats()
+
     model_te.eval(); model_icm.eval()
     with torch.no_grad():
-        for sig, te, icm in loader:
-            sig = sig.squeeze().to(DEVICE)
-            te = te.squeeze()[:3].to(DEVICE)
-            icm = icm.squeeze()[:3].to(DEVICE)
-            if(not torch.all(torch.eq(te, 0))):
-                label = model_te(sig)
-                loss = crit_te(label, te)
+        for sig, te in loader_te:
+            sig = sig.to(DEVICE)
+            te = te.to(DEVICE).long()
+            logits = model_te(sig)
+            loss = crit_te(logits, te)
+            te_loss_stats.push(loss.item())
+            
+            # Calculate accuracy
+            preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
+            te_acc_stats.push((preds == te).sum().item()/te.shape[0])
+        for sig, icm in loader_icm:
+            sig = sig.to(DEVICE)
+            icm = icm.to(DEVICE).long()
 
-                te_stats.push(loss.item())
-            if(not torch.all(torch.eq(icm, 0))):
-                label = model_te(sig)
-                loss = crit_icm(label, icm)
+            logits = model_icm(sig)
+            loss = crit_icm(logits, icm)
+            icm_loss_stats.push(loss.item())
+        
+            # Calculate accuracy
+            preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
+            icm_acc_stats.push((preds == icm).sum().item()/icm.shape[0])
 
-                icm_stats.push(loss.item())
-    print("TE: " + str(te_stats.mean) + " +- " + str(te_stats.std_dev))
-    print("ICM: " + str(icm_stats.mean) + " +- " + str(icm_stats.std_dev))
+    print("TE: " + str(te_loss_stats.mean) + " +- " + str(te_loss_stats.std_dev))
+    print("ICM: " + str(icm_loss_stats.mean) + " +- " + str(icm_loss_stats.std_dev))
+    print("TE Acc: " + str(te_acc_stats.mean) + " +- " + str(te_acc_stats.std_dev))
+    print("ICM Acc: " + str(icm_acc_stats.mean) + " +- " + str(icm_acc_stats.std_dev))
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="A simple script using argparse to greet a user.")
