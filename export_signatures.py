@@ -32,7 +32,7 @@ def get_quad_tphate_interp(latents):
     # 3. Apply PCA
     # Since the input has 2 dimensions (features), we can set n_components=2 
     # to get all principal components, or n_components=1 to reduce dimensionality to 1D.
-    pca = PCA(n_components=2)
+    pca = PCA(n_components=8)
     pca.fit(X_scaled)
 
     # 4. Transform the data
@@ -60,7 +60,9 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
                   Original was 10000 which is very slow!
                   1000 gives ~10x speedup with minimal accuracy loss
     """
+    
     N = len(X)
+    level_threshold=N
     t = np.linspace(a, b, n_points)
     dt = t[1] - t[0]
     X_t = [Xi(t) for Xi in X]
@@ -75,7 +77,7 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
         for previous_level_integral in previous_level:
             for i in range(N):
                 current_level.append(np.cumsum(previous_level_integral * dX_t[i]))
-                sig_flat.append(np.cumsum(previous_level_integral * dX_t[i]))
+                sig_flat.append(np.cumsum(previous_level_integral * dX_t[i])[-1])
         signature.append(current_level)
 
     signature_terms = [list(itertools.product(*([np.arange(1, N+1).tolist()] * i)))
@@ -87,8 +89,6 @@ def get_new_row(group, cell_id):
     sig = flatten_list(sig)
     terms = flatten_list(terms)
     print(signature.shape)
-    print(len(sig), " ", terms)
-    signature = signature.reshape(-1)
     # Return a Series instead of DataFrame for proper groupby handling
     result = pd.Series({'cell_id': cell_id})
     for i, val in enumerate(signature):

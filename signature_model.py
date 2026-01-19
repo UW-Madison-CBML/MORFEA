@@ -10,6 +10,6 @@ class SignatureClassifier(torch.nn.Module):
     def forward(self, x):
         x = F.relu(self.lin1(x))
         x = self.dropout(F.relu(self.lin2(x)))
-        x = F.relu(self.lin3(x))
-        return F.softmax(x)
+        x = self.lin3(x)
+        return x
         
