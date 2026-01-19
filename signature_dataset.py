@@ -19,18 +19,18 @@ class SignatureDataset(Dataset):
         """
         self.sig_df = sig_df.rename(columns={"cell_id":"embryo_id", "video_name":"embryo_id"})
         self.grades_df = grades_df.rename(columns={"cell_id":"embryo_id", "video_name":"embryo_id"})
-        if(not("embryo_id" in sig_df.columns and "embryo_id" in grades_df.columns)):
-            raise ValueError("no embryo_id column")
+        if(not("embryo_id" in self.sig_df.columns and "embryo_id" in self.grades_df.columns)):
             print(self.sig_df.head())
             print(self.grades_df.head())
+            raise ValueError("no embryo_id column")
         self.df = self.sig_df.merge(self.grades_df, how="left", left_on="embryo_id", right_on="embryo_id")
 
     def __getitem__(self, idx):
         grade_options = ["A","B","C","NA"]
-        signature = self.df.iloc[idx][[i for i in self.df.columns.tolist() if i[:2] == "s_"]].to_numpy() 
+        signature = self.df.iloc[idx][[i for i in self.df.columns.tolist() if i[:2] == "s_"]].to_numpy(dtype=np.float32)
         te,icm = self.df.iloc[idx][["TE","ICM"]].values
-        te_grade = np.array([1 if j == te else 0 for j in grades_options]) 
-        icm_grade = np.array([1 if j == icm else 0 for j in grades_options])
+        te_grade = np.array([1 if j == te else 0 for j in grade_options], dtype=np.float32)
+        icm_grade = np.array([1 if j == icm else 0 for j in grade_options], dtype=np.float32)
         return signature, te_grade, icm_grade
 
     def __len__(self):
