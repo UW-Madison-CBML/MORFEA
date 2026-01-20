@@ -24,15 +24,19 @@ class SignatureDataset(Dataset):
             print(self.sig_df.head())
             print(self.grades_df.head())
             raise ValueError("no embryo_id column")
-        sig_cols = [col for col in self.sig_df.columns if col.startswith("s_")]
-        self.df = self.sig_df.merge(self.grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", self.grade] + sig_cols].dropna(subset=[self.grade])
+        self.sig_cols = [col for col in self.sig_df.columns if col.startswith("s_")]
+        self.df = self.sig_df.merge(self.grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", self.grade] + self.sig_cols].dropna(subset=[self.grade])
+        sig_data = self.df[self.sig_cols].values
+        self.mean = sig_data.mean(axis=0)
+        self.std = (sig_data.std(axis=0) + 1e-8).astype(np.float32)  # Avoid division by zero
 
     def __getitem__(self, idx):
         grade_options = ["A","B","C"]
         signature = self.df.iloc[idx][[i for i in self.df.columns.tolist() if i[:2] == "s_"]].to_numpy(dtype=np.float32)
+        signature = (signature - self.mean) / self.std
         g = self.df.iloc[idx][self.grade]
         g_grade = grade_options.index(g)
-        return signature, g_grade
+        return signature.astype(np.float32), g_grade
 
     def __len__(self):
         return len(self.df)

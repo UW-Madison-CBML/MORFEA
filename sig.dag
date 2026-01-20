@@ -1,0 +1,3 @@
+JOB A export_signatures.sub
+JOB B train_classifier.sub
+PARENT A CHILD B
