@@ -32,7 +32,7 @@ def get_quad_tphate_interp(latents):
     # 3. Apply PCA
     # Since the input has 2 dimensions (features), we can set n_components=2 
     # to get all principal components, or n_components=1 to reduce dimensionality to 1D.
-    pca = PCA(n_components=8)
+    pca = PCA(n_components=5)
     pca.fit(X_scaled)
 
     # 4. Transform the data
@@ -88,7 +88,7 @@ def get_new_row(group, cell_id):
     (_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group))
     sig = flatten_list(sig)
     terms = flatten_list(terms)
-    print(signature.shape)
+    print(terms)
     # Return a Series instead of DataFrame for proper groupby handling
     result = pd.Series({'cell_id': cell_id})
     for i, val in enumerate(signature):
