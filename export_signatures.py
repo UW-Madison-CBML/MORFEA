@@ -8,6 +8,7 @@ import os
 import time
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+import umap
 def flatten_list(nested_list):
     """
     Recursively flattens an arbitrarily nested list.
@@ -21,32 +22,29 @@ def flatten_list(nested_list):
             flat_list.append(item)
     return flat_list
 # ig assume embryo timesteps are equally spaced
-def get_quad_tphate_interp(latents):
-    #tphate_op = tphate.TPHATE(n_jobs=8, n_components=3)
-    #tphate_data = tphate_op.fit_transform(latents) 
+def get_quad_tphate_interp(latents, how="PCA", n_components=2):
+    X_out = np.zeros((latents.shape[0], n_components))
+    if(how == "TPHATE"):
+        tphate_op = tphate.TPHATE(n_jobs=8, n_components=n_components)
+        X_out = tphate_op.fit_transform(latents) 
+
+    elif(how == "PCA"):
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(latents)
+
+        pca = PCA(n_components=n_components)
+        pca.fit(X_scaled)
+
+        X_out = pca.transform(X_scaled)
+    elif(how == "UMAP"):
+        mapper = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=n_components, random_state=42)
+
+        X_out = mapper.fit_transform(latents)
+    
+    else:
+        raise ValueError("invalid how")
     timesteps = np.linspace(0, 1, latents.shape[0])
-
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(latents)
-
-    # 3. Apply PCA
-    # Since the input has 2 dimensions (features), we can set n_components=2 
-    # to get all principal components, or n_components=1 to reduce dimensionality to 1D.
-    pca = PCA(n_components=5)
-    pca.fit(X_scaled)
-
-    # 4. Transform the data
-    X_pca = pca.transform(X_scaled)
-
-    #x_data = tphate_data[:, 0]
-    #y_data = tphate_data[:, 1]
-    #z_data = tphate_data[:, 2]
-
-    #interp_x = make_interp_spline(timesteps, x_data, k=2)
-    #interp_y = make_interp_spline(timesteps, y_data, k=2)
-    #interp_z = make_interp_spline(timesteps, z_data, k=2)
-
-    interps = [make_interp_spline(timesteps, X_pca[:,i], k=2) for i in range(X_pca.shape[1])]
+    interps = [make_interp_spline(timesteps, X_out[:,i], k=2) for i in range(X_out.shape[1])]
 
     return interps
 
@@ -85,15 +83,26 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
     print(len(sig_flat))    
     return t, X_t, X_prime_t, signature, signature_terms, np.array(sig_flat)
 def get_new_row(group, cell_id):
-    (_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group))
-    sig = flatten_list(sig)
-    terms = flatten_list(terms)
-    print(terms)
+    #(_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group, how="UMAP", n_components=3))
+    N = 50
+    signature = np.array([np.array([i(np.random.uniform(0,1,200)) for i in get_quad_tphate_interp(group, how="UMAP", n_components=10)]).reshape(-1) for j in range(N)])
+    #sig = flatten_list(sig)
+    #terms = flatten_list(terms)
+    #print(terms)
     # Return a Series instead of DataFrame for proper groupby handling
-    result = pd.Series({'cell_id': cell_id})
-    for i, val in enumerate(signature):
-        result[f"s_{i}"] = val
-    return result 
+    N, S = signature.shape
+    #result = pd.DataFrame({"cell_id":[cell_id] * N})
+    #for i, val in enumerate(signature):
+        #result[f"s_{i}"] = val
+    res = pd.DataFrame(signature)
+    
+    # 2. Rename columns to s_0, s_1, etc.
+    res.columns = [f's_{i}' for i in range(res.shape[1])]
+    
+    # 3. Add the cell_id (Pandas broadcasts this single value to all N rows)
+    res['cell_id'] = cell_id
+    
+    return res
 def main(model_name):
     file_name = "latents/"+ model_name
     #file_name =
