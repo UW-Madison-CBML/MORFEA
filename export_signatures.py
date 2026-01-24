@@ -84,23 +84,13 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
     return t, X_t, X_prime_t, signature, signature_terms, np.array(sig_flat)
 def get_new_row(group, cell_id):
     #(_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group, how="UMAP", n_components=3))
-    N = 50
-    signature = np.array([np.array([i(np.random.uniform(0,1,200)) for i in get_quad_tphate_interp(group, how="UMAP", n_components=10)]).reshape(-1) for j in range(N)])
     #sig = flatten_list(sig)
     #terms = flatten_list(terms)
     #print(terms)
     # Return a Series instead of DataFrame for proper groupby handling
-    N, S = signature.shape
     #result = pd.DataFrame({"cell_id":[cell_id] * N})
-    #for i, val in enumerate(signature):
-        #result[f"s_{i}"] = val
-    res = pd.DataFrame(signature)
-    
-    # 2. Rename columns to s_0, s_1, etc.
-    res.columns = [f's_{i}' for i in range(res.shape[1])]
-    
-    # 3. Add the cell_id (Pandas broadcasts this single value to all N rows)
-    res['cell_id'] = cell_id
+    for i, val in enumerate(signature):
+        result[f"s_{i}"] = val
     
     return res
 def main(model_name):
