@@ -1,1 +1,1 @@
-convlstm_latent_split l1 --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.05 --no-residual --size 4096 --name noskip
+convlstm_latent_split l1 --ms-ssim-weight 0.5 --rec-weight 0.5 --temporal-weight 0.05 --size 2048 --name latent_test_control

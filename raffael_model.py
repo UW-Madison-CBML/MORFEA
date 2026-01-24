@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 from raffael_conv_lstm import ConvLSTM
 from huggingface_hub import PyTorchModelHubMixin
-
+import torch.nn.functional as F
 
 class ResidualBlock(nn.Module):
     """
@@ -218,7 +218,11 @@ class Decoder(nn.Module):
         # Linear layer to expand compressed latent to spatial dimensions
         # Input: (B*T, effective_latent_size)
         # Output: (B*T, latent_dim * 16 * 16)
-        self.latent_expand = nn.Linear(effective_latent_size, latent_dim * 16 * 16)
+        self.lin1 = nn.Linear(latent_size, latent_size)
+        self.lin2 = nn.Linear(latent_size, latent_size)
+        self.latent_expand = nn.Linear(latent_size, latent_dim * 16 * 16)
+        self.lin1_empty = nn.Linear(effective_latent_size, effective_latent_size)
+        self.lin2_empty = nn.Linear(effective_latent_size, effective_latent_size)
         self.latent_expand_empty = nn.Linear(effective_latent_size, latent_dim * 16 * 16) 
         if use_convlstm:
             # ConvLSTM decodes temporal dimension
@@ -270,11 +274,11 @@ class Decoder(nn.Module):
             if empty_well:
                 z_seq = z_seq[:, :, :L//2]  # First half for empty wells
             else:
-                z_seq = z_seq[:, :, L//2:]  # Second half for embryos
+                z_seq = z_seq  # Second half for embryos
 
         # Expand compressed latent to spatial dimensions
         z_flat = z_seq.view(B * T, -1)  # (B*T, effective_latent_size)
-        z_expanded = self.latent_expand_empty(z_flat) if self.use_latent_split and empty_well else self.latent_expand(z_flat)
+        z_expanded = self.latent_expand_empty(F.relu(self.lin2_empty(F.relu(self.lin1_empty(z_flat))))) if self.use_latent_split and empty_well else self.latent_expand(F.relu(self.lin2(F.relu(self.lin1(z_flat)))))
         z_expanded = torch.nn.functional.relu(z_expanded)
         z_spatial = z_expanded.view(B, T, self.latent_dim, 16, 16)  # (B, T, latent_dim, 16, 16)
 
@@ -480,7 +484,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
                 if empty_well:
                     return x_rec, z_seq[:, :, :self.latent_size//2]
                 else:
-                    return x_rec, z_seq[:, :, self.latent_size//2:]
+                    return x_rec, z_seq
             else:
                 return x_rec, z_seq
 
