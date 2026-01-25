@@ -31,13 +31,13 @@ def fit_circle_curvature(points):
     
     area = np.sqrt(area_squared)
     
-    if area < 1e-10:
+    if area == 0:
         return 0
     
     # Radius = (a*b*c) / (4*Area)
     radius = (a * b * c) / (4 * area)
     
-    if radius < 1e-10:
+    if radius == 0:
         return 0
     
     return 1 / radius
@@ -47,24 +47,24 @@ def calculate_curvatures(trajectory):
     curvatures = []
     
     for i in range(len(trajectory)):
-        if i == 0:
+        if i < 6:
             # First point: use forward difference
             if len(trajectory) >= 3:
-                points = trajectory[i:i+3]
+                points = trajectory[i:i+12:4]
                 curvatures.append(fit_circle_curvature(points))
             else:
                 curvatures.append(0)
-        elif i == len(trajectory) - 1:
+        elif i >= len(trajectory) - 6:
             # Last point: use backward difference
             if len(trajectory) >= 3:
-                points = trajectory[i-2:i+1]
+                points = trajectory[i-11:i+1:4]
                 curvatures.append(fit_circle_curvature(points))
             else:
                 curvatures.append(0)
         else:
             # Middle points: use centered window
             if i < len(trajectory) - 1:
-                points = trajectory[i-1:i+2]
+                points = trajectory[i-6:i+6:4]
                 curvatures.append(fit_circle_curvature(points))
             else:
                 curvatures.append(0)
