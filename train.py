@@ -625,7 +625,7 @@ ABLATION STUDY CONFIGURATION
             "encoder_layers": 2,
             "decoder_hidden_dim": 128,
             "decoder_layers": 2,
-            "latent_size": 4096,
+            "latent_size": latent_size,
             "use_classifier": False,
             "num_classes": 2,
             "use_latent_split": False,
