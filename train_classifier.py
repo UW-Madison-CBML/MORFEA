@@ -244,7 +244,7 @@ def main(model_name):
     )
     
     learning_rate = 0.001
-    sigs_df = pd.read_csv(os.path.abspath(f"signatures/{model_name}_sigs.csv"))
+    sigs_df = pd.read_csv(os.path.abspath(f"signatures/{model_name}_sigs.csv")).rename(columns={"embryo_id":"cell_id"})
     grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"))
     mask = sigs_df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = sigs_df[mask]

@@ -9,6 +9,61 @@ import time
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import umap
+def fit_circle_curvature(points):
+    """
+    Fit a circle to 3 consecutive points and return curvature (1/radius).
+    If points are collinear or too close, return 0.
+    """
+    if len(points) < 3:
+        raise ValueError("not enough points")
+    
+    # Get three points
+    p1, p2, p3 = points[0], points[1], points[2]
+    
+    # Calculate the radius using the circumradius formula
+    a = np.linalg.norm(p2 - p1)
+    b = np.linalg.norm(p3 - p2)
+    c = np.linalg.norm(p3 - p1)
+    
+    # Area using Heron's formula
+    s = (a + b + c) / 2
+    area_squared = s * (s - a) * (s - b) * (s - c)
+    
+    if area_squared <= 0:
+        return 0  # Collinear points
+    print(area_squared)
+    
+    area = np.sqrt(area_squared)
+     
+    print(area)
+    if area == 0:
+        return 0
+    
+    # Radius = (a*b*c) / (4*Area)
+    radius = (a * b * c) / (4 * area)
+    print(radius)
+    if radius == 0:
+        return 0
+    print(1/radius) 
+    return 1 / radius
+def calculate_curvatures(trajectory):
+    """Calculate curvature for each point in trajectory using sliding window."""
+    offset = 6
+    curvatures = []
+    
+    for i in range(len(trajectory)):
+        if i < offset:
+            # First point: use forward difference
+            curvatures.append(0)
+        elif i >= len(trajectory) - offset:
+            curvatures.append(0)
+        else:
+            points = trajectory[i-offset:i+offset:(offset*2)//3]
+            curvatures.append(fit_circle_curvature(points))
+    
+    return np.array(curvatures)
+
+
 def flatten_list(nested_list):
     """
     Recursively flattens an arbitrarily nested list.
@@ -40,7 +95,8 @@ def get_quad_tphate_interp(latents, how="PCA", n_components=2):
         mapper = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=n_components, random_state=42)
 
         X_out = mapper.fit_transform(latents)
-    
+    elif(how == "FULL"):
+        X_out = latents 
     else:
         raise ValueError("invalid how")
     timesteps = np.linspace(0, 1, latents.shape[0])
@@ -84,15 +140,16 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
     return t, X_t, X_prime_t, signature, signature_terms, np.array(sig_flat)
 def get_new_row(group, cell_id):
     #(_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group, how="UMAP", n_components=3))
+    interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).T
+    signature =  calculate_curvatures(interped_latents)
+    print(signature.shape)
     #sig = flatten_list(sig)
     #terms = flatten_list(terms)
-    #print(terms)
-    # Return a Series instead of DataFrame for proper groupby handling
-    #result = pd.DataFrame({"cell_id":[cell_id] * N})
+    result = pd.Series({"cell_id":cell_id})
     for i, val in enumerate(signature):
         result[f"s_{i}"] = val
     
-    return res
+    return result
 def main(model_name):
     file_name = "latents/"+ model_name
     #file_name =

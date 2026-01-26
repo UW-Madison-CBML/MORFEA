@@ -5,44 +5,73 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 from matplotlib.patches import Patch
-
-def fit_circle_curvature(points):
+from sklearn.decomposition import PCA
+from scipy.optimize import least_squares
+def fit_circle_curvature(points, how="triangle"):
     """
     Fit a circle to 3 consecutive points and return curvature (1/radius).
     If points are collinear or too close, return 0.
     """
-    if len(points) < 3:
-        raise ValueError("not enough points")
+    if(how == "triangle"):
     
-    # Get three points
-    p1, p2, p3 = points[0], points[1], points[2]
-    
-    # Calculate the radius using the circumradius formula
-    a = np.linalg.norm(p2 - p1)
-    b = np.linalg.norm(p3 - p2)
-    c = np.linalg.norm(p3 - p1)
-    
-    # Area using Heron's formula
-    s = (a + b + c) / 2
-    area_squared = s * (s - a) * (s - b) * (s - c)
-    
-    if area_squared <= 0:
-        return 0  # Collinear points
-    print(area_squared)
-    
-    area = np.sqrt(area_squared)
-     
-    print(area)
-    if area == 0:
-        return 0
-    
-    # Radius = (a*b*c) / (4*Area)
-    radius = (a * b * c) / (4 * area)
-    print(radius)
-    if radius == 0:
-        return 0
-    print(1/radius) 
-    return 1 / radius
+        # Get three points
+        points = points[::max(1,len(points)//3)]
+        p1, p2, p3 = points[0], points[1], points[2]
+
+        # Calculate the radius using the circumradius formula
+        a = np.linalg.norm(p2 - p1)
+        b = np.linalg.norm(p3 - p2)
+        c = np.linalg.norm(p3 - p1)
+        
+        # Area using Heron's formula
+        s = (a + b + c) / 2
+        area_squared = s * (s - a) * (s - b) * (s - c)
+        
+        if area_squared <= 0:
+            return 0  # Collinear points
+        print(area_squared)
+        
+        area = np.sqrt(area_squared)
+         
+        print(area)
+        if area == 0:
+            return 0
+        
+        # Radius = (a*b*c) / (4*Area)
+        radius = (a * b * c) / (4 * area)
+        print(radius)
+        if radius == 0:
+            return 0
+        print(1/radius) 
+        return 1 / radius
+    else:
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(points)
+        pca = PCA(n_components=2)
+        pca.fit(X_scaled)
+        points_2d = pca.transform(X_scaled)       
+        def circle_residuals(params, points):
+            xc, yc, R = params
+            # Calculate distance from each point to the center (xc, yc)
+            distances = np.sqrt((points[:, 0] - xc)**2 + (points[:, 1] - yc)**2)
+            # The residual is the difference between these distances and the radius R
+            return distances - R
+
+
+        x = points[:,0]
+        y = points[:,1]
+        points = np.column_stack((x, y))
+
+        x0 = [np.mean(x), np.mean(y), np.std(x)]
+
+        res = least_squares(circle_residuals, x0, args=(points,))
+
+        _, _, radius = res.x
+        
+        if(radius == 0):
+            return 0 
+        return 1/radius
+        
 
 def calculate_curvatures(trajectory):
     """Calculate curvature for each point in trajectory using sliding window."""
@@ -51,10 +80,13 @@ def calculate_curvatures(trajectory):
     
     for i in range(len(trajectory)):
         if i < offset:
-            # First point: use forward difference
-            curvatures.append(0)
+            points = trajectory[i:i+(2*offset):(offset*2)//3]
+            curvatures.append(fit_circle_curvature(points))
+
         elif i >= len(trajectory) - offset:
-            curvatures.append(0)
+            points = trajectory[i-(2*offset):i:(offset*2)//3]
+            curvatures.append(fit_circle_curvature(points))
+
         else:
             points = trajectory[i-offset:i+offset:(offset*2)//3]
             curvatures.append(fit_circle_curvature(points))
