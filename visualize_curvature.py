@@ -12,7 +12,7 @@ def fit_circle_curvature(points):
     If points are collinear or too close, return 0.
     """
     if len(points) < 3:
-        return 0
+        raise ValueError("not enough points")
     
     # Get three points
     p1, p2, p3 = points[0], points[1], points[2]
@@ -28,46 +28,36 @@ def fit_circle_curvature(points):
     
     if area_squared <= 0:
         return 0  # Collinear points
+    print(area_squared)
     
     area = np.sqrt(area_squared)
-    
+     
+    print(area)
     if area == 0:
         return 0
     
     # Radius = (a*b*c) / (4*Area)
     radius = (a * b * c) / (4 * area)
-    
+    print(radius)
     if radius == 0:
         return 0
-    
+    print(1/radius) 
     return 1 / radius
 
 def calculate_curvatures(trajectory):
     """Calculate curvature for each point in trajectory using sliding window."""
+    offset = 6
     curvatures = []
     
     for i in range(len(trajectory)):
-        if i < 6:
+        if i < offset:
             # First point: use forward difference
-            if len(trajectory) >= 3:
-                points = trajectory[i:i+12:4]
-                curvatures.append(fit_circle_curvature(points))
-            else:
-                curvatures.append(0)
-        elif i >= len(trajectory) - 6:
-            # Last point: use backward difference
-            if len(trajectory) >= 3:
-                points = trajectory[i-11:i+1:4]
-                curvatures.append(fit_circle_curvature(points))
-            else:
-                curvatures.append(0)
+            curvatures.append(0)
+        elif i >= len(trajectory) - offset:
+            curvatures.append(0)
         else:
-            # Middle points: use centered window
-            if i < len(trajectory) - 1:
-                points = trajectory[i-6:i+6:4]
-                curvatures.append(fit_circle_curvature(points))
-            else:
-                curvatures.append(0)
+            points = trajectory[i-offset:i+offset:(offset*2)//3]
+            curvatures.append(fit_circle_curvature(points))
     
     return np.array(curvatures)
 
@@ -141,22 +131,26 @@ def main():
     latents = np.load(npy_path)
     
     # Add latent columns to dataframe
+    latent_cols = []
     n_dims = latents.shape[1]
     for i in range(n_dims):
         df[f'z_{i}'] = latents[:, i]
-    
+        latent_cols.append(f"z_{i}")
+    df.rename(columns={"cell_id":"embryo_id", "video_name":"embryo_id"}) 
+    print(df.head())
     # Group by embryo_id
     grouped = df.groupby('embryo_id')
-    
+    count = 0 
     # Create plots for each embryo
     for embryo_id, group in grouped:
+        count += 1
         # Sort by timepoint if available
-        if 'timepoint' in group.columns:
-            group = group.sort_values('timepoint')
+        if 'time_step' in group.columns:
+            group = group.sort_values('time_step')
         
-        # Extract trajectory (z_0, z_1)
-        trajectory = group[['z_0', 'z_1']].values
-        
+        trajectory = group[latent_cols].values.astype(np.float32)
+        if(count % 50 == 0):
+            print(trajectory)
         # Calculate curvatures
         curvatures = calculate_curvatures(trajectory)
         
@@ -164,8 +158,8 @@ def main():
         phases = load_phase_annotations(embryo_id)
         
         # Create timepoints array
-        if 'timepoint' in group.columns:
-            timepoints = group['timepoint'].values
+        if 'time_step' in group.columns:
+            timepoints = group['time_step'].values
         else:
             timepoints = np.arange(len(trajectory))
         
