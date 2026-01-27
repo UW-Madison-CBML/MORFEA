@@ -9,43 +9,56 @@ import time
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import umap
-def fit_circle_curvature(points):
+
+def fit_circle_curvature(points, how="triangle"):
     """
     Fit a circle to 3 consecutive points and return curvature (1/radius).
     If points are collinear or too close, return 0.
     """
-    if len(points) < 3:
-        raise ValueError("not enough points")
+    if(how == "triangle"):
     
-    # Get three points
-    p1, p2, p3 = points[0], points[1], points[2]
-    
-    # Calculate the radius using the circumradius formula
-    a = np.linalg.norm(p2 - p1)
-    b = np.linalg.norm(p3 - p2)
-    c = np.linalg.norm(p3 - p1)
-    
-    # Area using Heron's formula
-    s = (a + b + c) / 2
-    area_squared = s * (s - a) * (s - b) * (s - c)
-    
-    if area_squared <= 0:
-        return 0  # Collinear points
-    print(area_squared)
-    
-    area = np.sqrt(area_squared)
-     
-    print(area)
-    if area == 0:
-        return 0
-    
-    # Radius = (a*b*c) / (4*Area)
-    radius = (a * b * c) / (4 * area)
-    print(radius)
-    if radius == 0:
-        return 0
-    print(1/radius) 
-    return 1 / radius
+        # Get three points
+        points = points[::max(1,len(points)//3)]
+        p1, p2, p3 = points[0], points[1], points[2]
+
+        # Calculate the radius using the circumradius formula
+        a = np.linalg.norm(p2 - p1)
+        b = np.linalg.norm(p3 - p2)
+        c = np.linalg.norm(p3 - p1)
+        
+        # Area using Heron's formula
+        s = (a + b + c) / 2
+        area_squared = s * (s - a) * (s - b) * (s - c)
+        
+        if area_squared <= 0:
+            return 0  # Collinear points
+        print(area_squared)
+        
+        area = np.sqrt(area_squared)
+         
+        print(area)
+        if area == 0:
+            return 0
+        
+        # Radius = (a*b*c) / (4*Area)
+        radius = (a * b * c) / (4 * area)
+        print(radius)
+        if radius == 0:
+            return 0
+        print(1/radius) 
+        return 1 / radius
+    else:
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(points)
+        pca = PCA(n_components=2)
+        pca.fit(X_scaled)
+        points_2d = pca.transform(X_scaled)       
+        def circle_residuals(params, points):
+            xc, yc, R = params
+            # Calculate distance from each point to the center (xc, yc)
+            distances = np.sqrt((points[:, 0] - xc)**2 + (points[:, 1] - yc)**2)
+            # The residual is the difference between these distances and the radius R
+            return distances - R
 def calculate_curvatures(trajectory):
     """Calculate curvature for each point in trajectory using sliding window."""
     offset = 6
@@ -53,12 +66,13 @@ def calculate_curvatures(trajectory):
     
     for i in range(len(trajectory)):
         if i < offset:
-            # First point: use forward difference
-            curvatures.append(0)
+            points = trajectory[i:i+(2*offset)]
+            curvatures.append(fit_circle_curvature(points))
         elif i >= len(trajectory) - offset:
-            curvatures.append(0)
+            points = trajectory[i-(2*offset):i]
+            curvatures.append(fit_circle_curvature(points))
         else:
-            points = trajectory[i-offset:i+offset:(offset*2)//3]
+            points = trajectory[i-offset:i+offset]
             curvatures.append(fit_circle_curvature(points))
     
     return np.array(curvatures)
@@ -100,7 +114,7 @@ def get_quad_tphate_interp(latents, how="PCA", n_components=2):
     else:
         raise ValueError("invalid how")
     timesteps = np.linspace(0, 1, latents.shape[0])
-    interps = [make_interp_spline(timesteps, X_out[:,i], k=2) for i in range(X_out.shape[1])]
+    interps = [make_interp_spline(timesteps, X_out[:,i], k=3) for i in range(X_out.shape[1])]
 
     return interps
 
@@ -140,13 +154,18 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
     return t, X_t, X_prime_t, signature, signature_terms, np.array(sig_flat)
 def get_new_row(group, cell_id):
     #(_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group, how="UMAP", n_components=3))
-    interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).T
-    signature =  calculate_curvatures(interped_latents)
-    print(signature.shape)
+    new_rows = []
+    for i in range(20):
+        uniform = np.sort(np.random.uniform(0,1,500))
+        interped_latents = np.array([i(uniform) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).T
+        signature = np.concatenate((calculate_curvatures(interped_latents),uniform))
+        new_rows.append(signature)
+    new_rows = np.array(new_rows).T 
+    print(new_rows.shape)
     #sig = flatten_list(sig)
     #terms = flatten_list(terms)
-    result = pd.Series({"cell_id":cell_id})
-    for i, val in enumerate(signature):
+    result = pd.DataFrame({"cell_id":[cell_id]*20})
+    for i, val in enumerate(new_rows):
         result[f"s_{i}"] = val
     
     return result

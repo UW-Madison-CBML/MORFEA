@@ -80,15 +80,15 @@ def calculate_curvatures(trajectory):
     
     for i in range(len(trajectory)):
         if i < offset:
-            points = trajectory[i:i+(2*offset):(offset*2)//3]
+            points = trajectory[i:i+(2*offset)]
             curvatures.append(fit_circle_curvature(points))
 
         elif i >= len(trajectory) - offset:
-            points = trajectory[i-(2*offset):i:(offset*2)//3]
+            points = trajectory[i-(2*offset):i]
             curvatures.append(fit_circle_curvature(points))
 
         else:
-            points = trajectory[i-offset:i+offset:(offset*2)//3]
+            points = trajectory[i-offset:i+offset]
             curvatures.append(fit_circle_curvature(points))
     
     return np.array(curvatures)
