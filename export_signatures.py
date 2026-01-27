@@ -155,16 +155,17 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
 def get_new_row(group, cell_id):
     #(_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group, how="UMAP", n_components=3))
     new_rows = []
-    for i in range(20):
+    for i in range(50):
         uniform = np.sort(np.random.uniform(0,1,500))
-        interped_latents = np.array([i(uniform) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).T
-        signature = np.concatenate((calculate_curvatures(interped_latents),uniform))
-        new_rows.append(signature)
+        interped_latents = np.array([i(uniform) for i in get_quad_tphate_interp(group, how="PCA", n_components=10)]).T
+        #signature = np.concatenate((calculate_curvatures(interped_latents),uniform))
+        #new_rows.append(signature)
+        new_rows.append( 
     new_rows = np.array(new_rows).T 
     print(new_rows.shape)
     #sig = flatten_list(sig)
     #terms = flatten_list(terms)
-    result = pd.DataFrame({"cell_id":[cell_id]*20})
+    result = pd.DataFrame({"cell_id":[cell_id]*50})
     for i, val in enumerate(new_rows):
         result[f"s_{i}"] = val
     
