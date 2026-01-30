@@ -153,20 +153,21 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
     print(len(sig_flat))    
     return t, X_t, X_prime_t, signature, signature_terms, np.array(sig_flat)
 def get_new_row(group, cell_id):
-    #(_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group, how="UMAP", n_components=3))
-    new_rows = []
-    for i in range(50):
-        uniform = np.sort(np.random.uniform(0,1,500))
-        interped_latents = np.array([i(uniform) for i in get_quad_tphate_interp(group, how="PCA", n_components=10)]).T
-        #signature = np.concatenate((calculate_curvatures(interped_latents),uniform))
-        #new_rows.append(signature)
-        new_rows.append( 
-    new_rows = np.array(new_rows).T 
-    print(new_rows.shape)
+    #(_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group, how="FULL", n_components=0))
+    signature = np.array([i(np.linspace(0,1, 500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).flatten()
+    #new_rows = []
+    #for i in range(50):
+    #    uniform = np.sort(np.random.uniform(0,1,500))
+    #    interped_latents = np.array([i(uniform) for i in get_quad_tphate_interp(group, how="PCA", n_components=10)]).T
+    #    #signature = np.concatenate((calculate_curvatures(interped_latents),uniform))
+    #    #new_rows.append(signature)
+    #    new_rows.append( 
+    #new_rows = np.array(new_rows).T 
+    #print(new_rows.shape)
     #sig = flatten_list(sig)
     #terms = flatten_list(terms)
-    result = pd.DataFrame({"cell_id":[cell_id]*50})
-    for i, val in enumerate(new_rows):
+    result = pd.DataFrame({"cell_id":[cell_id]})
+    for i, val in enumerate(signature):
         result[f"s_{i}"] = val
     
     return result
@@ -177,6 +178,13 @@ def main(model_name):
     values = np.load(file_name+'.npy')
     if(len(keys) != values.shape[0]):
         raise ValueError("keys and values sizes do not match")
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(values)
+
+    pca = PCA(n_components=50)
+    pca.fit(X_scaled)
+
+    values = pca.transform(X_scaled) 
     lat_columns = [f"z_{i}" for i in range(values.shape[1])]
     values_df = pd.DataFrame(values, columns=lat_columns)
     df = pd.concat([keys, values_df], axis = 1)
