@@ -1,12 +1,12 @@
-import torch
 from signature_dataset import SignatureDataset
 from signature_model import SignatureClassifier
-from torch.utils.data import DataLoader
 import wandb
 import os
 import pandas as pd
 import numpy as np
 import math
+from sklearn import tree
+
 class RunningStats:
     def __init__(self):
         self.n = 0
@@ -197,15 +197,7 @@ VAL_EMBRYOS =[
     "LNA592-9",
     ]
 def main(model_name):
-    torch.cuda.empty_cache()
-    torch.autograd.detect_anomaly(True)
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    wandb.login(key=os.getenv("WANDB_KEY"))
-    run = wandb.init(
-        entity="jenslundsgaard7-uw-madison",
-        project="IVF-Training",
-    )
     
     learning_rate = 0.001
     sigs_df = pd.read_csv(os.path.abspath(f"signatures/{model_name}_sigs.csv")).rename(columns={"embryo_id":"cell_id"})
@@ -221,31 +213,23 @@ def main(model_name):
     dataset_te_val = SignatureDataset(val_df, grades_df, "TE", keep_na=True) 
     dataset_icm_val = SignatureDataset(val_df, grades_df, "ICM", keep_na=True)
     sig_size = len([i for i in sigs_df.columns if i[:2] == "s_"])
-    crit_te = torch.nn.CrossEntropyLoss()
-    crit_icm = torch.nn.CrossEntropyLoss()
-    model_te = SignatureClassifier(sig_size)
-    model_te = model_te.to(DEVICE)
-    model_icm = SignatureClassifier(sig_size)
-    model_icm = model_icm.to(DEVICE)
-    optimizer_te = torch.optim.Adam(model_te.parameters(), lr=learning_rate, weight_decay=1e-5)
-    optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=learning_rate, weight_decay=1e-5)
 
 
     loader_te = DataLoader(
         dataset_te,
-        batch_size=32,
-        shuffle=True,
+        batch_size=len(dataset_te.df),
+        shuffle=False,
         num_workers=4,
         pin_memory=True,
-        drop_last=True
+        drop_last=False
     )
     loader_icm = DataLoader(
         dataset_icm,
-        batch_size=32,
-        shuffle=True,
+        batch_size=len(dataset_icm.df),
+        shuffle=False,
         num_workers=4,
         pin_memory=True,
-        drop_last=True
+        drop_last=False
     )
     loader_te_val = DataLoader(
         dataset_te_val,
@@ -270,60 +254,43 @@ def main(model_name):
 
     print(f"TE val loader batches: {len(loader_te_val)}")
     print(f"ICM val loader batches: {len(loader_icm_val)}")
+    model_te = tree.DecisionTreeClassifier()
+    model_icm = tree.DecisionTreeClassifier()
+    clf = clf.fit(X, Y)
+    for sig, te in loader_te:
+        print(sig.shape, ", ", te.shape)
+        #label = model_te.fit(sig, te)
 
-    for epoch in range(200):
-        model_te.train(); model_icm.train()
-        for sig, te in loader_te:
-            sig = sig.to(DEVICE)
-            te = te.to(DEVICE).long()
-            label = model_te(sig)
-            loss = crit_te(label, te)
-
-            optimizer_te.zero_grad() 
-            loss.backward() 
-            optimizer_te.step()
-            run.log({"te": loss.item()})
-
-        for sig, icm in loader_icm:
-            sig = sig.to(DEVICE)
-            icm = icm.to(DEVICE).long()
-
-            label = model_icm(sig)
-            loss = crit_icm(label, icm)
-
-            optimizer_icm.zero_grad() 
-            loss.backward() 
-            optimizer_icm.step()
-            run.log({"icm": loss.item()})
-    
+    for sig, icm in loader_icm:
+        print(sig.shape, ", ", icm.shape)
+        #label = model_icm.fit(sig, icm)
+"""
     te_loss_stats = RunningStats()
     icm_loss_stats = RunningStats()
     te_acc_stats = RunningStats()
     icm_acc_stats = RunningStats()
 
-    model_te.eval(); model_icm.eval()
-    with torch.no_grad():
-        for sig, te in loader_te:
-            sig = sig.to(DEVICE)
-            te = te.to(DEVICE).long()
-            logits = model_te(sig)
-            loss = crit_te(logits, te)
-            te_loss_stats.push(loss.item())
-            
-            # Calculate accuracy
-            preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
-            te_acc_stats.push((preds == te).sum().item()/te.shape[0])
-        for sig, icm in loader_icm:
-            sig = sig.to(DEVICE)
-            icm = icm.to(DEVICE).long()
-
-            logits = model_icm(sig)
-            loss = crit_icm(logits, icm)
-            icm_loss_stats.push(loss.item())
+    for sig, te in loader_te_val:
+        sig = sig.to(DEVICE)
+        te = te.to(DEVICE).long()
+        logits = model_te(sig)
+        loss = crit_te(logits, te)
+        te_loss_stats.push(loss.item())
         
-            # Calculate accuracy
-            preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
-            icm_acc_stats.push((preds == icm).sum().item()/icm.shape[0])
+        # Calculate accuracy
+        preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
+        te_acc_stats.push((preds == te).sum().item()/te.shape[0])
+    for sig, icm in loader_icm_val:
+        sig = sig.to(DEVICE)
+        icm = icm.to(DEVICE).long()
+
+        logits = model_icm(sig)
+        loss = crit_icm(logits, icm)
+        icm_loss_stats.push(loss.item())
+    
+        # Calculate accuracy
+        preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
+        icm_acc_stats.push((preds == icm).sum().item()/icm.shape[0])
 
     print("TE: " + str(te_loss_stats.mean) + " +- " + str(te_loss_stats.std_dev))
     print("ICM: " + str(icm_loss_stats.mean) + " +- " + str(icm_loss_stats.std_dev))
@@ -335,26 +302,13 @@ def main(model_name):
     print("="*60)
     
     # Evaluate TE model
-    te_results = evaluate_model_detailed(model_te, loader_te_val, crit_te, DEVICE, "TE")
-    print_evaluation_report(te_results, "TE")
+    #te_results = evaluate_model_detailed(model_te, loader_te_val, crit_te, DEVICE, "TE")
+    #print_evaluation_report(te_results, "TE")
     
     # Evaluate ICM model
-    icm_results = evaluate_model_detailed(model_icm, loader_icm_val, crit_icm, DEVICE, "ICM")
-    print_evaluation_report(icm_results, "ICM")
-    
-    # Log to wandb
-    run.log({
-        "final_te_accuracy": te_results['accuracy'],
-        "final_te_random_baseline": te_results['random_baseline'],
-        "final_te_majority_baseline": te_results['majority_baseline'],
-        "final_te_improvement_random": te_results['improvement_over_random'],
-        "final_te_improvement_majority": te_results['improvement_over_majority'],
-        "final_icm_accuracy": icm_results['accuracy'],
-        "final_icm_random_baseline": icm_results['random_baseline'],
-        "final_icm_majority_baseline": icm_results['majority_baseline'],
-        "final_icm_improvement_random": icm_results['improvement_over_random'],
-        "final_icm_improvement_majority": icm_results['improvement_over_majority'],
-    })
+    #icm_results = evaluate_model_detailed(model_icm, loader_icm_val, crit_icm, DEVICE, "ICM")
+    #print_evaluation_report(icm_results, "ICM")
+""" 
 
 if __name__ == "__main__":
     import argparse
