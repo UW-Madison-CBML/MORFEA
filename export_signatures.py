@@ -10,6 +10,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import umap
 
+from scipy.stats import kurtosis
 def fit_circle_curvature(points, how="triangle"):
     """
     Fit a circle to 3 consecutive points and return curvature (1/radius).
@@ -154,7 +155,19 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
     return t, X_t, X_prime_t, signature, signature_terms, np.array(sig_flat)
 def get_new_row(group, cell_id):
     #(_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group, how="FULL", n_components=0))
-    signature = np.array([i(np.linspace(0,1, 500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).flatten()
+    signature = np.array([i(np.linspace(0,1, 500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).T
+
+
+    # 2. Calculate Stats along columns (axis=0)
+    # Mean: average of each column
+    means = np.mean(signature, axis=0)
+
+    # Standard Deviation (std): spread of each column (ddof=1 for sample std)
+    stds = np.std(signature, axis=0, ddof=1)
+
+    # Kurtosis: fourth central moment (fisher=True means Normal = 0)
+    kurt = kurtosis(signature, axis=0, fisher=True, bias=False)
+    signature = np.concatenate((signature.flatten(), means, stds, kurt))
     #new_rows = []
     #for i in range(50):
     #    uniform = np.sort(np.random.uniform(0,1,500))
