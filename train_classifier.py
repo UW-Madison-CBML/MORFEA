@@ -31,7 +31,7 @@ class RunningStats:
         """Returns sample standard deviation."""
         return math.sqrt(self.variance)
 
-def evaluate_model_detailed(model, loader, criterion, device, grade_name="Grade"):
+def evaluate_model_detailed(model, loader, criterion, device,keep_na=False, grade_name="Grade"):
     """Comprehensive evaluation with per-class metrics."""
     model.eval()
     
@@ -61,10 +61,10 @@ def evaluate_model_detailed(model, loader, criterion, device, grade_name="Grade"
     overall_acc = (all_preds == all_labels).mean()
     
     # Per-class metrics
-    grade_names = ["A", "B", "C"]
+    grade_names = ["A","B","C","NA"] if keep_na else ["A", "B", "C"]
     class_stats = {}
     
-    for cls in range(3):
+    for cls in range(4 if keep_na else 3):
         mask = all_labels == cls
         if mask.sum() > 0:
             class_acc = (all_preds[mask] == all_labels[mask]).mean()
@@ -82,7 +82,7 @@ def evaluate_model_detailed(model, loader, criterion, device, grade_name="Grade"
             }
     
     # Confusion matrix
-    confusion = np.zeros((3, 3), dtype=int)
+    confusion = np.zeros((4,4) if keep_na else (3, 3), dtype=int)
     for true, pred in zip(all_labels, all_preds):
         confusion[true, pred] += 1
     
@@ -110,7 +110,7 @@ def evaluate_model_detailed(model, loader, criterion, device, grade_name="Grade"
     }
 
 
-def print_evaluation_report(results, grade_type):
+def print_evaluation_report(results, grade_type, keep_na=False):
     """Pretty print evaluation results."""
     print(f"\n{'='*60}")
     print(f"{grade_type} MODEL EVALUATION")
@@ -129,7 +129,7 @@ def print_evaluation_report(results, grade_type):
     print(f"  vs Majority: {results['improvement_over_majority']:.1f}% of possible improvement")
     
     print(f"\nPer-Class Performance:")
-    for grade in ["A", "B", "C"]:
+    for grade in ["A","B","C", "NA"] if keep_na else ["A", "B", "C"]:
         stats = results['class_stats'][grade]
         print(f"  Grade {grade}: {stats['accuracy']:.1%} "
               f"({stats['count']:3d} samples, {stats['percentage']:.1%} of dataset)")
@@ -303,7 +303,7 @@ def main(model_name):
 
     model_te.eval(); model_icm.eval()
     with torch.no_grad():
-        for sig, te in loader_te:
+        for sig, te in loader_te_val:
             sig = sig.to(DEVICE)
             te = te.to(DEVICE).long()
             logits = model_te(sig)
@@ -313,7 +313,7 @@ def main(model_name):
             # Calculate accuracy
             preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
             te_acc_stats.push((preds == te).sum().item()/te.shape[0])
-        for sig, icm in loader_icm:
+        for sig, icm in loader_icm_val:
             sig = sig.to(DEVICE)
             icm = icm.to(DEVICE).long()
 
@@ -335,12 +335,10 @@ def main(model_name):
     print("="*60)
     
     # Evaluate TE model
-    te_results = evaluate_model_detailed(model_te, loader_te_val, crit_te, DEVICE, "TE")
-    print_evaluation_report(te_results, "TE")
+    te_results = evaluate_model_detailed(model_te, loader_te_val, crit_te, DEVICE, "TE", keep_na=True)
     
     # Evaluate ICM model
-    icm_results = evaluate_model_detailed(model_icm, loader_icm_val, crit_icm, DEVICE, "ICM")
-    print_evaluation_report(icm_results, "ICM")
+    icm_results = evaluate_model_detailed(model_icm, loader_icm_val, crit_icm, DEVICE, "ICM", keep_na=True)
     
     # Log to wandb
     run.log({

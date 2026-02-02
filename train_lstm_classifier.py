@@ -7,6 +7,31 @@ import os
 import pandas as pd
 import numpy as np
 import math
+from torch.nn.utils.rnn import pad_sequence
+
+def collate_fn_padd(batch):
+    # 'batch' is a list of tuples (sequence, label)
+    # Assume sequences are 1D tensors for simplicity, e.g., torch.tensor([1, 2, 3])
+
+    # Separate sequences and labels
+    sequences = [item[0] for item in batch]
+    labels = torch.tensor([item[1] for item in batch], dtype=torch.float32)
+
+    # Get original lengths
+    lengths = torch.tensor([s.shape[0] for s in sequences], dtype=torch.long)
+
+    # Pad the sequences to the maximum length in the batch.
+    # batch_first=True makes the output tensor shape (batch_size, max_length, feature_dim)
+    # The default padding_value is 0.0
+    padded_sequences = pad_sequence(sequences, batch_first=True, padding_value=0)
+
+    # Note: It's important to sort the batch by length in descending order for
+    # pack_padded_sequence to work correctly.
+    lengths, sorted_idx = lengths.sort(descending=True)
+    padded_sequences = padded_sequences[sorted_idx]
+    labels = labels[sorted_idx]
+
+    return padded_sequences, labels, lengths
 VAL_EMBRYOS =[
     "RG434-11",
     "RC1103-1",
@@ -118,38 +143,42 @@ def main(model_name):
 
     loader_te = DataLoader(
         dataset_te,
-        batch_size=1,
-        shuffle=False,
+        batch_size=10,
+        shuffle=True,
         num_workers=4,
         pin_memory=True,
-        drop_last=False)
+        drop_last=False,
+        collate_fn=collate_fn_padd)
     loader_icm = DataLoader(
         dataset_icm,
-        batch_size=1,
-        shuffle=False,
+        batch_size=10,
+        shuffle=True,
         num_workers=4,
         pin_memory=True,
-        drop_last=False)
+        drop_last=False, collate_fn=collate_fn_padd)
     loader_te_val = DataLoader(
         dataset_te_val,
         batch_size=1,
         shuffle=False,
         num_workers=4,
         pin_memory=True,
-        drop_last=False)
+        drop_last=False, collate_fn=collate_fn_padd)
     loader_icm_val = DataLoader(
         dataset_icm_val,
         batch_size=1,
         shuffle=False,
         num_workers=4,
         pin_memory=True,
-        drop_last=False)
+        drop_last=False, collate_fn=collate_fn_padd)
 
     for epoch in range(20):
         model_te.train(); model_icm.train()
         for sig, te in loader_te:
-            sig = sig.squeeze().to(DEVICE)
-            te = te.squeeze().to(DEVICE).long()
+            sig = sig.to(DEVICE).view(10,-1, lat_size)
+            te = te.to(DEVICE).long()
+            if -1 in te:
+                continue 
+            print(sig.shape)
             label = model_te(sig)
             loss = crit_te(label, te)
 
@@ -159,9 +188,12 @@ def main(model_name):
             run.log({"te": loss.item()})
 
         for sig, icm in loader_icm:
-            sig = sig.squeeze().to(DEVICE)
-            icm = icm.squeeze().to(DEVICE).long()
-
+            sig = sig.to(DEVICE).view(10,-1, lat_size)
+            icm = icm.to(DEVICE).long()
+            if -1 in icm:
+                continue
+            
+            print(sig.shape)
             label = model_icm(sig)
             loss = crit_icm(label, icm)
 
