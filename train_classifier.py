@@ -209,7 +209,7 @@ def main(model_name):
     
     learning_rate = 0.001
     sigs_df = pd.read_csv(os.path.abspath(f"signatures/{model_name}_sigs.csv")).rename(columns={"embryo_id":"cell_id"})
-    grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"))
+    grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"), keep_default_na=False)
     mask = sigs_df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = sigs_df[mask]
     print(len(val_df)/len(sigs_df))
@@ -223,9 +223,9 @@ def main(model_name):
     sig_size = len([i for i in sigs_df.columns if i[:2] == "s_"])
     crit_te = torch.nn.CrossEntropyLoss()
     crit_icm = torch.nn.CrossEntropyLoss()
-    model_te = SignatureClassifier(sig_size)
+    model_te = SignatureClassifier(sig_size, keep_na=True)
     model_te = model_te.to(DEVICE)
-    model_icm = SignatureClassifier(sig_size)
+    model_icm = SignatureClassifier(sig_size, keep_na=True)
     model_icm = model_icm.to(DEVICE)
     optimizer_te = torch.optim.Adam(model_te.parameters(), lr=learning_rate, weight_decay=1e-5)
     optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=learning_rate, weight_decay=1e-5)
