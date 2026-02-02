@@ -12,8 +12,6 @@ if [ -f "api_keys.txt" ]; then
     echo "HuggingFace token loaded from api_keys.txt"
 fi
 ls -lh
-# Run export script
-echo "Running export_latents.py..."
 
 python train_lstm_classifier.py --name "$1"
 

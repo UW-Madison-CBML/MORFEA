@@ -7,6 +7,51 @@ import os
 import pandas as pd
 import numpy as np
 import math
+VAL_EMBRYOS =[
+    "RG434-11",
+    "RC1103-1",
+    "LV488-7",
+    "QC211-6",
+    "BM016-2",
+    "LM184-3",
+    "RMN410-3",
+    "PA145-1",
+    "RO793-2",
+    "PV361-2",
+    "RC755-7",
+    "VC581-3",
+    "VC581-11",
+    "ADM715-1-2",
+    "LS1045-4",
+    "GA800-4",
+    "GJ191-1",
+    "JV227-2",
+    "LA367-4",
+    "BN356-6",
+    "TN611-7",
+    "AHS115-5",
+    "LCF544-2",
+    "JV227-5",
+    "CAV074-8",
+    "AL702-9",
+    "VH99-3",
+    "GE218-3",
+    "CC455-3",
+    "DA1054-5",
+    "ME378-4",
+    "BA560-1",
+    "PA145-2",
+    "DSM138-5",
+    "FN852-1",
+    "TJ297-4",
+    "RC755-9",
+    "PA289-8",
+    "LS93-8",
+    "GA817-1-8",
+    "AM918-2-5",
+    "LNA592-9",
+    ]
+
 class RunningStats:
     def __init__(self):
         self.n = 0
@@ -56,8 +101,8 @@ def main(model_name):
     latents_df = latents_df[~mask]
 
 
-    dataset_te = GradeLSTMDataset(sigs_df, grades_df, "TE", keep_na=True) 
-    dataset_icm = GradeLSTMDataset(sigs_df, grades_df, "ICM", keep_na=True)
+    dataset_te = GradeLSTMDataset(latents_df, grades_df, "TE", keep_na=True) 
+    dataset_icm = GradeLSTMDataset(latents_df, grades_df, "ICM", keep_na=True)
     dataset_te_val = GradeLSTMDataset(val_df, grades_df, "TE", keep_na=True) 
     dataset_icm_val = GradeLSTMDataset(val_df, grades_df, "ICM", keep_na=True)
     lat_size = len(lat_cols)
@@ -154,4 +199,13 @@ def main(model_name):
     print("TE Acc: " + str(te_acc_stats.mean) + " +- " + str(te_acc_stats.std_dev))
     print("ICM Acc: " + str(icm_acc_stats.mean) + " +- " + str(icm_acc_stats.std_dev))
 
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="A simple script using argparse to greet a user.")
 
+
+    parser.add_argument("--name", help="Model name. Must have already exported latents")
+
+    args = parser.parse_args()
+
+    main(args.name)
