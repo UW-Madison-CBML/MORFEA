@@ -10,28 +10,21 @@ import math
 from torch.nn.utils.rnn import pad_sequence
 
 def collate_fn_padd(batch):
-    # 'batch' is a list of tuples (sequence, label)
-    # Assume sequences are 1D tensors for simplicity, e.g., torch.tensor([1, 2, 3])
-
-    # Separate sequences and labels
-    sequences = [item[0] for item in batch]
-    labels = torch.tensor([item[1] for item in batch], dtype=torch.float32)
-
-    # Get original lengths
-    lengths = torch.tensor([s.shape[0] for s in sequences], dtype=torch.long)
-
-    # Pad the sequences to the maximum length in the batch.
-    # batch_first=True makes the output tensor shape (batch_size, max_length, feature_dim)
-    # The default padding_value is 0.0
-    padded_sequences = pad_sequence(sequences, batch_first=True, padding_value=0)
-
-    # Note: It's important to sort the batch by length in descending order for
-    # pack_padded_sequence to work correctly.
-    lengths, sorted_idx = lengths.sort(descending=True)
-    padded_sequences = padded_sequences[sorted_idx]
-    labels = labels[sorted_idx]
-
-    return padded_sequences, labels, lengths
+    # batch is [(tensor1, label1), (tensor2, label2), ...]
+    signals = [item[0] for item in batch]
+    targets = [item[1] for item in batch]
+    
+    # Calculate original lengths before padding
+    lengths = torch.tensor([len(s) for s in signals])
+    
+    # Pad the signals
+    signals_padded = torch.nn.utils.rnn.pad_sequence(
+        signals, batch_first=True, padding_value=0.0
+    )
+    
+    targets = torch.tensor(targets)
+    
+    return signals_padded, targets, lengths # Return all three
 VAL_EMBRYOS =[
     "RG434-11",
     "RC1103-1",
@@ -173,13 +166,13 @@ def main(model_name):
 
     for epoch in range(20):
         model_te.train(); model_icm.train()
-        for sig, te in loader_te:
+        for sig, te, lengths in loader_te:
             sig = sig.to(DEVICE).view(10,-1, lat_size)
             te = te.to(DEVICE).long()
             if -1 in te:
                 continue 
             print(sig.shape)
-            label = model_te(sig)
+            label = model_te(sig, lengths)
             loss = crit_te(label, te)
 
             optimizer_te.zero_grad() 
@@ -187,14 +180,14 @@ def main(model_name):
             optimizer_te.step()
             run.log({"te": loss.item()})
 
-        for sig, icm in loader_icm:
+        for sig, icm, lengths in loader_icm:
             sig = sig.to(DEVICE).view(10,-1, lat_size)
             icm = icm.to(DEVICE).long()
             if -1 in icm:
                 continue
             
             print(sig.shape)
-            label = model_icm(sig)
+            label = model_icm(sig, lengths)
             loss = crit_icm(label, icm)
 
             optimizer_icm.zero_grad() 
