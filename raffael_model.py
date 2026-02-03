@@ -151,6 +151,9 @@ class Encoder(nn.Module):
         # Input: (B*T, compress_size)
         # Output: (B*T, latent_size)
         self.latent_compress = nn.Linear(compress_size, latent_size)
+        self.lin1 = nn.Linear(latent_size)
+        self.lin2 = nn.Linear(latent_size)
+        self.lin3 = nn.Linear(latent_size)
 
     def forward(self, x):
         """
@@ -187,6 +190,7 @@ class Encoder(nn.Module):
         h_flat = self.dropout(h_flat)  # Apply dropout
         z_compressed = self.latent_compress(h_flat)  # (B*T, latent_size)
         z_compressed = torch.nn.functional.relu(z_compressed)
+        z_compressed = F.relu(self.lin3(F.relu(self.lin2(F.relu(self.lin1(z_compressed)))))) 
         z_seq = z_compressed.view(B, T, self.latent_size)  # (B, T, latent_size)
 
         # Take last timestep
@@ -213,7 +217,7 @@ class Decoder(nn.Module):
         self.use_convlstm = use_convlstm
 
         # If using latent split, we only use half the latent for reconstruction
-        effective_latent_size = latent_size // 2 if use_latent_split else latent_size
+        effective_latent_size = latent_size // 4 if use_latent_split else latent_size
 
         # Linear layer to expand compressed latent to spatial dimensions
         # Input: (B*T, effective_latent_size)
@@ -292,7 +296,7 @@ class Decoder(nn.Module):
 
         # If using latent split, select which half to use
         if self.use_latent_split and empty_well:
-            z_seq = z_seq[:, :, :L//2]  # First half for empty wells
+            z_seq = z_seq[:, :, :L//4]  # First half for empty wells
             
             # Expand compressed latent to spatial dimensions
             z_flat = z_seq.view(B * T, -1)  # (B*T, effective_latent_size)
