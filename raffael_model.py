@@ -234,12 +234,19 @@ class Decoder(nn.Module):
                 batch_first=True,
                 return_all_layers=False
             )
-            # Spatial decoder input channels
+            self.convlstm_empty = ConvLSTM(
+                input_dim=latent_dim,
+                hidden_dim=hidden_dim,
+                kernel_size=(3, 3),
+                num_layers=num_layers,
+                batch_first=True,
+                return_all_layers=False
+            )
             spatial_input_channels = hidden_dim
+
         else:
             # No ConvLSTM - just pass through expanded latent
             self.convlstm = None
-            # Spatial decoder input channels
             spatial_input_channels = latent_dim
 
         # Spatial decoding with residual connections: 16x16 -> 32x32 -> 64x64 -> 128x128
@@ -257,7 +264,21 @@ class Decoder(nn.Module):
             nn.Conv2d(32, 1, kernel_size=3, padding=1),
             nn.Sigmoid()  # Assume pixels normalized to [0,1]
         )
+        # Spatial decoding with residual connections: 16x16 -> 32x32 -> 64x64 -> 128x128
+        self.spatial_decoder_empty = nn.Sequential(
+            # 16 -> 32 (with upsampling)
+            ResidualUpBlock(spatial_input_channels, 128, use_residual=use_residual, use_batchnorm=use_batchnorm),
 
+            # 32 -> 64 (with upsampling)
+            ResidualUpBlock(128, 64, use_residual=use_residual, use_batchnorm=use_batchnorm),
+
+            # 64 -> 128 (with upsampling)
+            ResidualUpBlock(64, 32, use_residual=use_residual, use_batchnorm=use_batchnorm),
+
+            # Final output layer
+            nn.Conv2d(32, 1, kernel_size=3, padding=1),
+            nn.Sigmoid()  # Assume pixels normalized to [0,1]
+        )
     def forward(self, z_seq, empty_well=False):
         """
         Args:
@@ -270,32 +291,48 @@ class Decoder(nn.Module):
         B, T, L = z_seq.shape
 
         # If using latent split, select which half to use
-        if self.use_latent_split:
-            if empty_well:
-                z_seq = z_seq[:, :, :L//2]  # First half for empty wells
+        if self.use_latent_split and empty_well:
+            z_seq = z_seq[:, :, :L//2]  # First half for empty wells
+            
+            # Expand compressed latent to spatial dimensions
+            z_flat = z_seq.view(B * T, -1)  # (B*T, effective_latent_size)
+            z_expanded = self.latent_expand_empty(F.relu(self.lin2_empty(F.relu(self.lin1_empty(z_flat)))))
+            z_expanded = torch.nn.functional.relu(z_expanded)
+            z_spatial = z_expanded.view(B, T, self.latent_dim, 16, 16)  # (B, T, latent_dim, 16, 16)
+
+            if self.use_convlstm:
+                # ConvLSTM decodes temporal dimension
+                lstm_out, _ = self.convlstm_empty(z_spatial)  # list of (B, T, hidden_dim, 16, 16)
+                h_seq = lstm_out[0]                 # (B, T, hidden_dim, 16, 16)
             else:
-                z_seq = z_seq  # Second half for embryos
+                # No temporal processing - just pass through expanded latent
+                h_seq = z_spatial  # (B, T, latent_dim, 16, 16)
 
-        # Expand compressed latent to spatial dimensions
-        z_flat = z_seq.view(B * T, -1)  # (B*T, effective_latent_size)
-        z_expanded = self.latent_expand_empty(F.relu(self.lin2_empty(F.relu(self.lin1_empty(z_flat))))) if self.use_latent_split and empty_well else self.latent_expand(F.relu(self.lin2(F.relu(self.lin1(z_flat)))))
-        z_expanded = torch.nn.functional.relu(z_expanded)
-        z_spatial = z_expanded.view(B, T, self.latent_dim, 16, 16)  # (B, T, latent_dim, 16, 16)
-
-        if self.use_convlstm:
-            # ConvLSTM decodes temporal dimension
-            lstm_out, _ = self.convlstm(z_spatial)  # list of (B, T, hidden_dim, 16, 16)
-            h_seq = lstm_out[0]                 # (B, T, hidden_dim, 16, 16)
+            # Spatial decoding: process each timestep separately
+            B, T, C, H, W = h_seq.shape
+            h_seq = h_seq.view(B * T, C, H, W)  # (B*T, C, 16, 16)
+            x_rec = self.spatial_decoder_empty(h_seq)  # (B*T, 1, 128, 128)
+            x_rec = x_rec.view(B, T, 1, 128, 128)  # (B, T, 1, 128, 128)
         else:
-            # No temporal processing - just pass through expanded latent
-            h_seq = z_spatial  # (B, T, latent_dim, 16, 16)
+            z_seq = z_seq  # Whole vec for embryos
+            z_flat = z_seq.view(B * T, -1)  # (B*T, effective_latent_size)
+            z_expanded = self.latent_expand(F.relu(self.lin2(F.relu(self.lin1(z_flat)))))
+            z_expanded = torch.nn.functional.relu(z_expanded)
+            z_spatial = z_expanded.view(B, T, self.latent_dim, 16, 16)  # (B, T, latent_dim, 16, 16)
 
-        # Spatial decoding: process each timestep separately
-        B, T, C, H, W = h_seq.shape
-        h_seq = h_seq.view(B * T, C, H, W)  # (B*T, C, 16, 16)
-        x_rec = self.spatial_decoder(h_seq)  # (B*T, 1, 128, 128)
-        x_rec = x_rec.view(B, T, 1, 128, 128)  # (B, T, 1, 128, 128)
+            if self.use_convlstm:
+                # ConvLSTM decodes temporal dimension
+                lstm_out, _ = self.convlstm(z_spatial)  # list of (B, T, hidden_dim, 16, 16)
+                h_seq = lstm_out[0]                 # (B, T, hidden_dim, 16, 16)
+            else:
+                # No temporal processing - just pass through expanded latent
+                h_seq = z_spatial  # (B, T, latent_dim, 16, 16)
 
+            # Spatial decoding: process each timestep separately
+            B, T, C, H, W = h_seq.shape
+            h_seq = h_seq.view(B * T, C, H, W)  # (B*T, C, 16, 16)
+            x_rec = self.spatial_decoder(h_seq)  # (B*T, 1, 128, 128)
+            x_rec = x_rec.view(B, T, 1, 128, 128)  # (B, T, 1, 128, 128)
         return x_rec
 
 
