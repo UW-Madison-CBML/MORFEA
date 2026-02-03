@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "Installing dependencies..."
-pip install safetensors wandb sklearn
+pip install safetensors wandb sklearn seaborn
 mkdir clusters
 # Extract dataset
 echo "Extracting dataset..."
