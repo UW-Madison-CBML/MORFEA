@@ -136,38 +136,38 @@ def main(model_name):
 
     loader_te = DataLoader(
         dataset_te,
-        batch_size=10,
+        batch_size=32,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
-        drop_last=False,
+        drop_last=True,
         collate_fn=collate_fn_padd)
     loader_icm = DataLoader(
         dataset_icm,
-        batch_size=10,
+        batch_size=32,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
-        drop_last=False, collate_fn=collate_fn_padd)
+        drop_last=True, collate_fn=collate_fn_padd)
     loader_te_val = DataLoader(
         dataset_te_val,
         batch_size=1,
         shuffle=False,
         num_workers=4,
         pin_memory=True,
-        drop_last=False, collate_fn=collate_fn_padd)
+        drop_last=True, collate_fn=collate_fn_padd)
     loader_icm_val = DataLoader(
         dataset_icm_val,
         batch_size=1,
         shuffle=False,
         num_workers=4,
         pin_memory=True,
-        drop_last=False, collate_fn=collate_fn_padd)
+        drop_last=True, collate_fn=collate_fn_padd)
 
     for epoch in range(20):
         model_te.train(); model_icm.train()
         for sig, te, lengths in loader_te:
-            sig = sig.to(DEVICE).view(10,-1, lat_size)
+            sig = sig.to(DEVICE).view(32,-1, lat_size)
             te = te.to(DEVICE).long()
             if -1 in te:
                 continue 
@@ -181,7 +181,7 @@ def main(model_name):
             run.log({"te": loss.item()})
 
         for sig, icm, lengths in loader_icm:
-            sig = sig.to(DEVICE).view(10,-1, lat_size)
+            sig = sig.to(DEVICE).view(32,-1, lat_size)
             icm = icm.to(DEVICE).long()
             if -1 in icm:
                 continue

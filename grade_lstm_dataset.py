@@ -34,11 +34,11 @@ class GradeLSTMDataset(Dataset):
 
     def __getitem__(self, idx):
         grade_options = ["A", "B", "C", "NA"] if self.keep_na else ["A","B","C"]
-        embryo_id = self.df.iloc[max(0,idx-1)]["embryo_id"]
-        rows = self.df.iloc[:idx][self.df["embryo_id"] == embryo_id]
+        embryo_id = self.df.iloc[idx]["embryo_id"]
+        rows = self.df.iloc[:idx+1][self.df["embryo_id"] == embryo_id]
         lat_seq = rows[[i for i in self.df.columns.tolist() if i[:2] == "z_"]].to_numpy(dtype=np.float32)
         lat_seq = (lat_seq - self.mean) / self.std
-        grade_index = grade_options.index(rows.iloc[-1][self.grade]) if len(rows) != 0 else -1
+        grade_index = grade_options.index(rows.iloc[-1][self.grade])
         return torch.from_numpy(lat_seq.astype(np.float32)), torch.tensor(grade_index)
 
     def __len__(self):
