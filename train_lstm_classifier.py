@@ -202,21 +202,21 @@ def main(model_name):
 
     model_te.eval(); model_icm.eval()
     with torch.no_grad():
-        for sig, te in loader_te_val:
+        for sig, te, lengths in loader_te_val:
             sig = sig.to(DEVICE)
             te = te.to(DEVICE).long()
-            logits = model_te(sig)
+            logits = model_te(sig, lengths)
             loss = crit_te(logits, te)
             te_loss_stats.push(loss.item())
             
             # Calculate accuracy
             preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
             te_acc_stats.push((preds == te).sum().item()/te.shape[0])
-        for sig, icm in loader_icm_val:
+        for sig, icm, lengths in loader_icm_val:
             sig = sig.to(DEVICE)
             icm = icm.to(DEVICE).long()
 
-            logits = model_icm(sig)
+            logits = model_icm(sig, lengths)
             loss = crit_icm(logits, icm)
             icm_loss_stats.push(loss.item())
     print("TE: " + str(te_loss_stats.mean) + " +- " + str(te_loss_stats.std_dev))
