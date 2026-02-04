@@ -472,9 +472,9 @@ ABLATION STUDY CONFIGURATION
         pin_memory=True,
         drop_last=False  # Don't drop last for validation
     )
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * 10)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * 20)
 
-    for epoch in range(10):
+    for epoch in range(20):
         model.train()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
