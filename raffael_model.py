@@ -151,9 +151,9 @@ class Encoder(nn.Module):
         # Input: (B*T, compress_size)
         # Output: (B*T, latent_size)
         self.latent_compress = nn.Linear(compress_size, latent_size)
-        self.lin1 = nn.Linear(latent_size)
-        self.lin2 = nn.Linear(latent_size)
-        self.lin3 = nn.Linear(latent_size)
+        self.lin1 = nn.Linear(latent_size, latent_size)
+        self.lin2 = nn.Linear(latent_size,latent_size)
+        self.lin3 = nn.Linear(latent_size,latent_size)
 
     def forward(self, x):
         """
