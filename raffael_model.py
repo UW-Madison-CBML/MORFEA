@@ -523,7 +523,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
             # If using latent split, return only the relevant half
             if self.use_latent_split:
                 if empty_well:
-                    return x_rec, z_seq[:, :, :self.latent_size//2]
+                    return x_rec, z_seq[:, :, :self.latent_size//4]
                 else:
                     return x_rec, z_seq
             else:
