@@ -156,15 +156,14 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
 def get_new_row(group, cell_id):
     #(_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group, how="FULL", n_components=0))
     #signature = np.array([i(np.linspace(0,1, 500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).flatten()
-    signature = group[:-50,:].flatten()
+    #signature = group[:-50,:].flatten()
 
 
     # Kurtosis: fourth central moment (fisher=True means Normal = 0)
     #new_rows = []
     #for i in range(50):
-    #    uniform = np.sort(np.random.uniform(0,1,500))
-    #    interped_latents = np.array([i(uniform) for i in get_quad_tphate_interp(group, how="PCA", n_components=10)]).T
-    #    #signature = np.concatenate((calculate_curvatures(interped_latents),uniform))
+    interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T
+    signature = np.array(calculate_curvatures(interped_latents))
     #    #new_rows.append(signature)
     #    new_rows.append( 
     #new_rows = np.array(new_rows).T 
@@ -183,13 +182,13 @@ def main(model_name):
     values = np.load(file_name+'.npy')
     if(len(keys) != values.shape[0]):
         raise ValueError("keys and values sizes do not match")
-    scaler = StandardScaler()
+    """scaler = StandardScaler()
     X_scaled = scaler.fit_transform(values)
 
     pca = PCA(n_components=100)
     pca.fit(X_scaled)
 
-    values = pca.transform(X_scaled) 
+    values = pca.transform(X_scaled)""" 
     lat_columns = [f"z_{i}" for i in range(values.shape[1])]
     values_df = pd.DataFrame(values, columns=lat_columns)
     df = pd.concat([keys, values_df], axis = 1)
