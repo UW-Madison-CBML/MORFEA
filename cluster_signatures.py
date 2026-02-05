@@ -19,6 +19,7 @@ def main(model_name):
         raise ValueError("no embryo_id column")
     sig_cols = [col for col in sig_df.columns if col.startswith("s_")]
     df = sig_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", "TE"] + sig_cols].dropna(subset=["TE"])
+    # Assuming df is your dataframe with features s_0, s_1, ... and a TE column with grades
 
     # Extract feature columns (assuming they start with 's_')
     feature_cols = [col for col in df.columns if col.startswith('s_')]
@@ -28,9 +29,39 @@ def main(model_name):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # Perform KMeans clustering into 3 groups
-    kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
-    clusters = kmeans.fit_predict(X_scaled)
+    # Try multiple clustering algorithms
+
+    from sklearn.cluster import AgglomerativeClustering
+    from sklearn.metrics import silhouette_score
+
+    results = {}
+
+    # 1. KMeans with k=3
+    kmeans = KMeans(n_clusters=3, random_state=42, n_init=20)
+    clusters_kmeans = kmeans.fit_predict(X_scaled)
+    results['KMeans'] = (clusters_kmeans, silhouette_score(X_scaled, clusters_kmeans))
+
+    # 2. Hierarchical clustering with different linkages
+    for linkage in ['ward', 'complete', 'average']:
+        hierarchical = AgglomerativeClustering(n_clusters=3, linkage=linkage)
+        clusters_hier = hierarchical.fit_predict(X_scaled)
+        results[f'Hierarchical ({linkage})'] = (clusters_hier, silhouette_score(X_scaled, clusters_hier))
+
+    # 3. KMeans with k=4 (sometimes more clusters reveal better structure)
+    kmeans_4 = KMeans(n_clusters=4, random_state=42, n_init=20)
+    clusters_kmeans_4 = kmeans_4.fit_predict(X_scaled)
+    results['KMeans (k=4)'] = (clusters_kmeans_4, silhouette_score(X_scaled, clusters_kmeans_4))
+
+    # Pick the algorithm with the best silhouette score
+    best_algo_name, (clusters, best_score) = max(results.items(), key=lambda x: x[1][1])
+
+    print(f"\nClustering Results:")
+    for algo, (clust, score) in results.items():
+        n_clust = len(set(clust)) - (1 if -1 in clust else 0)
+        cluster_counts = pd.Series(clust).value_counts().sort_index().to_dict()
+        print(f"{algo}: {n_clust} clusters, Silhouette: {score:.3f}, Distribution: {cluster_counts}")
+
+    print(f"\n✓ Using {best_algo_name} (best score: {best_score:.3f})")
 
     # Add cluster assignments to the dataframe
     df['Cluster'] = clusters
@@ -68,7 +99,7 @@ def main(model_name):
     axes[1].legend(handles=legend_elements, loc='best')
 
     plt.tight_layout()
-    plt.savefig('clusters/clustering_comparison.png', dpi=300, bbox_inches='tight')
+    plt.savefig('clustering_comparison.png', dpi=300, bbox_inches='tight')
     print("Plot saved as 'clustering_comparison.png'")
 
     # Optional: Print a confusion-style matrix showing cluster vs grade distribution
@@ -87,7 +118,6 @@ def main(model_name):
     ari = adjusted_rand_score(grade_numeric, clusters)
     print(f"Adjusted Rand Index (cluster vs grade): {ari:.3f}")
     print("(Ranges from -1 to 1; higher means better agreement)")
-        
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="A simple script using argparse to greet a user.")
