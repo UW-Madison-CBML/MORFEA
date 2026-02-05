@@ -155,7 +155,8 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
     return t, X_t, X_prime_t, signature, signature_terms, np.array(sig_flat)
 def get_new_row(group, cell_id):
     #(_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group, how="FULL", n_components=0))
-    signature = np.array([i(np.linspace(0,1, 500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).flatten()
+    #signature = np.array([i(np.linspace(0,1, 500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).flatten()
+    signature = group[:-50,:].flatten()
 
 
     # Kurtosis: fourth central moment (fisher=True means Normal = 0)
@@ -185,7 +186,7 @@ def main(model_name):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(values)
 
-    pca = PCA(n_components=50)
+    pca = PCA(n_components=100)
     pca.fit(X_scaled)
 
     values = pca.transform(X_scaled) 
