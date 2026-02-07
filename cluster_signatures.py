@@ -19,105 +19,90 @@ def main(model_name):
         raise ValueError("no embryo_id column")
     sig_cols = [col for col in sig_df.columns if col.startswith("s_")]
     df = sig_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", "TE"] + sig_cols].dropna(subset=["TE"])
-    # Assuming df is your dataframe with features s_0, s_1, ... and a TE column with grades
-
-    # Extract feature columns (assuming they start with 's_')
     feature_cols = [col for col in df.columns if col.startswith('s_')]
     X = df[feature_cols].values
+    grades = df['TE'].values
 
-    # Standardize the features (important for KMeans)
+    print(f"Dataset: {len(df)} rows, {len(feature_cols)} features")
+    print(f"Grade distribution: {dict(pd.Series(grades).value_counts().sort_index())}")
+
+    # Standardize
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # Try multiple clustering algorithms
+    print("\n=== DIAGNOSTIC ANALYSIS ===\n")
 
-    from sklearn.cluster import AgglomerativeClustering
-    from sklearn.metrics import silhouette_score
+    # 1. Feature statistics by grade
+    print("Feature statistics by grade:")
+    for grade in sorted(set(grades)):
+        mask = grades == grade
+        grade_features = X[mask]
+        print(f"\nGrade {grade} (n={sum(mask)}):")
+        print(f"  Mean: {grade_features.mean():.4f}")
+        print(f"  Std:  {grade_features.std():.4f}")
+        print(f"  Min:  {grade_features.min():.4f}")
+        print(f"  Max:  {grade_features.max():.4f}")
 
-    results = {}
+    # 2. Can supervised learning predict grades?
+    print("\n\nCan we predict grades from features?")
+    rf = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+    scores = cross_val_score(rf, X_scaled, grades, cv=5)
+    baseline_accuracy = max(pd.Series(grades).value_counts()) / len(grades)
+    print(f"Random Forest CV accuracy: {scores.mean():.3f} (+/- {scores.std():.3f})")
+    print(f"Baseline (always predict majority): {baseline_accuracy:.3f}")
+    print(f"Improvement: {scores.mean() - baseline_accuracy:.3f}")
+    if scores.mean() - baseline_accuracy < 0.05:
+        print("⚠️  Features barely predict grades better than guessing!")
 
-    # 1. KMeans with k=3
-    kmeans = KMeans(n_clusters=3, random_state=42, n_init=20)
-    clusters_kmeans = kmeans.fit_predict(X_scaled)
-    results['KMeans'] = (clusters_kmeans, silhouette_score(X_scaled, clusters_kmeans))
+    # 3. Feature importance
+    rf.fit(X_scaled, grades)
+    importances = pd.DataFrame({
+        'feature': feature_cols,
+        'importance': rf.feature_importances_
+    }).sort_values('importance', ascending=False)
+    print(f"\nTop 10 most important features:")
+    print(importances.head(10).to_string(index=False))
 
-    # 2. Hierarchical clustering with different linkages
-    for linkage in ['ward', 'complete', 'average']:
-        hierarchical = AgglomerativeClustering(n_clusters=3, linkage=linkage)
-        clusters_hier = hierarchical.fit_predict(X_scaled)
-        results[f'Hierarchical ({linkage})'] = (clusters_hier, silhouette_score(X_scaled, clusters_hier))
-
-    # 3. KMeans with k=4 (sometimes more clusters reveal better structure)
-    kmeans_4 = KMeans(n_clusters=4, random_state=42, n_init=20)
-    clusters_kmeans_4 = kmeans_4.fit_predict(X_scaled)
-    results['KMeans (k=4)'] = (clusters_kmeans_4, silhouette_score(X_scaled, clusters_kmeans_4))
-
-    # Pick the algorithm with the best silhouette score
-    best_algo_name, (clusters, best_score) = max(results.items(), key=lambda x: x[1][1])
-
-    print(f"\nClustering Results:")
-    for algo, (clust, score) in results.items():
-        n_clust = len(set(clust)) - (1 if -1 in clust else 0)
-        cluster_counts = pd.Series(clust).value_counts().sort_index().to_dict()
-        print(f"{algo}: {n_clust} clusters, Silhouette: {score:.3f}, Distribution: {cluster_counts}")
-
-    print(f"\n✓ Using {best_algo_name} (best score: {best_score:.3f})")
-
-    # Add cluster assignments to the dataframe
-    df['Cluster'] = clusters
-
-    # Use PCA to reduce to 2D for visualization
+    # 4. Visualize with PCA
     pca = PCA(n_components=2)
     X_pca = pca.fit_transform(X_scaled)
 
-    # Create a comprehensive visualization
+    print(f"\n\nPCA: PC1 explains {pca.explained_variance_ratio_[0]:.1%}, PC2 explains {pca.explained_variance_ratio_[1]:.1%}")
+
+    # Plot
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-    # Plot 1: Clusters
-    scatter1 = axes[0].scatter(X_pca[:, 0], X_pca[:, 1], c=clusters, cmap='viridis', 
-                               s=100, alpha=0.6, edgecolors='black', linewidth=0.5)
-    axes[0].set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%} variance)')
-    axes[0].set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%} variance)')
-    axes[0].set_title('KMeans Clusters (Unsupervised)')
-    plt.colorbar(scatter1, ax=axes[0], label='Cluster')
-
-    # Plot 2: Actual grades
+    # By grade
     grade_colors = {'A': 'green', 'B': 'orange', 'C': 'red'}
-    grades = df['TE'].values
     colors = [grade_colors[g] for g in grades]
-    scatter2 = axes[1].scatter(X_pca[:, 0], X_pca[:, 1], c=colors, s=100, 
-                               alpha=0.6, edgecolors='black', linewidth=0.5)
-    axes[1].set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%} variance)')
-    axes[1].set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%} variance)')
-    axes[1].set_title('Actual Grades')
-
-    # Add legend for grades
+    axes[0].scatter(X_pca[:, 0], X_pca[:, 1], c=colors, s=20, alpha=0.5, edgecolors='none')
+    axes[0].set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%})')
+    axes[0].set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%})')
+    axes[0].set_title('Colored by Grade (A=green, B=orange, C=red)')
     from matplotlib.patches import Patch
-    legend_elements = [Patch(facecolor='green', edgecolor='black', label='A'),
-                       Patch(facecolor='orange', edgecolor='black', label='B'),
-                       Patch(facecolor='red', edgecolor='black', label='C')]
-    axes[1].legend(handles=legend_elements, loc='best')
+    legend_elements = [Patch(facecolor='green', label='A'), 
+                       Patch(facecolor='orange', label='B'),
+                       Patch(facecolor='red', label='C')]
+    axes[0].legend(handles=legend_elements)
+
+    # By cluster
+    hierarchical = AgglomerativeClustering(n_clusters=3, linkage='average')
+    clusters = hierarchical.fit_predict(X_scaled)
+    scatter = axes[1].scatter(X_pca[:, 0], X_pca[:, 1], c=clusters, cmap='viridis', s=20, alpha=0.5, edgecolors='none')
+    axes[1].set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%})')
+    axes[1].set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%})')
+    axes[1].set_title('Unsupervised Clustering (3 groups)')
+    plt.colorbar(scatter, ax=axes[1], label='Cluster')
 
     plt.tight_layout()
-    plt.savefig('clustering_comparison.png', dpi=300, bbox_inches='tight')
-    print("Plot saved as 'clustering_comparison.png'")
+    plt.savefig('diagnostic_plot.png', dpi=300, bbox_inches='tight')
+    print("\nPlot saved as 'diagnostic_plot.png'")
 
-    # Optional: Print a confusion-style matrix showing cluster vs grade distribution
-    print("\nCluster vs Grade Distribution:")
-    print(pd.crosstab(df['Cluster'], df['TE'], margins=True))
-
-    # Calculate silhouette score to assess clustering quality
-    from sklearn.metrics import silhouette_score
-    silhouette_avg = silhouette_score(X_scaled, clusters)
-    print(f"\nSilhouette Score: {silhouette_avg:.3f}")
-    print("(Score ranges from -1 to 1; higher is better, >0.5 is generally good)")
-
-    # Optional: Adjusted Rand Index if you want to measure agreement between clusters and grades
-    from sklearn.metrics import adjusted_rand_score
-    grade_numeric = pd.factorize(df['TE'])[0]  # Convert grades to numbers
-    ari = adjusted_rand_score(grade_numeric, clusters)
-    print(f"Adjusted Rand Index (cluster vs grade): {ari:.3f}")
-    print("(Ranges from -1 to 1; higher means better agreement)")
+    print("\n=== SUMMARY ===")
+    print("If the left plot (grades) shows no clear color separation,")
+    print("and the right plot (clusters) doesn't match it,")
+    print("then your features simply don't encode grade information.")
+    print("Unsupervised clustering can't find what isn't there.")
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="A simple script using argparse to greet a user.")
