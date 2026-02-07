@@ -19,90 +19,90 @@ def main(model_name):
         raise ValueError("no embryo_id column")
     sig_cols = [col for col in sig_df.columns if col.startswith("s_")]
     df = sig_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", "TE"] + sig_cols].dropna(subset=["TE"])
+
+    # Extract features
     feature_cols = [col for col in df.columns if col.startswith('s_')]
     X = df[feature_cols].values
     grades = df['TE'].values
 
-    print(f"Dataset: {len(df)} rows, {len(feature_cols)} features")
-    print(f"Grade distribution: {dict(pd.Series(grades).value_counts().sort_index())}")
+    print(f"Starting with {X.shape[0]} samples, {X.shape[1]} features\n")
 
     # Standardize
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    print("\n=== DIAGNOSTIC ANALYSIS ===\n")
+    # Strategy 1: Use only the most informative features
+    print("=== STRATEGY 1: Feature Selection ===")
+    selector = SelectKBest(f_classif, k=50)  # Keep top 50 features
+    X_selected = selector.fit_transform(X_scaled, grades)
+    print(f"Selected top 50 features (was 500)")
 
-    # 1. Feature statistics by grade
-    print("Feature statistics by grade:")
-    for grade in sorted(set(grades)):
-        mask = grades == grade
-        grade_features = X[mask]
-        print(f"\nGrade {grade} (n={sum(mask)}):")
-        print(f"  Mean: {grade_features.mean():.4f}")
-        print(f"  Std:  {grade_features.std():.4f}")
-        print(f"  Min:  {grade_features.min():.4f}")
-        print(f"  Max:  {grade_features.max():.4f}")
+    # Now cluster on selected features
+    kmeans = KMeans(n_clusters=3, random_state=42, n_init=20)
+    clusters_selected = kmeans.fit_predict(X_selected)
+    print(f"KMeans on selected features: Silhouette = {silhouette_score(X_selected, clusters_selected):.3f}")
+    print(f"Cluster distribution: {np.bincount(clusters_selected)}")
+    print(f"Grade vs Cluster agreement: {adjusted_rand_score(grades == 'C', clusters_selected):.3f}")
 
-    # 2. Can supervised learning predict grades?
-    print("\n\nCan we predict grades from features?")
-    rf = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
-    scores = cross_val_score(rf, X_scaled, grades, cv=5)
-    baseline_accuracy = max(pd.Series(grades).value_counts()) / len(grades)
-    print(f"Random Forest CV accuracy: {scores.mean():.3f} (+/- {scores.std():.3f})")
-    print(f"Baseline (always predict majority): {baseline_accuracy:.3f}")
-    print(f"Improvement: {scores.mean() - baseline_accuracy:.3f}")
-    if scores.mean() - baseline_accuracy < 0.05:
-        print("⚠️  Features barely predict grades better than guessing!")
-
-    # 3. Feature importance
-    rf.fit(X_scaled, grades)
-    importances = pd.DataFrame({
-        'feature': feature_cols,
-        'importance': rf.feature_importances_
-    }).sort_values('importance', ascending=False)
-    print(f"\nTop 10 most important features:")
-    print(importances.head(10).to_string(index=False))
-
-    # 4. Visualize with PCA
-    pca = PCA(n_components=2)
+    # Strategy 2: PCA dimensionality reduction
+    print("\n=== STRATEGY 2: PCA Reduction ===")
+    # Keep enough components to explain 80% variance
+    pca = PCA(n_components=0.80)
     X_pca = pca.fit_transform(X_scaled)
+    print(f"PCA reduced to {X_pca.shape[1]} components (explaining {pca.explained_variance_ratio_.sum():.1%} variance)")
 
-    print(f"\n\nPCA: PC1 explains {pca.explained_variance_ratio_[0]:.1%}, PC2 explains {pca.explained_variance_ratio_[1]:.1%}")
+    kmeans_pca = KMeans(n_clusters=3, random_state=42, n_init=20)
+    clusters_pca = kmeans_pca.fit_predict(X_pca)
+    print(f"KMeans on PCA: Silhouette = {silhouette_score(X_pca, clusters_pca):.3f}")
+    print(f"Cluster distribution: {np.bincount(clusters_pca)}")
 
-    # Plot
+    # Strategy 3: Combine both - select features, then reduce
+    print("\n=== STRATEGY 3: Feature Selection + PCA ===")
+    X_selected_pca = pca.fit_transform(X_selected)
+    print(f"Selected + PCA: {X_selected_pca.shape[1]} components")
+
+    kmeans_combo = KMeans(n_clusters=3, random_state=42, n_init=20)
+    clusters_combo = kmeans_combo.fit_predict(X_selected_pca)
+    print(f"KMeans on selected+PCA: Silhouette = {silhouette_score(X_selected_pca, clusters_combo):.3f}")
+    print(f"Cluster distribution: {np.bincount(clusters_combo)}")
+
+    # Visualize the best approach
+    print("\n=== VISUALIZATION ===")
+
+    # Use Strategy 3 for visualization (best of both worlds)
+    pca_viz = PCA(n_components=2)
+    X_viz = pca_viz.fit_transform(X_selected_pca)
+
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-    # By grade
+    # Actual grades
     grade_colors = {'A': 'green', 'B': 'orange', 'C': 'red'}
-    colors = [grade_colors[g] for g in grades]
-    axes[0].scatter(X_pca[:, 0], X_pca[:, 1], c=colors, s=20, alpha=0.5, edgecolors='none')
-    axes[0].set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%})')
-    axes[0].set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%})')
-    axes[0].set_title('Colored by Grade (A=green, B=orange, C=red)')
+    colors_grade = [grade_colors[g] for g in grades]
+    axes[0].scatter(X_viz[:, 0], X_viz[:, 1], c=colors_grade, s=100, alpha=0.6, edgecolors='black', linewidth=0.5)
+    axes[0].set_xlabel(f'PC1 ({pca_viz.explained_variance_ratio_[0]:.1%})')
+    axes[0].set_ylabel(f'PC2 ({pca_viz.explained_variance_ratio_[1]:.1%})')
+    axes[0].set_title('Actual Grades (A=green, B=orange, C=red)')
     from matplotlib.patches import Patch
-    legend_elements = [Patch(facecolor='green', label='A'), 
-                       Patch(facecolor='orange', label='B'),
-                       Patch(facecolor='red', label='C')]
+    legend_elements = [Patch(facecolor='green', edgecolor='black', label='A'),
+                       Patch(facecolor='orange', edgecolor='black', label='B'),
+                       Patch(facecolor='red', edgecolor='black', label='C')]
     axes[0].legend(handles=legend_elements)
 
-    # By cluster
-    hierarchical = AgglomerativeClustering(n_clusters=3, linkage='average')
-    clusters = hierarchical.fit_predict(X_scaled)
-    scatter = axes[1].scatter(X_pca[:, 0], X_pca[:, 1], c=clusters, cmap='viridis', s=20, alpha=0.5, edgecolors='none')
-    axes[1].set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%})')
-    axes[1].set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%})')
-    axes[1].set_title('Unsupervised Clustering (3 groups)')
+    # Clusters
+    scatter = axes[1].scatter(X_viz[:, 0], X_viz[:, 1], c=clusters_combo, cmap='viridis', 
+                              s=100, alpha=0.6, edgecolors='black', linewidth=0.5)
+    axes[1].set_xlabel(f'PC1 ({pca_viz.explained_variance_ratio_[0]:.1%})')
+    axes[1].set_ylabel(f'PC2 ({pca_viz.explained_variance_ratio_[1]:.1%})')
+    axes[1].set_title('KMeans Clusters (Feature Selection + PCA)')
     plt.colorbar(scatter, ax=axes[1], label='Cluster')
 
     plt.tight_layout()
-    plt.savefig('diagnostic_plot.png', dpi=300, bbox_inches='tight')
-    print("\nPlot saved as 'diagnostic_plot.png'")
+    plt.savefig('clustering_comparison.png', dpi=300, bbox_inches='tight')
+    print("Plot saved as 'clustering_comparison.png'")
 
-    print("\n=== SUMMARY ===")
-    print("If the left plot (grades) shows no clear color separation,")
-    print("and the right plot (clusters) doesn't match it,")
-    print("then your features simply don't encode grade information.")
-    print("Unsupervised clustering can't find what isn't there.")
+    # Show cluster vs grade breakdown
+    print("\n=== Cluster vs Grade Distribution ===")
+    print(pd.crosstab(clusters_combo, grades, margins=True))
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="A simple script using argparse to greet a user.")
