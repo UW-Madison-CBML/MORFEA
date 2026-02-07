@@ -23,7 +23,6 @@ def main(model_name):
     
     print(f"Attempting to load model: {model_name}")
     model = ConvLSTMAutoencoder.from_pretrained(model_name)
-    print(f"Successfully loaded model from {date_label}")
     model_loaded = True
 
     model = model.to(DEVICE)
