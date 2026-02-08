@@ -5,9 +5,11 @@ from PIL import Image, ImageFile
 import os
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 class IVFSequenceDataset(Dataset):
-    def __init__(self, df, resize=500, norm="minmax01"):
-        #self.df = pd.read_csv(index_csv)
-        self.df = df
+    def __init__(self, csv_path, indices=None, resize=500, norm="minmax01"):
+        self.df = pd.read_csv(csv_path)
+        # Apply the index mask if provided
+        if indices is not None:
+            self.df = self.df.iloc[indices].reset_index(drop=True)
         self.resize = resize
         self.norm = norm
 

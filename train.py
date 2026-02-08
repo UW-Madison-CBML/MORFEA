@@ -443,14 +443,12 @@ ABLATION STUDY CONFIGURATION
 
     learning_rate = 2e-4
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
-
-    df = pd.read_csv(os.path.abspath("index.csv"))
+    df_path = os.path.abspath("index.csv")
+    df = pd.read_csv(df_path)
     mask = df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
-    val_df = df[mask]
-    train_df = df[~mask]
-    train_dataset = IVFSequenceDataset(train_df, resize=128, norm="minmax01")
-    val_dataset = IVFSequenceDataset(val_df, resize=128, norm="minmax01")
-    print("val size: ", str(len(val_df) / len(df)))
+    train_dataset = IVFSequenceDataset(df_path,indices = ~mask, resize=128, norm="minmax01")
+    val_dataset = IVFSequenceDataset(df_path, indices= mask, resize=128, norm="minmax01")
+    print("val size: ", str(len(val_dataset.df) / len(df)))
 
     #generator = torch.Generator().manual_seed(42)
     #train_dataset, val_dataset = torch.utils.data.random_split(ds, [train_size, val_size], generator=generator)
@@ -866,14 +864,13 @@ ABLATION STUDY CONFIGURATION
 
     learning_rate = 2e-4
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
-
-    df = pd.read_csv(os.path.abspath("index.csv"))
+    df_path = os.path.abspath("index.csv")
+    df = pd.read_csv(df_path)
     mask = df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
-    val_df = df[mask]
-    train_df = df[~mask]
-    train_dataset = IVFSequenceDataset(train_df, resize=128, norm="minmax01")
-    val_dataset = IVFSequenceDataset(val_df, resize=128, norm="minmax01")
-    print("val size: ", str(len(val_df) / len(df)))
+    train_dataset = IVFSequenceDataset(df_path,indices = ~mask, resize=128, norm="minmax01")
+    val_dataset = IVFSequenceDataset(df_path, indices= mask, resize=128, norm="minmax01")
+
+    print("val size: ", str(len(val_dataset.df) / len(df)))
 
     #generator = torch.Generator().manual_seed(42)
     #train_dataset, val_dataset = torch.utils.data.random_split(ds, [train_size, val_size], generator=generator)

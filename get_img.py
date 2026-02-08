@@ -16,7 +16,7 @@ print(DEVICE)
 def main(model_name):
     login(os.getenv("HF_TOKEN"))
     ds = IVFSequenceDataset(os.path.abspath("index.csv"), resize=128, norm="minmax01")
-    loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=4, pin_memory=True)
+    loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=0, pin_memory=True)
     model = None
     api = HfApi()
     model_loaded = False
