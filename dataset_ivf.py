@@ -58,6 +58,17 @@ class IVFSequenceDataset(Dataset):
 
     def __len__(self):
         return len(self.df)
+    
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Convert DataFrame to something pickle-friendly
+        state['df'] = self.df.to_dict('records')
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        # Reconstruct DataFrame
+        self.df = pd.DataFrame(state['df'])
 
 if __name__ == "__main__":
 
