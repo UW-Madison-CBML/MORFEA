@@ -153,7 +153,7 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
                        for i in range(0, level_threshold+1)]
     print(len(sig_flat))    
     return t, X_t, X_prime_t, signature, signature_terms, np.array(sig_flat)
-def get_new_row(group, cell_id):
+def get_new_row(group, cell_id, max_len=0):
     #(_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group, how="FULL", n_components=0))
     #signature = np.array([i(np.linspace(0,1, 500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).flatten()
     #signature = group[:-50,:].flatten()
@@ -162,8 +162,14 @@ def get_new_row(group, cell_id):
     # Kurtosis: fourth central moment (fisher=True means Normal = 0)
     #new_rows = []
     #for i in range(50):
-    interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T
+    interped_latents = np.array([i(np.linspace(0,1,500) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T if max_len == 0 else group
     signature = np.array(calculate_curvatures(interped_latents))
+    if max_len > 0:
+        if(len(signature) > max_len):
+            raise ValueError(f"{cell_id} exceeds max len for padding")
+        elif(len(signature != max_len):
+            pad_width = (0, max_len - len(signature))
+            signature = np.pad(signature, pad_width, mode='constant', constant_values=0) 
     #    #new_rows.append(signature)
     #    new_rows.append( 
     #new_rows = np.array(new_rows).T 
@@ -193,8 +199,9 @@ def main(model_name):
     values_df = pd.DataFrame(values, columns=lat_columns)
     df = pd.concat([keys, values_df], axis = 1)
     # This returns a DataFrame where each row is a cell_id with its signature
+    max_points = df.groupby("embryo_id")["time_step"].size().max()
     signatures_df = df.groupby('embryo_id').apply(
-        lambda group: get_new_row(group[lat_columns].to_numpy(), group.name)
+        lambda group: get_new_row(group[lat_columns].to_numpy(), group.name, max_len=max_points)
     ).reset_index(drop=True)
 
     # Save to CSV
