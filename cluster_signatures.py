@@ -51,7 +51,7 @@ def main(model_name):
     # Strategy 2: PCA dimensionality reduction
     print("\n=== STRATEGY 2: PCA Reduction ===")
     # Keep enough components to explain 80% variance
-    pca = PCA(n_components=0.80)
+    pca = PCA(n_components=0.95)
     X_pca = pca.fit_transform(X_scaled)
     print(f"PCA reduced to {X_pca.shape[1]} components (explaining {pca.explained_variance_ratio_.sum():.1%} variance)")
 
@@ -59,7 +59,6 @@ def main(model_name):
     clusters_pca = kmeans_pca.fit_predict(X_pca)
     print(f"KMeans on PCA: Silhouette = {silhouette_score(X_pca, clusters_pca):.3f}")
     print(f"Cluster distribution: {np.bincount(clusters_pca)}")
-
     # Strategy 3: Combine both - select features, then reduce
     print("\n=== STRATEGY 3: Feature Selection + PCA ===")
     X_selected_pca = pca.fit_transform(X_selected)
@@ -69,13 +68,13 @@ def main(model_name):
     clusters_combo = kmeans_combo.fit_predict(X_selected_pca)
     print(f"KMeans on selected+PCA: Silhouette = {silhouette_score(X_selected_pca, clusters_combo):.3f}")
     print(f"Cluster distribution: {np.bincount(clusters_combo)}")
-
     # Visualize the best approach
     print("\n=== VISUALIZATION ===")
 
     # Use Strategy 3 for visualization (best of both worlds)
     pca_viz = PCA(n_components=2)
-    X_viz = pca_viz.fit_transform(X_selected_pca)
+    print(X_selected_pca.shape)
+    X_viz = pca_viz.fit_transform(X_selected_pca) if X_selected_pca.shape[1] >= 2 else X_selected_pca
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
@@ -101,7 +100,7 @@ def main(model_name):
     plt.colorbar(scatter, ax=axes[1], label='Cluster')
 
     plt.tight_layout()
-    plt.savefig('clustering_comparison.png', dpi=300, bbox_inches='tight')
+    plt.savefig('clusters/clustering_comparison.png', dpi=300, bbox_inches='tight')
     print("Plot saved as 'clustering_comparison.png'")
 
     # Show cluster vs grade breakdown
