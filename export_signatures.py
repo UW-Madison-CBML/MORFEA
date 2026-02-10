@@ -10,6 +10,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import umap
 
+from scipy.optimize import least_squares
 from scipy.stats import kurtosis
 def fit_circle_curvature(points, how="triangle"):
     """
@@ -33,20 +34,16 @@ def fit_circle_curvature(points, how="triangle"):
         
         if area_squared <= 0:
             return 0  # Collinear points
-        print(area_squared)
         
         area = np.sqrt(area_squared)
          
-        print(area)
         if area == 0:
             return 0
         
         # Radius = (a*b*c) / (4*Area)
         radius = (a * b * c) / (4 * area)
-        print(radius)
         if radius == 0:
             return 0
-        print(1/radius) 
         return 1 / radius
     else:
         scaler = StandardScaler()
@@ -60,6 +57,20 @@ def fit_circle_curvature(points, how="triangle"):
             distances = np.sqrt((points[:, 0] - xc)**2 + (points[:, 1] - yc)**2)
             # The residual is the difference between these distances and the radius R
             return distances - R
+        x = points[:,0]
+        y = points[:,1]
+        points = np.column_stack((x, y))
+
+        x0 = [np.mean(x), np.mean(y), np.std(x)]
+
+        res = least_squares(circle_residuals, x0, args=(points,))
+
+        _, _, radius = res.x
+        
+        if(radius == 0):
+            return 0 
+        return 1/radius
+ 
 def calculate_curvatures(trajectory):
     """Calculate curvature for each point in trajectory using sliding window."""
     offset = 6
@@ -151,7 +162,6 @@ def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
 
     signature_terms = [list(itertools.product(*([np.arange(1, N+1).tolist()] * i)))
                        for i in range(0, level_threshold+1)]
-    print(len(sig_flat))    
     return t, X_t, X_prime_t, signature, signature_terms, np.array(sig_flat)
 def get_new_row(group, cell_id, max_len=0):
     #(_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group, how="FULL", n_components=0))
@@ -162,12 +172,12 @@ def get_new_row(group, cell_id, max_len=0):
     # Kurtosis: fourth central moment (fisher=True means Normal = 0)
     #new_rows = []
     #for i in range(50):
-    interped_latents = np.array([i(np.linspace(0,1,500) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T if max_len == 0 else group
+    interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T if max_len == 0 else group
     signature = np.array(calculate_curvatures(interped_latents))
     if max_len > 0:
         if(len(signature) > max_len):
             raise ValueError(f"{cell_id} exceeds max len for padding")
-        elif(len(signature != max_len):
+        elif(len(signature) != max_len):
             pad_width = (0, max_len - len(signature))
             signature = np.pad(signature, pad_width, mode='constant', constant_values=0) 
     #    #new_rows.append(signature)
@@ -199,7 +209,10 @@ def main(model_name):
     values_df = pd.DataFrame(values, columns=lat_columns)
     df = pd.concat([keys, values_df], axis = 1)
     # This returns a DataFrame where each row is a cell_id with its signature
-    max_points = df.groupby("embryo_id")["time_step"].size().max()
+    sizes = df.groupby("embryo_id")["time_step"].size()
+    print(sizes.idxmax())
+    max_points = sizes.max()
+    print("max points", max_points)
     signatures_df = df.groupby('embryo_id').apply(
         lambda group: get_new_row(group[lat_columns].to_numpy(), group.name, max_len=max_points)
     ).reset_index(drop=True)
