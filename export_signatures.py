@@ -12,7 +12,7 @@ import umap
 
 from scipy.optimize import least_squares
 from scipy.stats import kurtosis
-def fit_circle_curvature(points, how="triangle"):
+def fit_circle_curvature(points, how=""):
     """
     Fit a circle to 3 consecutive points and return curvature (1/radius).
     If points are collinear or too close, return 0.
@@ -46,6 +46,8 @@ def fit_circle_curvature(points, how="triangle"):
             return 0
         return 1 / radius
     else:
+        if(np.isnan(points).any()):
+            return 0 
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(points)
         pca = PCA(n_components=2)
@@ -57,14 +59,18 @@ def fit_circle_curvature(points, how="triangle"):
             distances = np.sqrt((points[:, 0] - xc)**2 + (points[:, 1] - yc)**2)
             # The residual is the difference between these distances and the radius R
             return distances - R
-        x = points[:,0]
-        y = points[:,1]
+        x = points_2d[:,0]
+        y = points_2d[:,1]
         points = np.column_stack((x, y))
 
-        x0 = [np.mean(x), np.mean(y), np.std(x)]
-
-        res = least_squares(circle_residuals, x0, args=(points,))
-
+        x0 = [np.mean(x), np.mean(y), np.std(np.sqrt(x**2 + y**2))]
+        try:
+            res = least_squares(circle_residuals, x0, args=(points,))
+        except ValueError as e:
+            print(e)
+            return 0
+        if not res.success:
+            return 0
         _, _, radius = res.x
         
         if(radius == 0):
@@ -173,6 +179,8 @@ def get_new_row(group, cell_id, max_len=0):
     #new_rows = []
     #for i in range(50):
     interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T if max_len == 0 else group
+    if(np.isnan(interped_latents).any()):
+        print(f"{cell_id} has nan!!!")
     signature = np.array(calculate_curvatures(interped_latents))
     if max_len > 0:
         if(len(signature) > max_len):
