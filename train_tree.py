@@ -256,47 +256,36 @@ def main(model_name):
     print(f"ICM val loader batches: {len(loader_icm_val)}")
     model_te = tree.DecisionTreeClassifier()
     model_icm = tree.DecisionTreeClassifier()
-    clf = clf.fit(X, Y)
     for sig, te in loader_te:
         print(sig.shape, ", ", te.shape)
-        #label = model_te.fit(sig, te)
+        label = model_te.fit(sig, te)
 
     for sig, icm in loader_icm:
         print(sig.shape, ", ", icm.shape)
-        #label = model_icm.fit(sig, icm)
-"""
+        label = model_icm.fit(sig, icm)
+
     te_loss_stats = RunningStats()
     icm_loss_stats = RunningStats()
     te_acc_stats = RunningStats()
     icm_acc_stats = RunningStats()
 
     for sig, te in loader_te_val:
-        sig = sig.to(DEVICE)
-        te = te.to(DEVICE).long()
         logits = model_te(sig)
-        loss = crit_te(logits, te)
-        te_loss_stats.push(loss.item())
         
         # Calculate accuracy
         preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
         te_acc_stats.push((preds == te).sum().item()/te.shape[0])
     for sig, icm in loader_icm_val:
-        sig = sig.to(DEVICE)
-        icm = icm.to(DEVICE).long()
 
         logits = model_icm(sig)
-        loss = crit_icm(logits, icm)
-        icm_loss_stats.push(loss.item())
     
         # Calculate accuracy
         preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
         icm_acc_stats.push((preds == icm).sum().item()/icm.shape[0])
 
-    print("TE: " + str(te_loss_stats.mean) + " +- " + str(te_loss_stats.std_dev))
-    print("ICM: " + str(icm_loss_stats.mean) + " +- " + str(icm_loss_stats.std_dev))
     print("TE Acc: " + str(te_acc_stats.mean) + " +- " + str(te_acc_stats.std_dev))
     print("ICM Acc: " + str(icm_acc_stats.mean) + " +- " + str(icm_acc_stats.std_dev))
-
+"""
     print("\n" + "="*60)
     print("FINAL EVALUATION ON VALIDATION SET")
     print("="*60)
