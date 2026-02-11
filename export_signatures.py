@@ -181,19 +181,21 @@ def get_new_row(group, cell_id, max_len=0):
     interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T if max_len == 0 else group
     if(np.isnan(interped_latents).any()):
         print(f"{cell_id} has nan!!!")
-    signature = np.array(calculate_curvatures(interped_latents))
+    #signature = np.array(calculate_curvatures(interped_latents))
+    signature = group
     if max_len > 0:
         if(len(signature) > max_len):
             raise ValueError(f"{cell_id} exceeds max len for padding")
         elif(len(signature) != max_len):
-            pad_width = (0, max_len - len(signature))
-            signature = np.pad(signature, pad_width, mode='constant', constant_values=0) 
+            pad_width = max(0, max_len - len(signature))
+            signature = np.pad(signature, ((0, pad_width), (0, 0)), mode='constant') 
     #    #new_rows.append(signature)
     #    new_rows.append( 
     #new_rows = np.array(new_rows).T 
     #print(new_rows.shape)
     #sig = flatten_list(sig)
     #terms = flatten_list(terms)
+    signature = signature.flatten()
     result = pd.DataFrame({"cell_id":[cell_id]})
     for i, val in enumerate(signature):
         result[f"s_{i}"] = val

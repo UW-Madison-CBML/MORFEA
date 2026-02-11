@@ -20,4 +20,4 @@ fi
 
 echo "Setup complete."
 
-python upload_drive.py latents/latents.npy
+python upload_drive.py latents.tar.gz
