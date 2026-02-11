@@ -5,9 +5,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 from matplotlib.patches import Patch
+from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from scipy.optimize import least_squares
-def fit_circle_curvature(points, how="triangle"):
+def fit_circle_curvature(points, how=""):
     """
     Fit a circle to 3 consecutive points and return curvature (1/radius).
     If points are collinear or too close, return 0.

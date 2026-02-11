@@ -1,0 +1,34 @@
+# export_curvatures.sub
+   
+docker_image = jenslundsgaard/tphate:latest
+universe = docker
+# Specify your executable (single binary or a script that runs several
+#  commands) and arguments to be passed to jobs. 
+#  $(Process) will be a integer number for each job, starting with "0"
+#  and increasing for the relevant number of jobs.
+shell = ./export_curvatures.sh
+   		
+# Specify the name of the log, standard error, and standard output (or
+# "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
+#  queue number assigned to this set of jobs at the time of submission.
+log = export_curvatures_$(Cluster)_$(Process).log
+error =  export_curvatures_$(Cluster)_$(Process).err
+output = export_curvatures_$(Cluster)_$(Process).out
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT_OR_EVICT
+Requirements = (Target.HasCHTCStaging == true)
+#require_gpus = (DriverVersion >= 10.1)
+# Transfer our executable script
+transfer_output_remaps = "curvatures.tar.gz =  file:///staging/groups/bhaskar_group/ivf/curvatures.tar.gz;"
+transfer_input_files = export_curvatures.sh, export_curvatures.py, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz,  file:///staging/groups/bhaskar_group/ivf/curvatures.tar.gz, 
+#Requirements = (Machine == "bhaskargpu4000.chtc.wisc.edu") && (DriverVersion == "12.8") && (DeviceName == "NVIDIA H200")
+ 
+transfer_output_files = curvatures.tar.gz
+# Requirements (e.g., operating system) your job needs, what amount of
+# compute resources each job will need on the computer where it runs.
+request_cpus = 4
+request_memory = 80GB
+request_disk = 80GB
+
+
+queue 1
