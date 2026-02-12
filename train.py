@@ -697,7 +697,7 @@ ABLATION STUDY CONFIGURATION
         val_metrics = {
             'mse': RunningStats(),
             'l1': RunningStats(),
-            'ms_ssim_loss': RunningStats(),
+            'ssim': RunningStats(),
             'temp': RunningStats()
         }
         model.eval()  # Set model to evaluation mode
@@ -1165,7 +1165,7 @@ ABLATION STUDY CONFIGURATION
         val_metrics = {
             'mse': RunningStats(),
             'l1': RunningStats(),
-            'ms_ssim_loss': RunningStats(),
+            'ssim': RunningStats(),
             'temp': RunningStats()
         }
         model.eval()  # Set model to evaluation mode
