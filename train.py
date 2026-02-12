@@ -702,9 +702,7 @@ ABLATION STUDY CONFIGURATION
         with torch.no_grad():
             for embryo_vol, _, _ in val_loader:
                 embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, H, W)
-                val_recon, val_lat = model(embryo_vol, empty_well=False)
-                _, empty_val_lat = model(embryo_vol, empty_well=True)
-                val_lat = torch.cat([val_lat, empty_val_lat], dim= 2)
+                val_recon, val_lat = model(embryo_vol)
                 B, T, C, H, W = embryo_vol.shape
 
                 # MSE
