@@ -487,6 +487,16 @@ ABLATION STUDY CONFIGURATION
 
             # Forward pass - returns (reconstruction, latent_seq)
             embryo_recon, embryo_lat = model(embryo_vol)
+            if(index % 47 == 0):
+                vol_img = embryo_vol[0, -1, 0].cpu().detach().numpy()
+                recon_img = embryo_recon[0, -1, 0].cpu().detach().numpy()
+
+                vol_img = (vol_img * 255).astype(np.uint8)
+                recon_img = (recon_img * 255).astype(np.uint8)
+                comparison = np.concatenate((vol_img, recon_img), axis=1)
+     
+                images = wandb.Image(comparison, caption="Embryo vs Recon comparison")
+                run.log({"reconstruction": images})
 
             # Reconstruction loss using MS-SSIM + L1 or MSE (with configurable weights)
             if loss_type == "l1":
@@ -916,6 +926,16 @@ ABLATION STUDY CONFIGURATION
 
             # Forward pass for empty well (uses first half of latent: 0:2048)
             empty_recon, empty_lat = model(empty_well_vol, empty_well=True)
+            if(index % 47 == 0):
+                vol_img = embryo_vol[0, -1, 0].cpu().detach().numpy()
+                recon_img = embryo_recon[0, -1, 0].cpu().detach().numpy()
+
+                vol_img = (vol_img * 255).astype(np.uint8)
+                recon_img = (recon_img * 255).astype(np.uint8)
+                comparison = np.concatenate((vol_img, recon_img), axis=1)
+     
+                images = wandb.Image(comparison, caption="Embryo vs Recon comparison")
+                run.log({"reconstruction": images})
 
             # Reconstruction loss for embryo (with configurable weights)
             if loss_type == "l1":
