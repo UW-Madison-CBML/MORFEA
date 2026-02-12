@@ -283,9 +283,9 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
     Compatible with HuggingFace Hub
     Works with 128x128 images
     """
-
     def __init__(
         self,
+        config=None,
         seq_len=20,
         input_channels=1,
         encoder_hidden_dim=256,
@@ -294,16 +294,49 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         decoder_layers=2,
         latent_size=4096,
         use_classifier=True,
-        num_classes=2
-    ):
+        num_classes=2,
+        use_latent_split=False,
+        # Ablation parameters
+        dropout_rate=0.1,
+        use_convlstm=True,
+        use_residual=True,
+        use_batchnorm=True
+        ):
         super(ConvLSTMAutoencoder, self).__init__()
-
         self.seq_len = seq_len
         self.use_classifier = use_classifier
         self.encoder_hidden_dim = encoder_hidden_dim
         self.latent_size = latent_size
+        self.use_latent_split = use_latent_split
+        # Store ablation settings for reproducibility
+        self.dropout_rate = dropout_rate
+        self.use_convlstm = use_convlstm
+        self.use_residual = use_residual
+        self.use_batchnorm = use_batchnorm
+        if(config != None):
+            # Handle config as dict (from HuggingFace) or object
+            if isinstance(config, dict):
+                self.seq_len = config.get('seq_len', seq_len)
+                self.use_classifier = config.get('use_classifier', use_classifier)
+                self.encoder_hidden_dim = config.get('encoder_hidden_dim', encoder_hidden_dim)
+                self.latent_size = config.get('latent_size', latent_size)
+                self.use_latent_split = config.get('use_latent_split', use_latent_split)
+                self.dropout_rate = config.get('dropout_rate', dropout_rate)
+                self.use_convlstm = config.get('use_convlstm', use_convlstm)
+                self.use_residual = config.get('use_residual', use_residual)
+                self.use_batchnorm = config.get('use_batchnorm', use_batchnorm)
+            else:
+                self.seq_len = config.seq_len
+                self.use_classifier = config.use_classifier
+                self.encoder_hidden_dim = config.encoder_hidden_dim
+                self.latent_size = config.latent_size
+                self.use_latent_split = config.use_latent_split
+                self.dropout_rate = config.dropout_rate
+                self.use_convlstm = config.use_convlstm
+                self.use_residual = config.use_residual
+                self.use_batchnorm = config.use_batchnorm
 
-        # Core components
+            # Core components
         self.encoder = Encoder(
             input_channels=input_channels,
             hidden_dim=encoder_hidden_dim,

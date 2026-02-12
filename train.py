@@ -860,8 +860,8 @@ ABLATION STUDY CONFIGURATION
         use_convlstm=use_convlstm,
         use_residual=use_residual,
         use_batchnorm=use_batchnorm
-    """)
-        model = ConvLSTMAutoencoder(
+    """
+    model = ConvLSTMAutoencoder(
         seq_len=50,
         input_channels=1,
         encoder_hidden_dim=256,
