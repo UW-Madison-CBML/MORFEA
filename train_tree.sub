@@ -23,13 +23,11 @@ Requirements = (Target.HasCHTCStaging == true)
 # Transfer our executable script
 transfer_input_files = train_tree.sh, train_tree.py, api_keys.txt, signature_dataset.py, signature_models.txt, file:///staging/groups/bhaskar_group/ivf/signatures.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv
 
-requirements= Machine=="bhaskargpu4000.chtc.wisc.edu"
- 
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
-request_cpus = 4
-request_memory = 64GB
-request_disk = 80GB
+request_cpus = 2
+request_memory = 50GB
+request_disk = 50GB
 
 
 queue model from signature_models.txt
