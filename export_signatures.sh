@@ -4,6 +4,6 @@ tar -zxf signatures.tar.gz
 tar -zxf latents.tar.gz
 mkdir -p signatures
 ls -lh
-python export_signatures.py --name embryo-convlstm-l1-temporal-2025-12-17
+python export_signatures.py --name latents
 
 tar -czvf signatures.tar.gz signatures
