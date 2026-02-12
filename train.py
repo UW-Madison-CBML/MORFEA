@@ -843,7 +843,7 @@ ABLATION STUDY CONFIGURATION
     print("Configuration saved to training_config_latent_split.txt")
 
     # Create model with LATENT SPLIT and ABLATION parameters
-    model = ConvLSTMAutoencoder(
+    """model = ConvLSTMAutoencoder(
         None,
         seq_len=50,
         input_channels=1,
@@ -860,8 +860,18 @@ ABLATION STUDY CONFIGURATION
         use_convlstm=use_convlstm,
         use_residual=use_residual,
         use_batchnorm=use_batchnorm
+    """)
+        model = ConvLSTMAutoencoder(
+        seq_len=50,
+        input_channels=1,
+        encoder_hidden_dim=256,
+        encoder_layers=2,
+        decoder_hidden_dim=128,
+        decoder_layers=2,
+        latent_size=4096,
+        use_classifier=True,
+        num_classes=2
     )
-
     model = model.to(DEVICE)
 
     learning_rate = 2e-4
