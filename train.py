@@ -33,7 +33,6 @@ import os
 from huggingface_hub import login
 import shutil
 import hashlib
-
 import json
 class RunningStats:
     def __init__(self):
@@ -58,7 +57,6 @@ class RunningStats:
     def std_dev(self):
         """Returns sample standard deviation."""
         return math.sqrt(self.variance)
-
 
 VAL_EMBRYOS = ["CZ594-5","CJ261-10","RL747-8","TM272-9","LFA766-1","GT353-3","LGA881-2-5","LBE649-3","TH481-5","LTA908-2","BS648-7","GS955-7","HA1040-4","CM892-5","FC048-6","GC702-6","DI358-3","MM912-4","RK787-3","GSS052-2","OJ319-5","DML373-2","PS292-4","TM294-2","KT573-4","DJC641-4","FE14-020","LD400-1","MV930-2","MDCH869-4","AS662-2","LH1169-8","GA664-1","PMDPI029-1-3","DV116-3","FV709-11","GM456-3","RA361-4","LM844-1","DL020-3","VM570-4","MC833-6","LV613-2","ZS435-5","RM126-7","BK428-2","LS93-8","GS490-7","GF976-4","PMDPI029-1-11","DRL1048-1","BS294-7","CA658-12","RO793-2","GJ191-1","CC007-2","SL313-11","RC545-2-8","OJ319-9","PA289-8","TK319-10","SM686-7","KJ1077-3","BE645-10","BC167-4","VC581-1","FM162-6","PC758-2","HC459-6","DE069-10","GC340-3","BS596-5","PE256-2","LBE857-1","PH783-3","LS1045-4","CC455-3","DL617-6","BS1086-1","CK601-4","DA309-5","LTE064-1","KF460-4","LP181-1","GS349-4","LC47-8","GS205-6","EH309-8","BS1033-2","LL854-1","DHDPI042-6","BN356-6","PA145-2","GC340-1","MM334-5","AG274-2","BA518-7","BC973-4","BA1195-9","AM33-2","AB91-1","AB028-6","BC167-4","AL884-2","AM685-3"]
 def setup_distributed():
@@ -696,8 +694,12 @@ ABLATION STUDY CONFIGURATION
         }
 
         save_and_push_model(model, model_name +"-"+ date_label, required_files, model_config=hf_config)
-
-
+        val_metrics = {
+            'mse': RunningStats(),
+            'l1': RunningStats(),
+            'ssim': RunningStats(),
+            'temp': RunningStats()
+        }
         model.eval()  # Set model to evaluation mode
         with torch.no_grad():
             for embryo_vol, _, _ in val_loader:
@@ -722,11 +724,6 @@ ABLATION STUDY CONFIGURATION
                 if T > 1:
                     lat_diff = torch.diff(val_lat, dim=1)  # (B, T-1, latent_size)
                     temporal_smooth = lat_diff.norm(dim=-1).mean()  # Average L2 norm of differences
-                    val_metrics['temp'].push(temporal_smooth.item())
-
-
-
-
         # Log to wandb with val_ prefix
         val_log_dict = {
             f"val_{key}": value.mean for key, value in val_metrics.items()
@@ -737,6 +734,7 @@ ABLATION STUDY CONFIGURATION
 
         run.log(val_log_dict)
         run.log(val_log_std_dict)
+        
 
     run.finish()
     gc.collect()
@@ -866,7 +864,7 @@ ABLATION STUDY CONFIGURATION
     print("Configuration saved to training_config_latent_split.txt")
 
     # Create model with LATENT SPLIT and ABLATION parameters
-    model = ConvLSTMAutoencoder(
+    """model = ConvLSTMAutoencoder(
         None,
         seq_len=50,
         input_channels=1,
@@ -883,8 +881,18 @@ ABLATION STUDY CONFIGURATION
         use_convlstm=use_convlstm,
         use_residual=use_residual,
         use_batchnorm=use_batchnorm
+    """
+    model = ConvLSTMAutoencoder(
+        seq_len=50,
+        input_channels=1,
+        encoder_hidden_dim=256,
+        encoder_layers=2,
+        decoder_hidden_dim=128,
+        decoder_layers=2,
+        latent_size=4096,
+        use_classifier=True,
+        num_classes=2
     )
-
     model = model.to(DEVICE)
 
     learning_rate = 2e-4
@@ -949,7 +957,6 @@ ABLATION STUDY CONFIGURATION
      
                 images = wandb.Image(comparison, caption="Embryo vs Recon comparison")
                 run.log({"reconstruction": images})
-
             # Reconstruction loss for embryo (with configurable weights)
             if loss_type == "l1":
                 rec_loss_embryo, rec_metrics_embryo = convlstm_reconstruction_loss(
@@ -1156,12 +1163,11 @@ ABLATION STUDY CONFIGURATION
 
         save_and_push_model(model, model_name + "-" + date_label, required_files, model_config=hf_config)
         val_metrics = {
-            'mse': RunningStats() ,
+            'mse': RunningStats(),
             'l1': RunningStats(),
-            'ms_ssim_loss': RunningStats(),
+            'ssim': RunningStats(),
             'temp': RunningStats()
         }
-
         model.eval()  # Set model to evaluation mode
         with torch.no_grad():
             for embryo_vol, _, _ in val_loader:
@@ -1188,11 +1194,6 @@ ABLATION STUDY CONFIGURATION
                 if T > 1:
                     lat_diff = torch.diff(val_lat, dim=1)  # (B, T-1, latent_size)
                     temporal_smooth = lat_diff.norm(dim=-1).mean()  # Average L2 norm of differences
-                    val_metrics['temp'].push(temporal_smooth.item())
-
-
-
-
         # Log to wandb with val_ prefix
         val_log_dict = {
             f"val_{key}": value.mean for key, value in val_metrics.items()
@@ -1203,8 +1204,7 @@ ABLATION STUDY CONFIGURATION
 
         run.log(val_log_dict)
         run.log(val_log_std_dict)
-
-
+        
     run.finish()
     gc.collect()
     torch.cuda.empty_cache()

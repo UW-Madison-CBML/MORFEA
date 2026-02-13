@@ -22,7 +22,7 @@ Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
 transfer_output_remaps = "model_weights.pth =  file:///staging/groups/bhaskar_group/ivf/model_weights.pth;"
-transfer_input_files = train_model.sh, train.py, model.py, api_keys.txt, train_requirements.txt, model_weights.pth, bad_imgs.txt, dataset_ivf.py, embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, build_index.py, raffael_model.py, raffael_conv_lstm.py, raffael_losses.py, ablation.txt
+transfer_input_files = train_model.sh, train.py, model.py, api_keys.txt, dataset_ivf.py, embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, build_index.py, raffael_model.py, raffael_conv_lstm.py, raffael_losses.py, ablation.txt
 +WantGPULab = true
 +GPUJobLength = "long"
 gpus_minimum_capability = 7.0
