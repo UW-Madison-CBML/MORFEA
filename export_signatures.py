@@ -205,7 +205,7 @@ def get_new_row(group, cell_id, max_len=0):
 def main(model_name):
     file_name = "latents/"+ model_name
     #file_name =
-    keys = pd.read_csv(file_name+".csv")
+    keys = pd.read_csv(file_name+".csv").rename(columns={"cell_id":"embryo_id", "video_name":"embryo_id"})
     values = np.load(file_name+'.npy')
     if(len(keys) != values.shape[0]):
         raise ValueError("keys and values sizes do not match")
