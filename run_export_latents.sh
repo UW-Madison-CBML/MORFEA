@@ -31,8 +31,8 @@ transfer_output_files = latents.tar.gz
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
 request_cpus = 1
-request_memory = 64GB
-request_disk = 64GB
+request_memory = 80GB
+request_disk = 80GB
 
 
 queue 1
