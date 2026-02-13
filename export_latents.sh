@@ -23,10 +23,10 @@ for i in "${ADDR[@]}"; do
 done
 
 #cat get_latents.txt | xargs -I {} sh -c 'python export_latents.py --name "{}" --limit 50'
-mkdir "${1}"_latents
-mv *.csv "${1}"_latents
-mv *.npy "${1}"_latents
-tar -czvf "${1}"_latents.tar.gz "${1}"_latents
+mkdir latents
+mv *.csv latents
+mv *.npy latents
+tar -czvf latents.tar.gz latents
 # Cleanup
 echo "Cleaning up..."
 rm -r embryo_dataset
