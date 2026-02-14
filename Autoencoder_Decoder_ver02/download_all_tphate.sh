@@ -1,5 +1,4 @@
 #!/bin/bash
-# 下载所有 TPHATE 结果（包括可视化）
 
 REMOTE_USER="rho9"
 REMOTE_HOST="ap2001.chtc.wisc.edu"
@@ -11,14 +10,12 @@ mkdir -p "$LOCAL_DIR/tphate_segments_direct"
 echo "=== Downloading All TPHATE Results ==="
 echo ""
 
-# 1. 检查远程目录
 echo "1. Checking remote directory structure..."
 ssh ${REMOTE_USER}@${REMOTE_HOST} "cd ${REMOTE_DIR} && ls -lh tphate_segments_direct/ 2>/dev/null || echo 'Directory not found'"
 
 echo ""
 echo "2. Downloading visualization files..."
 
-# 下载所有可视化文件（逐个尝试）
 files=(
     "tphate_3d_gradient.png"
     "tphate_3d_segments.png"

@@ -1,5 +1,4 @@
 #!/bin/bash
-# 下载所有 TPHATE 可视化文件
 
 REMOTE_USER="rho9"
 REMOTE_HOST="ap2001.chtc.wisc.edu"

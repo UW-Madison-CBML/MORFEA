@@ -65,24 +65,19 @@ def extract_frame_latent_from_encoder(model, frame, device="cpu"):
     with torch.no_grad():
         frame = frame.to(device)
         
-        # 方法 1: 如果模型有 frame_encoder，直接用（最直接）
         if hasattr(model, 'frame_encoder'):
             z = model.frame_encoder(frame)  # [1, D]
             return z.squeeze(0).cpu().numpy()  # [D]
         
-        # 方法 2: 如果是 ConvLSTMAutoencoder，frame_encoder 在 model 下
         elif hasattr(model, 'frame_encoder'):
             z = model.frame_encoder(frame)  # [1, D]
             return z.squeeze(0).cpu().numpy()  # [D]
         
-        # 方法 3: 創建一個單幀的 sequence，通過完整模型
         else:
-            # 創建一個單幀的 sequence [1, 1, 1, H, W]
             seq = frame.unsqueeze(0)  # [1, 1, 1, H, W]
             output = model(seq)
             z_seq = output['z_seq']  # [1, 1, ...]
             
-            # 處理空間 latent
             if len(z_seq.shape) == 5:
                 # [1, 1, C, H, W] -> Global Average Pooling -> [1, 1, C]
                 B, T, C, H, W = z_seq.shape
@@ -106,15 +101,13 @@ def parse_time_from_path(path_str):
     Returns:
         time_value: 時間值（RUN number 或 frame index）
     """
-    # 嘗試提取 RUN number
     run_match = re.search(r'RUN[_\- ]?(\d+)', path_str, re.I)
     if run_match:
         return int(run_match.group(1))
     
-    # 如果沒有 RUN，嘗試提取其他數字
     nums = re.findall(r'\d+', Path(path_str).name)
     if nums:
-        return int(nums[-1])  # 取最後一個數字
+        return int(nums[-1])
     
     return 0
 
@@ -124,8 +117,8 @@ def export_all_frame_latents(
     index_csv="index.csv",
     output_file="latents_all_frames.npz",
     device="cuda" if torch.cuda.is_available() else "cpu",
-    batch_size=32,  # 批次處理 frames
-    max_sequences=None  # 限制處理的序列數（None = 全部）
+    batch_size=32,
+    max_sequences=None
 ):
     """
     提取所有 frame 的 latent vectors
@@ -189,7 +182,6 @@ def export_all_frame_latents(
     
     print(f"Total sequences in index.csv: {len(df)}")
     
-    # 直接从 cell folders 读取所有 frames（去重，每帧只提取一次）
     print("\nExtracting frame latents (each frame only once, no duplicates)...")
     all_latents = []
     all_cell_ids = []
@@ -198,10 +190,8 @@ def export_all_frame_latents(
     all_sequence_idx = []
     all_paths = []
     
-    # 統計每個 cell 的 frame 數
     cell_frame_count = defaultdict(int)
     
-    # 按 cell_id 分组，收集所有唯一的 frames
     unique_cells = df['cell_id'].unique()
     print(f"Unique cells: {unique_cells}")
     
@@ -210,8 +200,6 @@ def export_all_frame_latents(
             print(f"\nProcessing cell: {cell_id}")
             cell_df = df[df['cell_id'] == cell_id]
             
-            # 收集这个 cell 的所有 frames（去重）
-            # 使用 dict 确保每个 frame_in_cell 只出现一次
             cell_frames_dict = {}  # {frame_in_cell: (path, abs_time, seq_idx)}
             
             for seq_idx, row in cell_df.iterrows():
@@ -220,40 +208,30 @@ def export_all_frame_latents(
                 
                 for t, path in enumerate(paths):
                     frame_in_cell = start_idx + t
-                    # 只保留第一次出现的 frame（去重）
                     if frame_in_cell not in cell_frames_dict:
                         abs_time = parse_time_from_path(path)
                         cell_frames_dict[frame_in_cell] = (path, abs_time, seq_idx)
             
-            # 按 frame_in_cell 排序
             sorted_frames = sorted(cell_frames_dict.items())
             print(f"  Total unique frames: {len(sorted_frames)}")
             if len(sorted_frames) > 0:
                 print(f"  Frame range: {sorted_frames[0][0]} - {sorted_frames[-1][0]}")
             
-            # 提取每个 frame 的 latent（只提取一次）
             for frame_in_cell, (path, abs_time, seq_idx) in tqdm(sorted_frames, desc=f"  Extracting {cell_id}"):
-                # 加载图片
                 try:
-                    # 尝试修复路径
                     img_path = str(path)
                     
-                    # 路径修复策略（按优先级）
                     paths_to_try = [img_path]
                     
-                    # 策略1: 去掉 /mnt/htc-cephfs/fuse/root/ 前缀
                     if '/mnt/htc-cephfs/fuse/root' in img_path:
                         paths_to_try.append(img_path.replace('/mnt/htc-cephfs/fuse/root', ''))
                     
-                    # 策略2: 使用 data 符号链接
                     if 'embryo_dataset/' in img_path:
                         rel_path = img_path.split('embryo_dataset/')[-1]
                         paths_to_try.append(str(Path('data') / rel_path))
-                        # 也尝试去掉前缀后的 data 链接
                         if '/mnt/htc-cephfs/fuse/root' in img_path:
                             paths_to_try.append(str(Path('data') / rel_path))
                     
-                    # 尝试所有路径
                     img_path_found = None
                     for p in paths_to_try:
                         if Path(p).exists():
@@ -265,23 +243,19 @@ def export_all_frame_latents(
                     
                     img_path = img_path_found
                     
-                    # 加载并预处理图片
                     img = Image.open(img_path)
                     img = img.convert("L")
                     img = img.resize((128, 128), Image.BILINEAR)
                     img_array = np.array(img, dtype=np.float32)
                     
-                    # 归一化（minmax01）
                     p1, p99 = np.percentile(img_array, [1, 99])
                     if p99 > p1:
                         img_array = np.clip((img_array - p1) / (p99 - p1 + 1e-6), 0, 1)
                     else:
                         img_array = np.clip(img_array / 255.0, 0, 1)
                     
-                    # 转换为 tensor [1, 1, H, W]，确保是 float32
                     frame_tensor = torch.from_numpy(img_array.astype(np.float32)).unsqueeze(0).unsqueeze(0)
                     
-                    # 提取 latent
                     z = extract_frame_latent_from_encoder(model, frame_tensor, device)
                     
                     all_latents.append(z)
@@ -295,7 +269,6 @@ def export_all_frame_latents(
                     
                 except Exception as e:
                     print(f"    ⚠️  Error loading frame {frame_in_cell} ({path[:60]}...): {e}")
-                    # 跳过这个 frame
                     continue
     
     # Check if we extracted any frames

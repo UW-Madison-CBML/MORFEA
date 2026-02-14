@@ -1,5 +1,4 @@
 #!/bin/bash
-# 验证最终结果
 
 cd ~/ivf_repo
 
@@ -7,7 +6,6 @@ echo "=== Verifying TPHATE Results ==="
 python3 << 'PYTHON'
 import numpy as np
 
-# 检查 TPHATE 文件
 print("1. Checking tphate_3d_results_direct.npz...")
 d = np.load('tphate_3d_results_direct.npz', allow_pickle=True)
 f = d['frame_in_cell']
@@ -23,7 +21,6 @@ if len(f) == 435 and f.max() == 434:
 else:
     print("   ✗ Frame count is WRONG!")
 
-# 检查 latents 文件
 print("\n2. Checking latents_all_frames_direct.npz...")
 d2 = np.load('latents_all_frames_direct.npz', allow_pickle=True)
 f2 = d2['frame_in_cell']
@@ -35,7 +32,6 @@ if len(f) == len(f2):
 else:
     print(f"   ✗ Frame counts don't match! ({len(f)} vs {len(f2)})")
 
-# 检查可视化文件
 print("\n3. Checking visualization files...")
 import os
 files = [

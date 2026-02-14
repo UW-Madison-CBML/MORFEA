@@ -1,8 +1,6 @@
 #!/bin/bash
-# 在 CHTC 上运行的完整命令序列
 
 echo "=== Step 1: Force downgrade NumPy to 1.24.3 ==="
-# 强制安装 NumPy 1.24.3（稳定版本，兼容 s_gd2）
 pip install --user "numpy==1.24.3" --force-reinstall --no-deps --no-cache-dir
 
 echo ""

@@ -132,8 +132,6 @@ def apply_tphate_3d(Z, time_edges, cell_id, frame_in_cell, knn=10, n_components=
     
     print("\nUsing tphate library (REQUIRED, no fallback)...")
     
-    # 最簡單的方法：直接使用 fit_transform，不傳任何時間參數
-    # tphate 會自動從數據中學習時間結構（如果數據按時間順序排列）
     try:
         print("  Attempting TPHATE with standard fit_transform (no time parameters)...")
         tph = tphate.TPHATE(
@@ -142,7 +140,6 @@ def apply_tphate_3d(Z, time_edges, cell_id, frame_in_cell, knn=10, n_components=
             t="auto",
             n_jobs=-1
         )
-        # 直接調用 fit_transform，不傳任何額外參數
         Z_tphate = tph.fit_transform(Z)
         print(f"✓ TPHATE embedding shape: {Z_tphate.shape}")
         return Z_tphate
@@ -181,53 +178,38 @@ def apply_phate_with_time_improved(Z, time_edges, cell_id, frame_in_cell, n_comp
     
     N = len(Z)
     
-    # 1. 計算幾何距離（latent space）
     print("  Computing geometric distances...")
-    # 使用歐氏距離
     distances = squareform(pdist(Z, metric='euclidean'))
     
-    # 2. 構建時間鄰接矩陣
     print("  Building temporal adjacency matrix...")
     time_adj = sparse.lil_matrix((N, N))
     for i, j in time_edges:
         if i < N and j < N:
             time_adj[i, j] = 1
-            time_adj[j, i] = 1  # 無向圖
+            time_adj[j, i] = 1
     time_adj = time_adj.tocsr()
     
-    # 3. 結合幾何距離和時間結構
-    # 對於時間鄰居，降低距離（讓它們更近）
-    # 這模擬 TPHATE 的 temporal kernel
     print("  Combining geometric and temporal structure...")
-    temporal_weight = 0.3  # 時間鄰居的權重（可調整）
+    temporal_weight = 0.3
     
-    # 對時間鄰居的距離進行縮放
     distances_combined = distances.copy()
     time_neighbors = time_adj.nonzero()
     for i, j in zip(time_neighbors[0], time_neighbors[1]):
-        if i < j:  # 只處理一次（對稱矩陣）
-            # 降低時間鄰居之間的距離
+        if i < j:
             original_dist = distances[i, j]
             distances_combined[i, j] = original_dist * (1 - temporal_weight)
             distances_combined[j, i] = distances_combined[i, j]
     
-    # 4. 使用改進的距離矩陣構建 PHATE
     print("  Applying PHATE with temporal-weighted distances...")
     
-    # PHATE 需要從距離矩陣構建，但 PHATE API 可能不支持直接傳入距離矩陣
-    # 所以我們使用時間加權的 latent space
-    # 方法：對時間鄰居的 latent 進行平滑（局部平均）
     
-    # 計算時間鄰居的平均 latent（時間平滑）
     Z_temporal_smoothed = Z.copy()
     for i in range(N):
         neighbors = time_adj[i].nonzero()[1]
         if len(neighbors) > 0:
-            # 時間平滑：與時間鄰居的平均值混合
             neighbor_latents = Z[neighbors]
             Z_temporal_smoothed[i] = 0.7 * Z[i] + 0.3 * neighbor_latents.mean(axis=0)
     
-    # 5. 應用 PHATE（在時間平滑後的 latent space）
     ph = phate.PHATE(
         n_components=n_components,
         knn=knn,
@@ -270,7 +252,6 @@ def tphate_3d_pipeline(
     print(f"\nLoading preprocessed data from: {input_file}")
     data = np.load(input_file, allow_pickle=True)
     
-    # 選擇使用 Z_norm 還是 Z_pca
     if use_pca and 'Z_pca' in data:
         Z = data['Z_pca']
         print(f"  Using Z_pca: {Z.shape}")
@@ -285,7 +266,6 @@ def tphate_3d_pipeline(
     # Step 3: Build time structure
     time_edges, cell_groups = build_time_structure(cell_id, frame_in_cell)
     
-    # Step 4: Apply 3D TPHATE (不允許 fallback)
     np.random.seed(random_seed)
     Z_tphate = apply_tphate_3d(Z, time_edges, cell_id, frame_in_cell, knn=knn, n_components=n_components, use_phate_fallback=False)
     

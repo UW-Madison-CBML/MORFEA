@@ -1,5 +1,4 @@
 #!/bin/bash
-# 清理磁盘空间并检查大文件
 
 cd ~/ivf_repo
 

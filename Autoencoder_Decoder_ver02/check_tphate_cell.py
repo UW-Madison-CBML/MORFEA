@@ -47,15 +47,10 @@ if Path(index_csv).exists():
         row = df.iloc[i]
         print(f"  [{i}] cell_id={row['cell_id']}, start_idx={row['start_idx']}, n_paths={len(row['paths'].split('|'))}")
     
-    # 检查 TPHATE 中的 cell_id 是否在 index.csv 中
     tphate_cell = np.unique(cell_id_tphate)[0] if len(np.unique(cell_id_tphate)) > 0 else None
     if tphate_cell:
         matching = df[df['cell_id'] == tphate_cell]
-        print(f"\nIndex.csv 中匹配 cell_id='{tphate_cell}' 的序列:")
-        print(f"  找到 {len(matching)} 个序列")
         if len(matching) > 0:
-            print(f"  start_idx 范围: {matching['start_idx'].min()} - {matching['start_idx'].max()}")
-            print(f"  第一个序列的路径示例:")
             first_paths = matching.iloc[0]['paths'].split('|')
             print(f"    {first_paths[0] if len(first_paths) > 0 else 'N/A'}")
 else:

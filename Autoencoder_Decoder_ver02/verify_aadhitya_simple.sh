@@ -1,5 +1,4 @@
 #!/bin/bash
-# 简单验证脚本 - 直接在 CHTC 上运行
 
 python3 << 'PYTHON_EOF'
 import numpy as np
@@ -14,7 +13,6 @@ print(f"CSV: {csv_path}")
 print()
 
 try:
-    # 加载文件
     print("加载文件...")
     Z = np.load(npy_path)
     df = pd.read_csv(csv_path)
@@ -23,7 +21,6 @@ try:
     print(f"✓ CSV shape: {df.shape}")
     print(f"✓ CSV columns: {df.columns.tolist()}")
     
-    # 检查 cell_id 列
     if 'cell_id' in df.columns:
         print(f"✓ Unique embryos: {df['cell_id'].nunique()}")
         print(f"✓ Consistent: {len(df) == Z.shape[0]}")

@@ -56,12 +56,10 @@ def save_reconstruction_comparison(
     if T == 0:
         raise ValueError(f"Empty sequence: T={T}")
     
-    # 如果 n_frames_to_show 是 None 或 >= T，显示所有 frames
     if n_frames_to_show is None or n_frames_to_show >= T:
-        frame_indices = np.arange(T)  # 显示所有 frames
-        n_frames_to_show = T  # 更新实际要显示的数量
+        frame_indices = np.arange(T)
+        n_frames_to_show = T
     else:
-        # 否则均匀选择 frames
         frame_indices = np.linspace(0, T - 1, n_frames_to_show, dtype=int)
     
     # Get frame dimensions
@@ -461,7 +459,6 @@ def generate_reconstructions(
                 
                 # Save comparison
                 try:
-                    # 如果 n_frames_per_sample 是 None，显示所有 frames
                     n_frames_to_show = n_frames_per_sample if n_frames_per_sample is not None else original.shape[0]
                     filepath = save_reconstruction_comparison(
                         original,
@@ -597,7 +594,6 @@ def generate_single_sequence_reconstruction(
     # Clamp to [0, 1] range
     reconstructed = reconstructed.clamp(0, 1)
     
-    # Save comparison (如果 n_frames_to_show 是 None，显示所有 frames)
     if n_frames_to_show is None:
         n_frames_to_show = original.shape[0]
     filepath = save_reconstruction_comparison(

@@ -50,11 +50,9 @@ def preprocess_latents(
     # Step 2.1: Remove outliers (optional)
     if remove_outliers:
         print("\n[2.1] Removing outliers...")
-        # 計算每個維度的 mean 和 std
         Z_mean = Z.mean(axis=0, keepdims=True)
         Z_std = Z.std(axis=0, keepdims=True) + 1e-6
         
-        # 找出異常值（任何維度超過 threshold * std）
         z_scores = np.abs((Z - Z_mean) / Z_std)
         max_z_score = z_scores.max(axis=1)
         outlier_mask = max_z_score < outlier_std_threshold

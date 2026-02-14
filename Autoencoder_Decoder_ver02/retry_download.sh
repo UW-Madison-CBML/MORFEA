@@ -1,5 +1,4 @@
 #!/bin/bash
-# 重试下载 TPHATE 可视化文件（处理网络超时）
 
 REMOTE_USER="rho9"
 REMOTE_HOST="ap2001.chtc.wisc.edu"
@@ -26,7 +25,6 @@ max_retries=3
 retry_delay=5
 
 for file in "${files[@]}"; do
-    # 检查文件是否已存在
     if [ -f "$LOCAL_DIR/$file" ]; then
         size=$(stat -f%z "$LOCAL_DIR/$file" 2>/dev/null || stat -c%s "$LOCAL_DIR/$file" 2>/dev/null)
         if [ "$size" -gt 1000 ]; then

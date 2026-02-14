@@ -418,7 +418,7 @@ def main():
     parser.add_argument(
         "--device",
         type=str,
-        default=None,  # 改為 None，讓程序自動檢測（套用成功方法的邏輯）
+        default=None,
         help="Device to run on (default: auto-detect: cuda if available, else cpu). Valid values: 'cpu' or 'cuda'"
     )
     parser.add_argument(
@@ -442,16 +442,12 @@ def main():
     
     args = parser.parse_args()
     
-    # Auto-detect device (套用上次成功方法的邏輯)
-    # 就像 export_all_frame_latents_direct.py 一樣，直接在 Python 中處理 device
     if args.device and args.device in ["cpu", "cuda"]:
         device = args.device
     else:
-        # 如果 device 參數無效或未指定，自動檢測（就像成功的方法一樣）
         device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"⚠️  Device parameter invalid or missing, auto-detected: {device}")
     
-    # 如果指定了 cuda 但實際不可用，降級到 cpu
     if device == "cuda" and not torch.cuda.is_available():
         print(f"⚠️  CUDA requested but not available, falling back to CPU")
         device = "cpu"
@@ -487,7 +483,7 @@ def main():
         model_version_name=args.model_version,
         index_csv=args.index_csv,
         data_root=args.data_root,
-        device=device,  # 使用自動檢測的 device
+        device=device,
         batch_size=args.batch_size,
         max_embryos=args.max_embryos,
         output_base_dir=args.output_dir

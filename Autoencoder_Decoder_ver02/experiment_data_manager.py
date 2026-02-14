@@ -7,20 +7,20 @@ experiments/
   model_v1_baseline/
     embryo_ZS435-5/
       data/
-        latents.npy              # 原始latent vectors [T, latent_dim]
+        latents.npy
         tphate_3d.npy            # TPHATE 3D embedding [T, 3]
         pca_3d.npy               # PCA 3D embedding [T, 3]
         curvature.npy            # Curvature values [T]
-        metadata.npz             # 其他metadata (可以包含多个数组)
+        metadata.npz
       plots/
         trajectory_tphate.png
         trajectory_pca.png
         curvature_plot.png
         high_curvature_frames.png
-      metadata.json              # 实验配置和参数
+      metadata.json
     embryo_RS363-7/
       ...
-    summary.json                 # 该模型版本的所有embryo汇总
+    summary.json
   model_v2_no_temporal_smooth/
     ...
   model_v3_different_loss/
@@ -35,7 +35,6 @@ import shutil
 
 
 class ExperimentDataManager:
-    """管理实验数据的类"""
     
     def __init__(self, base_dir: str = "experiments"):
         """
@@ -65,7 +64,6 @@ class ExperimentDataManager:
         model_dir = self.base_dir / f"model_{model_name}"
         model_dir.mkdir(exist_ok=True)
         
-        # 保存模型配置
         config = {
             "model_name": model_name,
             "description": description,
@@ -105,11 +103,9 @@ class ExperimentDataManager:
         embryo_dir = model_dir / f"embryo_{embryo_id}"
         embryo_dir.mkdir(exist_ok=True)
         
-        # 创建子目录
         (embryo_dir / "data").mkdir(exist_ok=True)
         (embryo_dir / "plots").mkdir(exist_ok=True)
         
-        # 创建metadata文件
         metadata = {
             "embryo_id": embryo_id,
             "model_name": model_name,
@@ -122,7 +118,6 @@ class ExperimentDataManager:
         with open(metadata_path, 'w', encoding='utf-8') as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
         
-        # 更新模型配置中的embryo列表
         self._add_embryo_to_model_config(model_name, embryo_id)
         
         return embryo_dir
@@ -151,11 +146,9 @@ class ExperimentDataManager:
         embryo_dir = self._get_embryo_dir(model_name, embryo_id)
         data_dir = embryo_dir / "data"
         
-        # 保存numpy文件
         file_path = data_dir / f"{data_name}.npy"
         np.save(file_path, data)
         
-        # 更新metadata
         self._update_embryo_metadata(
             model_name, embryo_id,
             data_files={data_name: {
@@ -198,7 +191,6 @@ class ExperimentDataManager:
         file_path = plots_dir / f"{plot_name}.png"
         fig.savefig(file_path, dpi=dpi, bbox_inches='tight')
         
-        # 更新metadata
         self._update_embryo_metadata(
             model_name, embryo_id,
             plots=[plot_name]
@@ -231,7 +223,6 @@ class ExperimentDataManager:
         file_path = data_dir / "metadata.npz"
         np.savez(file_path, **arrays)
         
-        # 更新metadata
         array_info = {name: {"shape": list(arr.shape), "dtype": str(arr.dtype)}
                      for name, arr in arrays.items()}
         
@@ -295,7 +286,6 @@ class ExperimentDataManager:
         model_name: str,
         embryo_id: str
     ) -> Dict:
-        """获取embryo的metadata"""
         embryo_dir = self._get_embryo_dir(model_name, embryo_id)
         metadata_path = embryo_dir / "metadata.json"
         
@@ -303,13 +293,11 @@ class ExperimentDataManager:
             return json.load(f)
     
     def list_model_versions(self) -> List[str]:
-        """列出所有模型版本"""
         models = [d.name.replace("model_", "") for d in self.base_dir.glob("model_*")
                  if d.is_dir()]
         return sorted(models)
     
     def list_embryos(self, model_name: str) -> List[str]:
-        """列出特定模型版本的所有embryo"""
         model_dir = self.base_dir / f"model_{model_name}"
         if not model_dir.exists():
             return []
@@ -344,7 +332,6 @@ class ExperimentDataManager:
                 "created_at": metadata.get("created_at")
             }
         
-        # 保存汇总
         summary_path = model_dir / "summary.json"
         with open(summary_path, 'w', encoding='utf-8') as f:
             json.dump(summary, f, indent=2, ensure_ascii=False)
@@ -352,7 +339,6 @@ class ExperimentDataManager:
         return summary
     
     def _get_embryo_dir(self, model_name: str, embryo_id: str) -> Path:
-        """获取embryo目录，如果不存在则创建"""
         model_dir = self.base_dir / f"model_{model_name}"
         if not model_dir.exists():
             raise ValueError(f"Model version {model_name} does not exist")
@@ -370,7 +356,6 @@ class ExperimentDataManager:
         data_files: Optional[Dict] = None,
         plots: Optional[List] = None
     ):
-        """更新embryo的metadata"""
         embryo_dir = self._get_embryo_dir(model_name, embryo_id)
         metadata_path = embryo_dir / "metadata.json"
         
@@ -382,13 +367,12 @@ class ExperimentDataManager:
         
         if plots:
             metadata.setdefault("plots", []).extend(plots)
-            metadata["plots"] = list(set(metadata["plots"]))  # 去重
+            metadata["plots"] = list(set(metadata["plots"]))
         
         with open(metadata_path, 'w', encoding='utf-8') as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
     
     def _add_embryo_to_model_config(self, model_name: str, embryo_id: str):
-        """将embryo添加到模型配置中"""
         model_dir = self.base_dir / f"model_{model_name}"
         config_path = model_dir / "model_config.json"
         
@@ -404,12 +388,9 @@ class ExperimentDataManager:
                     json.dump(config, f, indent=2, ensure_ascii=False)
 
 
-# 使用示例
 if __name__ == "__main__":
-    # 创建管理器
     manager = ExperimentDataManager(base_dir="experiments")
     
-    # 创建模型版本
     model_config = {
         "encoder_hidden_dim": 256,
         "decoder_hidden_dim": 128,
@@ -422,14 +403,10 @@ if __name__ == "__main__":
         description="Baseline model with temporal smoothness"
     )
     
-    # 创建embryo目录
     manager.create_embryo_dir("v1_baseline", "ZS435-5")
     
-    # 保存数据
-    # latents = np.random.randn(435, 128)  # 示例数据
     # manager.save_data("v1_baseline", "ZS435-5", "latents", latents)
     
-    # 生成汇总
     # summary = manager.generate_summary("v1_baseline")
     # print(json.dumps(summary, indent=2))
 

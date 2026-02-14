@@ -1,5 +1,4 @@
 #!/bin/bash
-# 验证 TPHATE 结果的 frame 数量
 
 echo "=== Verifying Frame Count ==="
 echo ""

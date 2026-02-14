@@ -1,18 +1,13 @@
 #!/bin/bash
-# 嚴謹版 3D TPHATE Pipeline - 完整流程腳本
-# 在 CHTC 上運行完整的 pipeline
 
 set -e  # Exit on error
 
 echo "=========================================="
-echo "嚴謹版 3D TPHATE Pipeline"
 echo "=========================================="
 echo ""
 
 cd ~/ivf_repo
 
-# 檢查並安裝依賴
-echo "=== 檢查依賴 ==="
 python3 -c "import torch" 2>/dev/null || {
     echo "⚠️  torch not found, but should be available"
 }
@@ -40,7 +35,6 @@ python3 -c "import tphate" 2>/dev/null && {
     echo "✓ tphate installed"
 }
 
-echo "✓ 依賴檢查完成"
 echo ""
 
 # Step 1: Export all frame latents (direct from cell folders)
@@ -54,7 +48,7 @@ python3 export_all_frame_latents_direct.py \
     --checkpoint checkpoints/checkpoint_epoch_50.pt \
     --data_root data \
     --output latents_all_frames_direct.npz \
-    --cell_ids RI382-2  # 指定要處理的 cell_id，或移除此參數處理所有 cells
+    --cell_ids RI382-2
 
 if [ $? -ne 0 ]; then
     echo "❌ Step 1 failed!"
@@ -109,15 +103,8 @@ echo "=========================================="
 echo "✅ Pipeline Complete!"
 echo "=========================================="
 echo ""
-echo "結果文件："
-echo "  - latents_all_frames_direct.npz (Step 1 輸出，所有原始 frames)"
-echo "  - latents_preprocessed_direct.npz (Step 2 輸出)"
-echo "  - tphate_3d_results_direct.npz (Step 3-4 輸出，真正的 TPHATE)"
 echo ""
-echo "下一步："
-echo "  - 使用 tphate_3d_results.npz 進行軌跡分析"
 echo "  - TDA (persistent homology)"
-echo "  - Clustering / 分亞型"
 echo "  - Feature extraction for downstream classifier"
 echo ""
 

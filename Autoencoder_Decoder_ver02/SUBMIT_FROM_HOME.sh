@@ -1,13 +1,9 @@
 #!/bin/bash
-# 从 home 目录提交 HTCondor 作业
 
-echo "=== 从 home 目录提交 T-PHATE 生成作业 ==="
 echo ""
 
-# 切换到 home 目录
 cd ~
 
-# 创建 submit 文件
 cat > generate_tphate.sub << 'EOF'
 universe = vanilla
 log = /staging/groups/bhaskar_group/rho9/logs/generate_tphate_$(Cluster).log
@@ -28,10 +24,8 @@ EOF
 echo "✓ Created generate_tphate.sub in home directory"
 echo ""
 
-# 确保日志目录存在
 mkdir -p /staging/groups/bhaskar_group/rho9/logs
 
-# 提交作业
 echo "Submitting job..."
 condor_submit generate_tphate.sub
 

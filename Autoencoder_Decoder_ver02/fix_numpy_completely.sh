@@ -1,5 +1,4 @@
 #!/bin/bash
-# 彻底修复 NumPy 和 tphate 问题
 
 cd ~/ivf_repo
 

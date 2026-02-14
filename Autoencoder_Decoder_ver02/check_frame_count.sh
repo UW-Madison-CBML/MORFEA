@@ -1,10 +1,8 @@
 #!/bin/bash
-# 检查 TPHATE 结果中的 frame 数量
 
 echo "=== Checking Frame Count in TPHATE Results ==="
 echo ""
 
-# 在 CHTC 上运行这个脚本来检查
 # python3 << 'PYTHON'
 # import numpy as np
 # 

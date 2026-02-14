@@ -30,7 +30,6 @@ def divide_trajectory_into_segments(Z_tphate, cell_id, frame_in_cell, n_segments
     Returns:
         segment_labels: [N] segment labels (0, 1, 2, 3)
     """
-    # 按 cell 分组，然后按时间排序
     unique_cells = np.unique(cell_id)
     segment_labels = np.zeros(len(Z_tphate), dtype=int)
     
@@ -39,27 +38,21 @@ def divide_trajectory_into_segments(Z_tphate, cell_id, frame_in_cell, n_segments
         if mask.sum() == 0:
             continue
         
-        # 获取该 cell 的轨迹点
         cell_indices = np.where(mask)[0]
         cell_frames = frame_in_cell[cell_indices]
         
-        # 按时间排序
         sorted_order = np.argsort(cell_frames)
         sorted_indices = cell_indices[sorted_order]
         
-        # 计算轨迹长度（arc length）
         cell_trajectory = Z_tphate[sorted_indices]
         if len(cell_trajectory) > 1:
-            # 计算累积弧长
             diffs = np.diff(cell_trajectory, axis=0)
             distances = np.linalg.norm(diffs, axis=1)
             cumulative_length = np.concatenate([[0], np.cumsum(distances)])
             total_length = cumulative_length[-1]
             
-            # 按累积弧长分成 n_segments 段
             segment_size = total_length / n_segments
             for i, idx in enumerate(sorted_indices):
-                # 找到这个点在轨迹中的位置
                 pos_in_sorted = np.where(sorted_indices == idx)[0][0]
                 if pos_in_sorted == 0:
                     segment = 0
@@ -86,7 +79,6 @@ def load_original_images(paths, index_csv=None, resize=128):
     """
     images = []
     
-    # 如果提供了 index_csv，尝试从那里加载路径
     if index_csv and Path(index_csv).exists():
         try:
             df = pd.read_csv(index_csv)
@@ -99,24 +91,17 @@ def load_original_images(paths, index_csv=None, resize=128):
     for i, path_str in enumerate(paths):
         img = None
         
-        # 方法 1: 尝试直接加载原始路径
         if path_str and Path(path_str).exists():
             try:
                 img = Image.open(path_str)
             except:
                 pass
         
-        # 方法 2: 如果原始路径不存在，尝试从 index.csv 重建
         if img is None and df is not None:
-            # 从 index.csv 中找到对应的路径
-            # 需要根据 sequence_idx 和 frame_in_cell 来匹配
-            # 这里简化处理：直接尝试所有可能的路径
             for idx, row in df.iterrows():
                 row_paths = row['paths'].split('|')
                 for p in row_paths:
-                    # 尝试修复路径（如果是本地路径，替换为 CHTC 路径）
                     p_fixed = str(p)
-                    # 替换常见的本地路径前缀 (generic pattern for local development)
                     if 'embryo_dataset' in p_fixed and ('/Desktop/' in p_fixed or '/Users/' in p_fixed):
                         # Extract relative path and convert to staging
                         if 'embryo_dataset/' in p_fixed:
@@ -127,9 +112,7 @@ def load_original_images(paths, index_csv=None, resize=128):
                             p_fixed = p_fixed.replace(p_fixed.split('embryo_dataset')[0] + 'embryo_dataset',
                                                       '/staging/groups/bhaskar_group/rho9/ivf_data/embryo_dataset')
                     
-                    # 也尝试 data 符号链接
                     if not Path(p_fixed).exists():
-                        # 尝试使用 data 符号链接
                         p_symlink = p_fixed.replace('/staging/groups/bhaskar_group/rho9/ivf_data/embryo_dataset', 'data')
                         if Path(p_symlink).exists():
                             p_fixed = p_symlink
@@ -143,9 +126,8 @@ def load_original_images(paths, index_csv=None, resize=128):
                 if img is not None:
                     break
         
-        # 方法 3: 如果还是找不到，创建灰色占位图
         if img is None:
-            img = Image.new("L", (resize, resize), 128)  # 灰色而不是黑色
+            img = Image.new("L", (resize, resize), 128)
         else:
             img = img.convert("L")  # Grayscale
             img = img.resize((resize, resize), Image.BILINEAR)
@@ -350,13 +332,12 @@ def create_segment_visualization(
     Z_tphate = tphate_data['Z_tphate']  # [N, 3]
     cell_id = tphate_data['cell_id']
     frame_in_cell = tphate_data['frame_in_cell']
-    sequence_idx = tphate_data.get('sequence_idx', None)  # 从 tphate 文件获取，如果没有则从 latents 文件获取
+    sequence_idx = tphate_data.get('sequence_idx', None)
     
     # Load original latents data (for paths)
     print(f"Loading original data from: {latents_file}")
     latents_data = np.load(latents_file, allow_pickle=True)
     paths = latents_data['paths'] if 'paths' in latents_data else None
-    # 如果 tphate 文件没有 sequence_idx，从 latents 文件获取
     if sequence_idx is None:
         sequence_idx = latents_data['sequence_idx'] if 'sequence_idx' in latents_data else None
     
@@ -452,15 +433,12 @@ def create_segment_visualization(
     ax_3d_gradient.set_title('3D TPHATE Trajectory (Gradient: Frame Index)', fontsize=14, fontweight='bold')
     
     # Add colorbar (showing raw frame values, NOT normalized)
-    # 重要：使用 ScalarMappable 和 Normalize 来确保 colorbar 显示原始值（不归一化）
     print(f"  Frame values range: {frame_min} - {frame_max} (NOT normalized)")
     norm = Normalize(vmin=frame_min, vmax=frame_max)
     sm = ScalarMappable(norm=norm, cmap='viridis')
-    sm.set_array([])  # 空数组，只用于 colorbar
+    sm.set_array([])
     cbar = plt.colorbar(sm, ax=ax_3d_gradient, pad=0.1)
     cbar.set_label('Frame Index (Raw, NOT Normalized)', fontsize=10)
-    # 确保 colorbar 显示实际的原始 frame 值（不归一化）
-    # 使用整数 ticks，显示实际的 frame 编号
     if frame_max - frame_min > 0:
         num_ticks = min(10, int(frame_max - frame_min + 1))
         if num_ticks > 1:
@@ -561,7 +539,6 @@ def create_segment_visualization(
         
         # Load and paste frames
         if use_original_images:
-            # 从 index.csv 加载正确的路径
             df_index = None
             if Path(index_csv).exists():
                 try:
@@ -569,7 +546,7 @@ def create_segment_visualization(
                     print(f"  Loading images from index.csv for {segment_names[seg]}...")
                     print(f"  TPHATE cell_id: {np.unique(seg_cell_ids)}")
                     print(f"  Index.csv has {len(df_index)} sequences")
-                    print(f"  Index.csv unique cells: {df_index['cell_id'].unique()[:5]}...")  # 显示前5个
+                    print(f"  Index.csv unique cells: {df_index['cell_id'].unique()[:5]}...")
                 except Exception as e:
                     print(f"  Error loading index.csv: {e}")
                     pass
@@ -581,37 +558,29 @@ def create_segment_visualization(
                 x_offset = 20 + col * (frame_size + 20)
                 y_offset = 80 + row * (frame_size + 40)
                 
-                # Load image - 尝试多种方法
                 img_rgb = None
                 
-                # 获取当前 frame 的信息
                 current_frame_in_cell = seg_frames[sorted_order[i]]
                 current_seq_idx = sequence_idx[idx] if sequence_idx is not None and idx < len(sequence_idx) else None
                 
-                # 方法 1: 从 paths 数组（最直接的方法，适用于直接从 cell folder 提取的情况）
                 if paths is not None and idx < len(paths) and paths[idx]:
                     img_path = str(paths[idx])
                     
-                    # 路径修复策略（按优先级）
                     paths_to_try = [img_path]
                     
-                    # 策略1: 去掉 /mnt/htc-cephfs/fuse/root/ 前缀
                     if '/mnt/htc-cephfs/fuse/root' in img_path:
                         paths_to_try.append(img_path.replace('/mnt/htc-cephfs/fuse/root', ''))
                     
-                    # 策略2: 使用 data 符号链接
                     if 'embryo_dataset/' in img_path:
                         rel_path = img_path.split('embryo_dataset/')[-1]
                         paths_to_try.append(str(Path('data') / rel_path))
                     
-                    # 策略3: 尝试本地路径替换（fallback）
                     # Generic pattern for local development paths
                     if 'embryo_dataset' in img_path and ('/Desktop/' in img_path or '/Users/' in img_path):
                         if 'embryo_dataset/' in img_path:
                             rel_path = img_path.split('embryo_dataset/', 1)[1]
                             paths_to_try.append(f'/staging/groups/bhaskar_group/rho9/ivf_data/embryo_dataset/{rel_path}')
                     
-                    # 尝试所有路径
                     for p in paths_to_try:
                         if Path(p).exists():
                             try:
@@ -621,65 +590,49 @@ def create_segment_visualization(
                                 img_rgb = img.convert('RGB')
                                 break
                             except Exception as e:
-                                if i < 3:  # 只打印前3个错误
+                                if i < 3:
                                     print(f"    [Debug] Error loading {p[:60]}...: {e}")
                                 continue
                 
-                # 方法 2: 从 index.csv 重建路径（最可靠的方法）
                 if img_rgb is None and df_index is not None and current_seq_idx is not None:
                     if current_seq_idx < len(df_index):
                         row = df_index.iloc[current_seq_idx]
                         
-                        # 验证 cell_id 匹配
                         row_cell_id = row['cell_id']
                         current_cell_id = seg_cell_ids[sorted_order[i]]
                         
                         if row_cell_id != current_cell_id:
-                            # Cell ID 不匹配，尝试找到正确的序列
-                            # 在 index.csv 中查找匹配的 cell_id 和 frame_in_cell
                             matching_rows = df_index[
                                 (df_index['cell_id'] == current_cell_id) & 
                                 (df_index['start_idx'] <= current_frame_in_cell) &
-                                (df_index['start_idx'] + 16 > current_frame_in_cell)  # 假设序列长度是16
+                                (df_index['start_idx'] + 16 > current_frame_in_cell)
                             ]
                             if len(matching_rows) > 0:
-                                # 使用第一个匹配的行
                                 row = matching_rows.iloc[0]
                                 current_seq_idx = matching_rows.index[0]
                         
                         row_paths = row['paths'].split('|')
                         start_idx = int(row['start_idx'])
                         
-                        # frame_in_cell 是全局索引，需要转换为序列内的相对位置
-                        # frame_in_cell = start_idx + t，所以 t = frame_in_cell - start_idx
                         t_in_sequence = current_frame_in_cell - start_idx
                         
-                        # 检查 t_in_sequence 是否在有效范围内
                         if 0 <= t_in_sequence < len(row_paths):
                             img_path = row_paths[t_in_sequence]
                             
-                            # 路径已经在 index.csv 中是正确的，直接使用
-                            # 但需要检查是否存在，如果不存在，尝试其他路径格式
                             
-                            # 如果路径已经存在，直接使用
                             if not Path(img_path).exists():
-                                # 尝试不同的路径格式
-                                # 格式1: 去掉 /mnt/htc-cephfs/fuse/root/ 前缀（如果存在）
                                 if '/mnt/htc-cephfs/fuse/root' in img_path:
                                     img_path_alt = img_path.replace('/mnt/htc-cephfs/fuse/root', '')
                                     if Path(img_path_alt).exists():
                                         img_path = img_path_alt
                                 
-                                # 格式2: 使用 data 符号链接
                                 if not Path(img_path).exists():
-                                    # 提取相对路径部分
                                     if 'embryo_dataset/' in img_path:
                                         rel_path = img_path.split('embryo_dataset/')[-1]
                                         img_path_symlink = Path('data') / rel_path
                                         if img_path_symlink.exists():
                                             img_path = str(img_path_symlink)
                                 
-                                # 格式3: 尝试本地路径替换（fallback）
                                 if not Path(img_path).exists():
                                     # Generic pattern for local development paths
                                     if 'embryo_dataset' in img_path and ('/Desktop/' in img_path or '/Users/' in img_path):
@@ -698,12 +651,10 @@ def create_segment_visualization(
                                     img = img.resize((frame_size, frame_size), Image.BILINEAR)
                                     img_rgb = img.convert('RGB')
                                 except Exception as e:
-                                    # 调试信息
-                                    if i < 5:  # 只打印前5个错误
+                                    if i < 5:
                                         print(f"    [Debug] Error loading image {img_path[:60]}...: {e}")
                                     pass
                 
-                # 方法 3: 如果还是找不到，使用灰色占位图
                 if img_rgb is None:
                     img_rgb = Image.new('RGB', (frame_size, frame_size), (128, 128, 128))
                 
@@ -718,7 +669,6 @@ def create_segment_visualization(
                 except:
                     font = ImageFont.load_default()
                 
-                # 使用 current_frame_in_cell（已经在上面定义了）
                 text = f"Frame {current_frame_in_cell}"
                 bbox = draw.textbbox((0, 0), text, font=font)
                 text_width = bbox[2] - bbox[0]

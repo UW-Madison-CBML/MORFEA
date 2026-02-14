@@ -1,5 +1,4 @@
 #!/bin/bash
-# 下载可视化文件（修复 zsh glob 问题）
 
 cd "/Users/grnho/Desktop/Project IVF/Code/Autoencoder_Decoder_ver02"
 mkdir -p tphate_results_final
@@ -7,7 +6,6 @@ mkdir -p tphate_results_final
 echo "=== Downloading Visualization Files ==="
 echo ""
 
-# 使用引号包裹路径，避免 zsh glob 扩展问题
 echo "Downloading PNG files..."
 scp "rho9@ap2001.chtc.wisc.edu:~/ivf_repo/tphate_segments_direct/*.png" tphate_results_final/ 2>&1
 

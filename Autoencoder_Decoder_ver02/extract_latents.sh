@@ -141,7 +141,6 @@ if [ ! -f "index.csv" ]; then
     exit 1
 fi
 
-# Detect GPU for logging (但讓 Python 腳本自動處理 device，套用成功方法的邏輯)
 echo "Detecting GPU (for logging, Python will auto-detect)..."
 python3 << 'PYTHON_EOF'
 import torch

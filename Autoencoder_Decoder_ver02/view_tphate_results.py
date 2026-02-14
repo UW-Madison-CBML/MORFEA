@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 
 def view_tphate_results(results_dir="tphate_results"):
-    """查看 TPHATE 结果摘要"""
     
     results_path = Path(results_dir)
     
@@ -16,7 +15,6 @@ def view_tphate_results(results_dir="tphate_results"):
     print("=" * 60)
     print()
     
-    # 1. 查看 segments metadata
     metadata_file = results_path / "tphate_segments_direct" / "segments_metadata.json"
     if metadata_file.exists():
         print("📊 Segment Information:")
@@ -31,7 +29,6 @@ def view_tphate_results(results_dir="tphate_results"):
                 print(f"    Frame range: {frame_range[0]} - {frame_range[1]}")
         print()
     
-    # 2. 查看 TPHATE 3D results
     tphate_file = results_path / "tphate_3d_results_direct.npz"
     if tphate_file.exists():
         print("📈 TPHATE 3D Embedding:")
@@ -58,7 +55,6 @@ def view_tphate_results(results_dir="tphate_results"):
             print(f"  Frame range: {frames.min()} - {frames.max()}")
         print()
     
-    # 3. 查看 latent files
     latents_file = results_path / "latents_all_frames_direct.npz"
     if latents_file.exists():
         print("🧬 Original Latents:")
@@ -92,7 +88,6 @@ def view_tphate_results(results_dir="tphate_results"):
             print(f"  PCA components: {Z_pca.shape[1]}")
         print()
     
-    # 4. 可视化文件
     vis_dir = results_path / "tphate_segments_direct"
     if vis_dir.exists():
         print("🖼️  Visualization Files:")

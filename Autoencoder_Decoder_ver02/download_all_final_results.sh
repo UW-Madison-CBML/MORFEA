@@ -1,24 +1,19 @@
 #!/bin/bash
-# 下载所有最终结果文件
 
 cd "/Users/grnho/Desktop/Project IVF/Code/Autoencoder_Decoder_ver02"
 
-# 创建输出目录
 mkdir -p tphate_results_final
 
 echo "=== Downloading TPHATE Results ==="
 echo ""
 
-# 1. TPHATE 结果文件
 echo "1. Downloading TPHATE results..."
 scp rho9@ap2001.chtc.wisc.edu:~/ivf_repo/tphate_3d_results_direct.npz tphate_results_final/ 2>/dev/null && echo "   ✓ tphate_3d_results_direct.npz" || echo "   ✗ tphate_3d_results_direct.npz failed"
 
-# 2. 预处理文件（如果需要）
 echo ""
 echo "2. Downloading preprocessed latents..."
 scp rho9@ap2001.chtc.wisc.edu:~/ivf_repo/latents_preprocessed_direct.npz tphate_results_final/ 2>/dev/null && echo "   ✓ latents_preprocessed_direct.npz" || echo "   ✗ latents_preprocessed_direct.npz failed"
 
-# 3. 所有可视化文件
 echo ""
 echo "3. Downloading visualization files..."
 scp rho9@ap2001.chtc.wisc.edu:~/ivf_repo/tphate_segments_direct/*.png tphate_results_final/ 2>/dev/null && echo "   ✓ All PNG files" || echo "   ✗ PNG files failed"
@@ -58,7 +53,6 @@ for f in files_to_check:
     else:
         print(f"  ✗ {os.path.basename(f)} NOT FOUND")
 
-# 验证 frame 数量
 if os.path.exists('tphate_results_final/tphate_3d_results_direct.npz'):
     print("\nVerifying frame count...")
     d = np.load('tphate_results_final/tphate_3d_results_direct.npz', allow_pickle=True)

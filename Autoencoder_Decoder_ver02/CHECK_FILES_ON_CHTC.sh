@@ -1,28 +1,19 @@
 #!/bin/bash
-# 在 CHTC 上檢查並比較文件
 
 echo "============================================================"
-echo "檢查 CHTC 上的文件（在 CHTC 上執行）"
 echo "============================================================"
 echo ""
-echo "請在 CHTC 上執行以下命令檢查當前文件："
 echo ""
-echo "1. 檢查 staging 上的腳本："
 echo "   ls -lh /staging/groups/bhaskar_group/rho9/extract_latents.sh"
 echo "   head -20 /staging/groups/bhaskar_group/rho9/extract_latents.sh | grep -E '(DEVICE|Pre-creating|Output directory)'"
 echo ""
-echo "2. 檢查關鍵修復是否已存在："
 echo "   grep -A 3 'Pre-creating output directory' /staging/groups/bhaskar_group/rho9/extract_latents.sh"
 echo "   grep -A 3 'if \[ -z \"\$DEVICE\" \]' /staging/groups/bhaskar_group/rho9/extract_latents.sh"
 echo ""
-echo "3. 檢查 submit 文件："
 echo "   grep 'MaxJobRuntime' ~/extract_latents_from_home.sub"
 echo ""
 echo "============================================================"
 echo ""
-echo "如果文件還沒有更新，您需要："
-echo "  1. 在本地終端執行 scp 上傳"
-echo "  2. 或使用其他方法（如通過其他機器）"
 echo ""
 echo "============================================================"
 

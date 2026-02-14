@@ -1,12 +1,10 @@
 #!/bin/bash
-# 修复 NumPy 版本兼容性问题并重新安装 tphate
 
 echo "=== Fixing NumPy and TPHATE Installation ==="
 echo ""
 
 cd ~/ivf_repo
 
-# 1. 降级 NumPy 到 1.x
 echo "1. Downgrading NumPy to < 2.0..."
 pip install --user "numpy<2.0" --force-reinstall --no-cache-dir
 
@@ -18,15 +16,12 @@ fi
 echo "✓ NumPy downgraded"
 echo ""
 
-# 2. 卸载并重新安装 s_gd2 和 tphate
 echo "2. Reinstalling s_gd2 and tphate..."
 pip uninstall --user -y s_gd2 tphate 2>/dev/null || true
 
-# 先安装 s_gd2（可能需要从源码编译）
 echo "  Installing s_gd2..."
 pip install --user s_gd2 --no-cache-dir --force-reinstall
 
-# 然后安装 tphate
 echo "  Installing tphate..."
 pip install --user tphate --no-cache-dir --force-reinstall
 
@@ -38,7 +33,6 @@ fi
 echo "✓ tphate installed"
 echo ""
 
-# 3. 验证安装
 echo "3. Verifying installation..."
 python3 -c "import numpy as np; print(f'NumPy version: {np.__version__}')"
 python3 -c "import tphate; print('✓ tphate imported successfully')" 2>&1

@@ -24,21 +24,16 @@ def fix_index_paths(input_csv, output_csv=None, staging_base="/staging/groups/bh
     print(f"Found {len(df)} rows")
     print(f"Sample path: {df['paths'].iloc[0].split('|')[0] if len(df) > 0 else 'N/A'}")
     
-    # 转换路径
     def convert_paths(path_str):
-        """转换路径字符串中的所有路径"""
         paths = path_str.split("|")
         converted = []
         for p in paths:
-            # 如果是本地路径，转换为staging路径
             # Generic pattern for local development paths
             if "embryo_dataset" in p and ("/Desktop/" in p or "/Users/" in p):
-                # 提取相对路径
                 rel_path = p.split("embryo_dataset/", 1)[1]
                 new_path = f"{staging_base}/{rel_path}"
                 converted.append(new_path)
             elif "embryo_dataset" in p and not p.startswith("/staging"):
-                # 尝试提取cell_name和filename
                 parts = Path(p).parts
                 if "embryo_dataset" in parts:
                     idx = parts.index("embryo_dataset")
@@ -48,7 +43,6 @@ def fix_index_paths(input_csv, output_csv=None, staging_base="/staging/groups/bh
                 else:
                     converted.append(p)
             else:
-                # 已经是staging路径或不需要转换
                 converted.append(p)
         return "|".join(converted)
     

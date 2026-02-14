@@ -47,7 +47,6 @@ except (ImportError, AttributeError):
 
 
 def extract_frame_latent_from_encoder(model, frame, device="cpu"):
-    """从单张 frame 提取 latent vector"""
     model.eval()
     with torch.no_grad():
         frame = frame.to(device)
@@ -75,7 +74,6 @@ def extract_frame_latent_from_encoder(model, frame, device="cpu"):
 
 
 def parse_time_from_path(path_str):
-    """从路径中解析时间信息"""
     run_match = re.search(r'RUN[_\- ]?(\d+)', path_str, re.I)
     if run_match:
         return int(run_match.group(1))
@@ -86,14 +84,12 @@ def parse_time_from_path(path_str):
 
 
 def list_all_frames_in_cell(cell_dir):
-    """直接从 cell folder 列出所有图片 frames"""
     exts = ("*.jpg", "*.jpeg", "*.png", "*.JPG", "*.JPEG", "*.PNG")
     frames = []
     for ext in exts:
         frames += list(cell_dir.glob(ext))
     frames = [p for p in frames if p.exists() and p.stat().st_size > 0]
     
-    # 排序（使用 RUN number）
     run_pat = re.compile(r'RUN[_\- ]?(\d+)', re.I)
     num_pat = re.compile(r'(\d+)')
     
@@ -112,10 +108,10 @@ def list_all_frames_in_cell(cell_dir):
 
 def export_all_frame_latents_direct(
     checkpoint_path="checkpoints/checkpoint_epoch_50.pt",
-    data_root="data",  # 或 "/staging/groups/bhaskar_group/rho9/ivf_data/embryo_dataset"
+    data_root="data",
     output_file="latents_all_frames_direct.npz",
     device="cuda" if torch.cuda.is_available() else "cpu",
-    cell_ids=None  # None = 处理所有 cells
+    cell_ids=None
 ):
     """
     直接从 cell folders 读取所有 frames（不经过 index.csv）
@@ -167,14 +163,11 @@ def export_all_frame_latents_direct(
     print(f"\nScanning data root: {data_root}")
     data_path = Path(data_root)
     
-    # 尝试多种路径格式
     if not data_path.exists():
-        # 尝试 data 符号链接
         if Path('data').exists():
             data_path = Path('data')
             print(f"  Using 'data' symlink: {data_path}")
         else:
-            # 尝试 staging 路径
             staging_path = Path('/staging/groups/bhaskar_group/rho9/ivf_data/embryo_dataset')
             if staging_path.exists():
                 data_path = staging_path
@@ -203,7 +196,6 @@ def export_all_frame_latents_direct(
             cell_id = cell_dir.name
             print(f"\nProcessing cell: {cell_id}")
             
-            # 列出所有 frames
             frames = list_all_frames_in_cell(cell_dir)
             print(f"  Found {len(frames)} frames")
             
@@ -211,69 +203,59 @@ def export_all_frame_latents_direct(
                 print(f"  ⚠️  No frames found, skipping")
                 continue
             
-            # 限制：只处理前 435 个 frame（不包括 435，即索引 0-434）
             max_frames = 435
             original_count = len(frames)
             
             if len(frames) > max_frames:
-                frames = frames[:max_frames]  # 直接修改 frames，只取前 435 个（索引 0-434）
+                frames = frames[:max_frames]
                 print(f"  ✓ LIMITED to first {max_frames} frames (indices 0-{max_frames-1})")
                 print(f"  ✓ EXCLUDING frames {max_frames} to {original_count-1} ({original_count - max_frames} frames skipped)")
             else:
                 print(f"  ✓ Processing all {len(frames)} frames (less than {max_frames})")
             
             empty_well_detected = False
-            valid_frame_count = 0  # 实际成功提取的 frame 数量
+            valid_frame_count = 0
             
             for frame_idx, frame_path in enumerate(tqdm(frames, desc=f"  Extracting {cell_id}", total=len(frames))):
                 try:
-                    # 加载图片
                     img = Image.open(frame_path)
                     img = img.convert("L")
                     img = img.resize((128, 128), Image.BILINEAR)
                     img_array = np.array(img, dtype=np.float32)
                     
-                    # 检测 empty well（空白图像）
-                    # 方法：检查图像方差和像素值范围
                     img_std = img_array.std()
                     img_mean = img_array.mean()
                     img_range = img_array.max() - img_array.min()
                     
-                    # Empty well 特征：方差很小（几乎全黑/全白）或范围很小
                     is_empty = (img_std < 5.0) or (img_range < 10.0)
                     
                     if is_empty:
                         if not empty_well_detected:
                             print(f"\n    ⚠️  Empty well detected at frame {frame_idx}, skipping remaining frames")
                             empty_well_detected = True
-                        continue  # 跳过 empty well
+                        continue
                     
-                    # 归一化（minmax01）
                     p1, p99 = np.percentile(img_array, [1, 99])
                     if p99 > p1:
                         img_array = np.clip((img_array - p1) / (p99 - p1 + 1e-6), 0, 1)
                     else:
                         img_array = np.clip(img_array / 255.0, 0, 1)
                     
-                    # 转换为 tensor [1, 1, H, W]
                     frame_tensor = torch.from_numpy(img_array.astype(np.float32)).unsqueeze(0).unsqueeze(0)
                     
-                    # 提取 latent
                     z = extract_frame_latent_from_encoder(model, frame_tensor, device)
                     
-                    # 解析绝对时间
                     abs_time = parse_time_from_path(str(frame_path))
                     
                     all_latents.append(z)
                     all_cell_ids.append(cell_id)
-                    all_frame_in_cell.append(valid_frame_count)  # 使用连续的有效 frame 计数 (0, 1, 2, ..., 最多 434)
+                    all_frame_in_cell.append(valid_frame_count)
                     all_abs_time.append(abs_time)
                     all_paths.append(str(frame_path))
                     
                     valid_frame_count += 1
                     cell_frame_count[cell_id] = valid_frame_count
                     
-                    # 如果已经提取了 435 个有效 frame，停止（严格限制）
                     if valid_frame_count >= max_frames:
                         print(f"\n    ✓ Reached EXACTLY {max_frames} valid frames (frame_in_cell: 0-{max_frames-1}), stopping")
                         break

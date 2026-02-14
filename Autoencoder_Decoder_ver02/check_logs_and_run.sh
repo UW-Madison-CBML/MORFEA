@@ -1,5 +1,4 @@
 #!/bin/bash
-# 检查 logs 并运行 TPHATE
 
 cd ~/ivf_repo
 

@@ -1,5 +1,4 @@
 #!/bin/bash
-# 运行完整的 TPHATE pipeline（NumPy 已修复）
 
 cd ~/ivf_repo
 

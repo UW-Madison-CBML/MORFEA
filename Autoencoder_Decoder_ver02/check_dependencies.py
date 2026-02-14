@@ -11,7 +11,6 @@ required_packages = {
     'PIL': 'Pillow (PIL)',
 }
 
-print("=== 检查依赖包 ===")
 print()
 
 missing = []
@@ -30,17 +29,7 @@ for package, name in required_packages.items():
 
 print()
 if missing:
-    print(f"缺少的包: {', '.join(missing)}")
     print()
-    print("在CHTC上，PyTorch容器通常包含:")
-    print("  ✓ torch (包含在容器中)")
-    print("  ✓ numpy (包含在容器中)")
-    print("  ✗ pandas (可能需要安装)")
-    print("  ✗ Pillow (可能需要安装)")
     print()
-    print("解决方案:")
-    print("1. 使用包含所有包的容器")
-    print("2. 或者在脚本中安装缺失的包")
 else:
-    print("✓ 所有依赖包都已安装")
 

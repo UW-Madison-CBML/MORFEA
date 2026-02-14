@@ -1,5 +1,4 @@
 #!/bin/bash
-# 调试并修复 TPHATE pipeline
 
 cd ~/ivf_repo
 

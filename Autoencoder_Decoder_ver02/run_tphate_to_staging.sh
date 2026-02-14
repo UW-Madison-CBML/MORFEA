@@ -1,9 +1,7 @@
 #!/bin/bash
-# 运行 TPHATE pipeline，输出到 staging 目录（避免配额问题）
 
 cd ~/ivf_repo
 
-# 创建 staging 输出目录
 STAGING_OUTPUT="/staging/groups/bhaskar_group/rho9/ivf_results"
 mkdir -p "$STAGING_OUTPUT"
 
@@ -11,7 +9,6 @@ echo "=== Running TPHATE Pipeline (Output to Staging) ==="
 echo "Output directory: $STAGING_OUTPUT"
 echo ""
 
-# 运行 TPHATE
 python3 tphate_3d_pipeline.py \
     --input latents_preprocessed_direct.npz \
     --output "$STAGING_OUTPUT/tphate_3d_results_direct.npz" \

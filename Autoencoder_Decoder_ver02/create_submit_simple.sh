@@ -1,5 +1,4 @@
 #!/bin/bash
-# 在 CHTC 上创建 submit 文件（单行版本，避免语法错误）
 
 cat > generate_tphate.sub << 'EOF'
 universe = vanilla

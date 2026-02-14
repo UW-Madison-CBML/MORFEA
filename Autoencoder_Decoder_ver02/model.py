@@ -80,7 +80,7 @@ class ConvLSTMAutoencoder(nn.Module):
         decoder_hidden_dim=128,
         decoder_layers=2,
         use_classifier=False,
-        num_classes=3  # A, B, C 三个类别
+        num_classes=3
     ):
         super().__init__()
         self.seq_len = seq_len

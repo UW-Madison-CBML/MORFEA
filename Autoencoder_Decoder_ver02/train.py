@@ -108,7 +108,7 @@ def train(
         decoder_hidden_dim=128,
         decoder_layers=2,
         use_classifier=use_classifier,
-        num_classes=3  # A, B, C 三个类别
+        num_classes=3
     ).to(DEVICE)
     
     # Count parameters
