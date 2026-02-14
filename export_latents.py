@@ -154,8 +154,10 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
             num_latents = z_seq.shape[2] 
 
         # Extract the batch dimension
-        z = z_seq[0].cpu().numpy()  # Shape: (T, 4096)
-
+        z = z_seq[0].cpu().to(torch.float32).numpy()
+        # After you are done with the large tensors in the loop:
+        del embryo_vol
+        del z_seq
         # Add one row per time step
         for t in range(z.shape[0]):
             all_latents.append(z[t])

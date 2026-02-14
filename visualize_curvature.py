@@ -63,12 +63,16 @@ def fit_circle_curvature(points, how=""):
         y = points[:,1]
         points = np.column_stack((x, y))
 
-        x0 = [np.mean(x), np.mean(y), np.std(x)]
-
-        res = least_squares(circle_residuals, x0, args=(points,))
-
+        x0 = [np.mean(x), np.mean(y), np.std(np.sqrt(x**2 + y**2))]
+        try:
+            res = least_squares(circle_residuals, x0, args=(points,))
+        except ValueError as e:
+            print(e)
+            return 0
+        if not res.success:
+            return 0
         _, _, radius = res.x
-        
+
         if(radius == 0):
             return 0 
         return 1/radius
