@@ -31,7 +31,8 @@ def fix_index_paths(input_csv, output_csv=None, staging_base="/staging/groups/bh
         converted = []
         for p in paths:
             # 如果是本地路径，转换为staging路径
-            if "/Users/grnho/Desktop/Project IVF/embryo_dataset" in p:
+            # Generic pattern for local development paths
+            if "embryo_dataset" in p and ("/Desktop/" in p or "/Users/" in p):
                 # 提取相对路径
                 rel_path = p.split("embryo_dataset/", 1)[1]
                 new_path = f"{staging_base}/{rel_path}"

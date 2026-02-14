@@ -151,8 +151,9 @@ class IVFSequenceDataset(Dataset):
         # If tar.gz exists, always convert to tar path format
         if self.tar_file and os.path.exists(self.tar_file):
             # Extract relative path from any format
-            if "/Users/grnho/Desktop/Project IVF/embryo_dataset" in path_str:
-                # From local path
+            # Check for local development paths (generic pattern)
+            if "embryo_dataset" in path_str and ("/Desktop/" in path_str or "/Users/" in path_str):
+                # From local path - extract relative path after embryo_dataset
                 rel_path = path_str.split("embryo_dataset/", 1)[1] if "embryo_dataset/" in path_str else None
                 if rel_path:
                     return f"embryo_dataset/{rel_path}"
@@ -171,7 +172,8 @@ class IVFSequenceDataset(Dataset):
                     return f"embryo_dataset/{rel_path}"
         
         # If no tar.gz, try regular file paths
-        if "/Users/grnho/Desktop/Project IVF/embryo_dataset" in path_str:
+        # Check for local development paths (generic pattern)
+        if "embryo_dataset" in path_str and ("/Desktop/" in path_str or "/Users/" in path_str):
             rel_path = path_str.split("embryo_dataset/", 1)[1] if "embryo_dataset/" in path_str else None
             if rel_path:
                 possible_staging_paths = [

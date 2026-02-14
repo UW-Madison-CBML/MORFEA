@@ -116,13 +116,16 @@ def load_original_images(paths, index_csv=None, resize=128):
                 for p in row_paths:
                     # 尝试修复路径（如果是本地路径，替换为 CHTC 路径）
                     p_fixed = str(p)
-                    # 替换常见的本地路径前缀
-                    if '/Users/grnho/Desktop/Project IVF/embryo_dataset' in p_fixed:
-                        p_fixed = p_fixed.replace('/Users/grnho/Desktop/Project IVF/embryo_dataset', 
-                                                  '/staging/groups/bhaskar_group/rho9/ivf_data/embryo_dataset')
-                    elif '/Users/grnho/Desktop/Project IVF/' in p_fixed:
-                        p_fixed = p_fixed.replace('/Users/grnho/Desktop/Project IVF/', 
-                                                  '/staging/groups/bhaskar_group/rho9/ivf_data/')
+                    # 替换常见的本地路径前缀 (generic pattern for local development)
+                    if 'embryo_dataset' in p_fixed and ('/Desktop/' in p_fixed or '/Users/' in p_fixed):
+                        # Extract relative path and convert to staging
+                        if 'embryo_dataset/' in p_fixed:
+                            rel_path = p_fixed.split('embryo_dataset/', 1)[1]
+                            p_fixed = f'/staging/groups/bhaskar_group/rho9/ivf_data/embryo_dataset/{rel_path}'
+                        elif '/Desktop/' in p_fixed or '/Users/' in p_fixed:
+                            # Generic local path replacement
+                            p_fixed = p_fixed.replace(p_fixed.split('embryo_dataset')[0] + 'embryo_dataset',
+                                                      '/staging/groups/bhaskar_group/rho9/ivf_data/embryo_dataset')
                     
                     # 也尝试 data 符号链接
                     if not Path(p_fixed).exists():
@@ -602,9 +605,11 @@ def create_segment_visualization(
                         paths_to_try.append(str(Path('data') / rel_path))
                     
                     # 策略3: 尝试本地路径替换（fallback）
-                    if '/Users/grnho/Desktop/Project IVF/embryo_dataset' in img_path:
-                        paths_to_try.append(img_path.replace('/Users/grnho/Desktop/Project IVF/embryo_dataset',
-                                                  '/staging/groups/bhaskar_group/rho9/ivf_data/embryo_dataset'))
+                    # Generic pattern for local development paths
+                    if 'embryo_dataset' in img_path and ('/Desktop/' in img_path or '/Users/' in img_path):
+                        if 'embryo_dataset/' in img_path:
+                            rel_path = img_path.split('embryo_dataset/', 1)[1]
+                            paths_to_try.append(f'/staging/groups/bhaskar_group/rho9/ivf_data/embryo_dataset/{rel_path}')
                     
                     # 尝试所有路径
                     for p in paths_to_try:
@@ -676,12 +681,15 @@ def create_segment_visualization(
                                 
                                 # 格式3: 尝试本地路径替换（fallback）
                                 if not Path(img_path).exists():
-                                    if '/Users/grnho/Desktop/Project IVF/embryo_dataset' in img_path:
-                                        img_path = img_path.replace('/Users/grnho/Desktop/Project IVF/embryo_dataset',
-                                                          '/staging/groups/bhaskar_group/rho9/ivf_data/embryo_dataset')
-                                    elif '/Users/grnho/Desktop/Project IVF/' in img_path:
-                                        img_path = img_path.replace('/Users/grnho/Desktop/Project IVF/',
-                                                          '/staging/groups/bhaskar_group/rho9/ivf_data/')
+                                    # Generic pattern for local development paths
+                                    if 'embryo_dataset' in img_path and ('/Desktop/' in img_path or '/Users/' in img_path):
+                                        if 'embryo_dataset/' in img_path:
+                                            rel_path = img_path.split('embryo_dataset/', 1)[1]
+                                            img_path = f'/staging/groups/bhaskar_group/rho9/ivf_data/embryo_dataset/{rel_path}'
+                                        elif '/Desktop/' in img_path or '/Users/' in img_path:
+                                            # Generic local path replacement
+                                            img_path = img_path.replace(img_path.split('embryo_dataset')[0] + 'embryo_dataset',
+                                                                      '/staging/groups/bhaskar_group/rho9/ivf_data/embryo_dataset')
                             
                             if Path(img_path).exists():
                                 try:

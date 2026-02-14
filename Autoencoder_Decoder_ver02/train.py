@@ -20,7 +20,7 @@ from datetime import datetime
 possible_paths = [
     Path(__file__).parent,  # Current directory (where train.py is)
     Path(__file__).parent.parent,  # ../Code/
-    Path(__file__).parent.parent.parent,  # ../../ (if in Raffael/date/)
+    Path(__file__).parent.parent.parent,  # ../../ (parent directory)
     Path(__file__).parent.parent / "Code",  # ../Code/Code/
 ]
 for path in possible_paths:
