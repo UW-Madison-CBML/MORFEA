@@ -54,3 +54,7 @@ echo "3. Then on CHTC, submit:"
 echo "   condor_submit train_h200_lab.sub"
 echo "   condor_q"
 
+
+
+
+

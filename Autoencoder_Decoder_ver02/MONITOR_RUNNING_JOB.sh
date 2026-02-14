@@ -32,3 +32,7 @@ echo "condor_tail -f $JOB_ID"
 echo "or"
 echo "tail -f logs/train_2650588_0.out"
 
+
+
+
+

@@ -1,0 +1,16 @@
+{
+  "n_segments": 4,
+  "segment_counts": {
+    "Segment A": 103,
+    "Segment B": 107,
+    "Segment C": 113,
+    "Segment D": 112
+  },
+  "segment_colors": [
+    "#FF6B6B",
+    "#4ECDC4",
+    "#45B7D1",
+    "#FFA07A"
+  ],
+  "total_frames": 435
+}

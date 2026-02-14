@@ -8,12 +8,11 @@ log    = logs/train_$(Cluster)_$(Process).log
 output = logs/train_$(Cluster)_$(Process).out
 error  = logs/train_$(Cluster)_$(Process).err
 
-# Transfer necessary files
+# Transfer necessary files (your code/config, NOT shared filesystem data)
 transfer_input_files = \
     run_train.sh, \
     train.py, \
     model.py, \
-    conv_lstm.py, \
     losses.py, \
     dataset_ivf.py, \
     build_index.py

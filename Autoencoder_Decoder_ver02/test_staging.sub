@@ -1,0 +1,31 @@
+# 测试 staging 文件传输是否可行
+
+universe = vanilla
+executable = /bin/bash
+arguments = "ls -lh embryo_dataset.tar.gz 2>&1; echo '---'; file embryo_dataset.tar.gz 2>&1; echo '---'; du -h embryo_dataset.tar.gz 2>&1"
+
+log    = logs/test_staging_$(Cluster)_$(Process).log
+output = logs/test_staging_$(Cluster)_$(Process).out
+error  = logs/test_staging_$(Cluster)_$(Process).err
+
+Requirements = (Machine == "bhaskargpu4000.chtc.wisc.edu") && (Target.HasCHTCStaging == true)
+
++WantGPULab   = true
++GPUJobLength = "short"
++ProjectName  = "UWMadison_BME_Bhaskar"
+
++SingularityImage = "docker://pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime"
+
+request_gpus   = 1
+request_cpus   = 2
+request_memory = 4GB
+request_disk   = 20GB
+
+# 测试从 staging 传输文件
+transfer_input_files = file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz
+
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT_OR_EVICT
+
+queue 1
+

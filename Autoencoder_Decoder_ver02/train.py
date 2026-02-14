@@ -57,6 +57,7 @@ def train(
     smooth_weight=0.1,
     cls_weight=0.0,  # Set to 0 if classification not needed
     use_classifier=False,
+    use_l2_loss=False,  # If True, use L2 (MSE) instead of L1
     save_dir="checkpoints",
     log_dir="logs",
     resume_from=None
@@ -107,7 +108,7 @@ def train(
         decoder_hidden_dim=128,
         decoder_layers=2,
         use_classifier=use_classifier,
-        num_classes=2
+        num_classes=3  # A, B, C 三个类别
     ).to(DEVICE)
     
     # Count parameters
@@ -151,6 +152,7 @@ def train(
             "total": 0.0,
             "reconstruction": 0.0,
             "l1": 0.0,
+            "l2": 0.0,  # Will be 0 if using L1
             "ms_ssim": 0.0,
             "smooth": 0.0,
             "classification": 0.0
@@ -170,7 +172,8 @@ def train(
             rec_loss, rec_details = reconstruction_loss(
                 x_rec, vol,
                 l1_weight=l1_weight,
-                ms_ssim_weight=ms_ssim_weight
+                ms_ssim_weight=ms_ssim_weight,
+                use_l2=use_l2_loss
             )
             
             # Temporal smoothness loss
@@ -200,15 +203,19 @@ def train(
             # Record losses
             epoch_losses["total"] += total_loss.item()
             epoch_losses["reconstruction"] += rec_loss.item()
-            epoch_losses["l1"] += rec_details["l1_loss"]
+            if "l1_loss" in rec_details:
+                epoch_losses["l1"] += rec_details["l1_loss"]
+            if "l2_loss" in rec_details:
+                epoch_losses["l2"] += rec_details["l2_loss"]
             epoch_losses["ms_ssim"] += rec_details["ms_ssim_loss"]
             epoch_losses["smooth"] += smooth_loss.item()
             
             # Update progress bar
+            pixel_loss_key = "l2_loss" if use_l2_loss else "l1_loss"
             pbar.set_postfix({
                 "loss": f"{total_loss.item():.4f}",
                 "rec": f"{rec_loss.item():.4f}",
-                "l1": f"{rec_details['l1_loss']:.4f}",
+                pixel_loss_key: f"{rec_details[pixel_loss_key]:.4f}",
                 "ms_ssim": f"{rec_details['ms_ssim_loss']:.4f}",
                 "smooth": f"{smooth_loss.item():.4f}",
                 "ms_ssim_val": f"{rec_details['ms_ssim_value']:.4f}"
@@ -235,9 +242,14 @@ def train(
         print(f"\nEpoch {epoch+1}/{num_epochs} Summary:")
         print(f"  Total Loss: {epoch_losses['total']:.4f}")
         print(f"  Reconstruction: {epoch_losses['reconstruction']:.4f}")
-        print(f"    - L1: {epoch_losses['l1']:.4f}")
+        if use_l2_loss:
+            print(f"    - L2 (MSE): {epoch_losses['l2']:.4f}")
+        else:
+            print(f"    - L1: {epoch_losses['l1']:.4f}")
         print(f"    - MS-SSIM: {epoch_losses['ms_ssim']:.4f}")
         print(f"  Smooth: {epoch_losses['smooth']:.4f}")
+        if epoch_losses['classification'] > 0:
+            print(f"  Classification: {epoch_losses['classification']:.4f}")
         print(f"  Learning Rate: {current_lr:.6f}")
         
         # Save checkpoint
@@ -285,11 +297,13 @@ if __name__ == "__main__":
     parser.add_argument("--weight_decay", type=float, default=1e-5,
                        help="Weight decay")
     parser.add_argument("--l1_weight", type=float, default=0.5,
-                       help="L1 loss weight")
+                       help="L1/L2 loss weight")
     parser.add_argument("--ms_ssim_weight", type=float, default=0.5,
                        help="MS-SSIM loss weight")
     parser.add_argument("--smooth_weight", type=float, default=0.1,
                        help="Temporal smoothness loss weight")
+    parser.add_argument("--use_l2_loss", action="store_true",
+                       help="Use L2 (MSE) loss instead of L1 loss")
     parser.add_argument("--use_classifier", action="store_true",
                        help="Use classifier head")
     parser.add_argument("--cls_weight", type=float, default=0.0,
@@ -315,6 +329,7 @@ if __name__ == "__main__":
         smooth_weight=args.smooth_weight,
         cls_weight=args.cls_weight,
         use_classifier=args.use_classifier,
+        use_l2_loss=args.use_l2_loss,
         save_dir=args.save_dir,
         log_dir=args.log_dir,
         resume_from=args.resume_from

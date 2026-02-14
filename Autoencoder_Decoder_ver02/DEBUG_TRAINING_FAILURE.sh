@@ -51,3 +51,7 @@ echo "2. FileNotFoundError: index.csv - need to build it"
 echo "3. FileNotFoundError: data directory - wrong path"
 echo "4. CUDA out of memory - need more memory or smaller batch"
 
+
+
+
+

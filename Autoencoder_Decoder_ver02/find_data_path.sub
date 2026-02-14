@@ -1,0 +1,24 @@
+# Diagnostic job to find data path on GPU node
+executable = find_data_path.sh
+arguments = 
+
+output = find_data_path.out
+error = find_data_path.err
+log = find_data_path.log
+
+transfer_input_files = find_data_path.sh
+
++WantGPULab = true
++GPUJobLength = "short"
++ProjectName = "UWMadison_BME_Bhaskar"
++SingularityImage = "docker://pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime"
+
+request_gpus = 1
+request_cpus = 1
+request_memory = 2GB
+request_disk = 5GB
+
+Requirements = regexp("H200", TARGET.CUDADeviceName)
+
+queue 1
+

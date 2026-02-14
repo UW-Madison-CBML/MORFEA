@@ -59,3 +59,7 @@ echo "4. Push: git push"
 echo ""
 echo "Or run: git add ${TARGET_DIR}/ && git commit -m 'Add ConvLSTM Autoencoder (Raffael/${DATE_FOLDER})' && git push"
 
+
+
+
+

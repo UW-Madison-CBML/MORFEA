@@ -71,3 +71,7 @@ echo "5. Starting training (then you'll see epochs)"
 echo ""
 echo "If stuck at dependency installation, that's normal - it takes time!"
 
+
+
+
+

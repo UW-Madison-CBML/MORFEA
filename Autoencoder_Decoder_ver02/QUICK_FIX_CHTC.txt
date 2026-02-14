@@ -1,0 +1,61 @@
+# 在 CHTC 上直接執行這個命令（複製貼上整個區塊）
+
+cd ~/ivf/Raffael/2025-11-19 && \
+python3 << 'PYTHON_FIX'
+import re
+
+# Read train.py
+with open('train.py', 'r') as f:
+    content = f.read()
+
+# Check if already fixed
+if '★ Ensure index.csv exists before loading dataset ★' in content:
+    print("✓ Already fixed!")
+    exit(0)
+
+# Find the insertion point (before "train_dataset = IVFSequenceDataset")
+pattern = r'(\s+)(train_dataset = IVFSequenceDataset\(index_csv, resize=128, norm="minmax01"\))'
+match = re.search(pattern, content)
+
+if not match:
+    print("ERROR: Cannot find insertion point")
+    exit(1)
+
+indent = match.group(1)
+insertion = f'''{indent}# ★ Ensure index.csv exists before loading dataset ★
+{indent}index_path = Path(index_csv)
+{indent}if not index_path.exists():
+{indent}    print(f"[train] {{index_csv}} not found, building with build_index.py ...", flush=True)
+{indent}    if build_index is None:
+{indent}        raise ImportError(
+{indent}            f"[train] build_index module not available. "
+{indent}            "Cannot auto-generate index.csv. Please run build_index.py manually."
+{indent}        )
+{indent}    build_index.main()
+{indent}    if not index_path.exists():
+{indent}        raise FileNotFoundError(
+{indent}            f"[train] After running build_index.main(), still no {{index_csv}}. "
+{indent}            "Check that symlink 'data' -> /project/bhaskar_group/ivf has valid content."
+{indent}        )
+{indent}    print(f"[train] ✓ Successfully created {{index_csv}}", flush=True)
+{indent}
+{indent}'''
+
+# Replace
+new_content = content.replace(match.group(0), insertion + match.group(0))
+
+# Write back
+with open('train.py', 'w') as f:
+    f.write(new_content)
+
+print("✓ train.py fixed!")
+PYTHON_FIX
+
+# 驗證
+python3 -m py_compile train.py && echo "✓ Syntax OK" || echo "✗ Syntax error"
+grep "Ensure index.csv exists" train.py && echo "✓ Update confirmed!" || echo "✗ Update failed"
+
+
+
+
+

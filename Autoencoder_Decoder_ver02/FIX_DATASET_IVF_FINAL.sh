@@ -58,3 +58,7 @@ echo "=== Ready ==="
 echo "New job 2650510 is already submitted and idle"
 echo "Check status: condor_q"
 
+
+
+
+

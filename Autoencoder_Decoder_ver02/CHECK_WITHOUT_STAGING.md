@@ -76,3 +76,7 @@ echo "=== Errors ===" && \
 cat $(ls -t logs/train_*.err 2>/dev/null | head -1) 2>/dev/null | tail -10
 ```
 
+
+
+
+

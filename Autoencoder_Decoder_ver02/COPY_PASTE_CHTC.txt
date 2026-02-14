@@ -34,3 +34,7 @@ cd ~/ivf/Raffael/2025-11-19 && chmod +x run_train.sh && mkdir -p logs && condor_
 
 ========================================
 
+
+
+
+

@@ -96,3 +96,7 @@ echo ""
 echo "Note: Results may be in staging (requires group access)"
 echo "Contact lab admin or check with: ls -lh /staging/groups/bhaskar_group/ivf/results/"
 
+
+
+
+

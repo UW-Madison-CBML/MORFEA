@@ -1,0 +1,12 @@
+# 在终端中逐个运行这些命令来下载所有文件
+
+cd "/Users/grnho/Desktop/Project IVF/Code/Autoencoder_Decoder_ver02/tphate_results/tphate_segments_direct"
+
+scp rho9@ap2001.chtc.wisc.edu:~/ivf_repo/tphate_segments_direct/tphate_3d_gradient.png .
+scp rho9@ap2001.chtc.wisc.edu:~/ivf_repo/tphate_segments_direct/tphate_3d_segments.png .
+scp rho9@ap2001.chtc.wisc.edu:~/ivf_repo/tphate_segments_direct/segment_A_frames.png .
+scp rho9@ap2001.chtc.wisc.edu:~/ivf_repo/tphate_segments_direct/segment_B_frames.png .
+scp rho9@ap2001.chtc.wisc.edu:~/ivf_repo/tphate_segments_direct/segment_C_frames.png .
+scp rho9@ap2001.chtc.wisc.edu:~/ivf_repo/tphate_segments_direct/segment_D_frames.png .
+scp rho9@ap2001.chtc.wisc.edu:~/ivf_repo/tphate_segments_direct/tphate_segments_combined.png .
+scp rho9@ap2001.chtc.wisc.edu:~/ivf_repo/tphate_segments_direct/segments_metadata.json .

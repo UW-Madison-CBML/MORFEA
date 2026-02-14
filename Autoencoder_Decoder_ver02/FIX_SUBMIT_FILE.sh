@@ -48,3 +48,7 @@ echo ""
 echo "Now submit:"
 echo "  condor_submit train_h200_lab.sub"
 
+
+
+
+

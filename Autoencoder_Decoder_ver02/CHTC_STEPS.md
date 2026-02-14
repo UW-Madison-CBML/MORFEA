@@ -87,3 +87,7 @@ condor_tail -stderr <cluster.proc>
 - The wrapper script automatically searches for it in parent directories
 - If still fails, manually add path in `run_train.sh`
 
+
+
+
+

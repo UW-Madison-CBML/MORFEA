@@ -103,3 +103,7 @@ git commit -m "Add ConvLSTM Autoencoder (Raffael/2025-11-19)" && \
 git push
 ```
 
+
+
+
+

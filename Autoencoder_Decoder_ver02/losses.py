@@ -97,14 +97,15 @@ def ms_ssim(img1, img2, kernel_size=11, sigma=1.5, weights=None, levels=5):
     return ms_ssim_val
 
 
-def reconstruction_loss(x_rec, x_true, l1_weight=0.5, ms_ssim_weight=0.5):
+def reconstruction_loss(x_rec, x_true, l1_weight=0.5, ms_ssim_weight=0.5, use_l2=False):
     """
-    Combined reconstruction loss: L1 + MS-SSIM
+    Combined reconstruction loss: L1/L2 + MS-SSIM
     Args:
         x_rec: (B, T, 1, H, W) - reconstructed video
         x_true: (B, T, 1, H, W) - original video
-        l1_weight: L1 loss weight
+        l1_weight: L1/L2 loss weight
         ms_ssim_weight: MS-SSIM loss weight
+        use_l2: If True, use L2 (MSE) instead of L1
     """
     B, T, C, H, W = x_rec.shape
     
@@ -112,18 +113,23 @@ def reconstruction_loss(x_rec, x_true, l1_weight=0.5, ms_ssim_weight=0.5):
     x_rec_flat = x_rec.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
     x_true_flat = x_true.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
     
-    # L1 Loss
-    l1_loss = F.l1_loss(x_rec, x_true)
+    # L1 or L2 Loss
+    if use_l2:
+        pixel_loss = F.mse_loss(x_rec, x_true)
+        loss_name = "l2_loss"
+    else:
+        pixel_loss = F.l1_loss(x_rec, x_true)
+        loss_name = "l1_loss"
     
     # MS-SSIM Loss
     ms_ssim_val = ms_ssim(x_rec_flat, x_true_flat)
     ms_ssim_loss = 1 - ms_ssim_val
     
     # Combined loss
-    total_loss = l1_weight * l1_loss + ms_ssim_weight * ms_ssim_loss
+    total_loss = l1_weight * pixel_loss + ms_ssim_weight * ms_ssim_loss
     
     return total_loss, {
-        "l1_loss": l1_loss.item(),
+        loss_name: pixel_loss.item(),
         "ms_ssim_loss": ms_ssim_loss.item(),
         "ms_ssim_value": ms_ssim_val.item()
     }
@@ -146,16 +152,33 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
     return weight * smooth_loss
 
 
-def classification_loss(logits, labels, criterion=None):
+def classification_loss(logits, labels, criterion=None, use_one_hot=False):
     """
     Classification loss
     Args:
         logits: (B, num_classes) - classification logits
-        labels: (B,) - ground truth labels
+        labels: (B,) or (B, num_classes) - ground truth labels
+                - If use_one_hot=False: class indices (0, 1, 2, 3) - shape (B,)
+                - If use_one_hot=True: one-hot vectors - shape (B, num_classes)
         criterion: loss function, default CrossEntropyLoss
+        use_one_hot: If True, labels are one-hot encoded (B, num_classes)
+                     If False, labels are class indices (B,)
     """
     if criterion is None:
-        criterion = nn.CrossEntropyLoss()
+        if use_one_hot:
+            # For one-hot: use NLLLoss with log_softmax, or BCEWithLogitsLoss
+            # CrossEntropyLoss doesn't work with one-hot directly
+            criterion = nn.BCEWithLogitsLoss()
+            return criterion(logits, labels.float())
+        else:
+            # For class indices: use CrossEntropyLoss (standard)
+            criterion = nn.CrossEntropyLoss()
     
-    return criterion(logits, labels)
+    if use_one_hot:
+        # Convert one-hot to class indices if needed
+        if labels.dim() > 1:
+            labels = labels.argmax(dim=1)
+        return criterion(logits, labels)
+    else:
+        return criterion(logits, labels)
 

@@ -1,0 +1,38 @@
+# HTCondor submit file - 使用 bhaskar GPU
+# 使用 GPU 节点运行 T-PHATE 生成（可能更快，也更容易匹配节点）
+
+# Lab GPU settings
++WantGPULab = true
++GPUJobLength = "long"
++ProjectName = "UWMadison_BME_Bhaskar"
+
+# 基本信息
+universe = vanilla
+log = $(HOME)/logs/generate_tphate_$(Cluster).log
+output = $(HOME)/logs/generate_tphate_$(Cluster).out
+error = $(HOME)/logs/generate_tphate_$(Cluster).err
+getenv = True
+
+# 执行命令
+executable = /usr/bin/python3
+arguments = /staging/groups/bhaskar_group/rho9/generate_tphate_for_aadhitya.py --npy_file /staging/groups/bhaskar_group/ivf/latents/latents.npy --csv_file /staging/groups/bhaskar_group/ivf/latents/latents.csv --output_base /staging/groups/bhaskar_group/rho9/aadhitya_v1_val --knn 5 --skip_existing
+
+# 资源要求（GPU 作业）
+request_gpus = 1
+request_cpus = 4
+request_memory = 8GB
+request_disk = 10GB
+
+# 运行时间限制（24 小时）
++MaxJobRuntime = 86400
+
+# 不使用文件传输（直接访问 staging）
+should_transfer_files = NO
+
+queue 1
+
+
+
+
+
+

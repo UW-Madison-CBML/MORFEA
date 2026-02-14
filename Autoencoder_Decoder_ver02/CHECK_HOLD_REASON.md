@@ -51,3 +51,7 @@ condor_rm <cluster.proc>
 condor_submit train_h200_lab.sub
 ```
 
+
+
+
+

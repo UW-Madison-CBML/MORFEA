@@ -95,3 +95,7 @@ echo ""
 echo "Next: Download Python files from GitHub or create them manually"
 echo "Files needed: conv_lstm.py, model.py, losses.py, train.py"
 
+
+
+
+

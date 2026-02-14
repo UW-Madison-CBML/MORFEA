@@ -1,28 +1,33 @@
 #!/bin/bash
-# Check why job was held and what errors occurred
+# 檢查任務為什麼被 HOLD
 
-JOB_ID="2650588.0"
-
-echo "=== Job Hold Reason ==="
-condor_q -hold $JOB_ID
-
+echo "============================================================"
+echo "任務被 HOLD（暫停），需要找出原因"
+echo "============================================================"
 echo ""
-echo "=== Full Job Info ==="
-condor_q -long $JOB_ID | grep -E "HoldReason|LastHoldReason|ExitCode|ExitBySignal"
-
+echo "請在 CHTC 上執行以下命令："
 echo ""
-echo "=== Try to get output from remote node ==="
-condor_tail $JOB_ID 2>&1 | tail -n 50
-
+echo "1️⃣  查看 HOLD 的原因："
+echo "   condor_q -better-analyze 2852953.0 | grep -A 10 'HoldReason'"
 echo ""
-echo "=== Check if output files exist in job directory ==="
-JOB_DIR=$(condor_q -long $JOB_ID | grep "^Iwd" | awk '{print $3}')
-echo "Job directory: $JOB_DIR"
-if [ -n "$JOB_DIR" ] && [ -d "$JOB_DIR" ]; then
-    echo "Files in job directory:"
-    ls -lh "$JOB_DIR" 2>/dev/null | head -20
+echo "2️⃣  查看完整的任務狀態："
+echo "   condor_q -long 2852953.0 | grep -E 'HoldReason|HoldCode|LastHoldReason'"
+echo ""
+echo "3️⃣  查看 condor 日誌中的 HOLD 信息："
+echo "   grep '2852953' ~/logs/extract_latents_v1_baseline.log | grep -i 'hold\|evicted\|terminated' | tail -10"
+echo ""
+echo "4️⃣  查看錯誤日誌："
+echo "   cat ~/logs/extract_latents_v1_baseline.err"
+echo ""
+echo "============================================================"
+echo "常見的 HOLD 原因："
+echo "  - 任務運行時間超過限制"
+echo "  - 資源使用超過限制"
+echo "  - 系統錯誤"
+echo "  - 手動 hold"
     echo ""
-    echo "Logs directory:"
-    ls -lh "$JOB_DIR/logs" 2>/dev/null | grep $JOB_ID || echo "No logs found"
-fi
-
+echo "找到原因後，可以："
+echo "  - 如果是資源問題，調整請求的資源"
+echo "  - 如果是時間限制，已經設置了 24 小時，應該足夠"
+echo "  - 如果是其他問題，根據錯誤信息修復"
+echo "============================================================"

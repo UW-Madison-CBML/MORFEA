@@ -219,3 +219,7 @@ ls -lh checkpoints/
    - Visualize reconstructions
    - Run T-PHATE on latents
 
+
+
+
+

@@ -91,3 +91,7 @@ echo "  mkdir -p logs"
 echo "  condor_submit train_h200_lab.sub"
 echo "  condor_q"
 
+
+
+
+

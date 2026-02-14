@@ -33,3 +33,7 @@ echo "- If GPUs are 'Idle', your job should start soon"
 echo "- Lab jobs typically get priority over general pool"
 echo "- Wait time: 0-4 hours typically"
 
+
+
+
+

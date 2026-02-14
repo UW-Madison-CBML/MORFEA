@@ -1,0 +1,50 @@
+# extract_latents.sub
+# HTCondor submit file for extracting latent trajectories
+# NOTE: Must submit from /home directory, but files can be in staging
+
+universe = vanilla
+executable = /staging/groups/bhaskar_group/rho9/extract_latents.sh
+# Use absolute paths for staging files
+transfer_input_files = /staging/groups/bhaskar_group/rho9/extract_all_latent_trajectories.py, /staging/groups/bhaskar_group/rho9/model.py, /staging/groups/bhaskar_group/rho9/dataset_ivf.py, /staging/groups/bhaskar_group/rho9/build_index.py, /staging/groups/bhaskar_group/rho9/index.csv, $(checkpoint)
+
+# Arguments: checkpoint_path (absolute path), model_version_name
+arguments = $(checkpoint) $(model_version)
+
+# Output files
+output = logs/extract_latents_$(model_version).out
+error = logs/extract_latents_$(model_version).err
+log = logs/extract_latents_$(model_version).log
+
+# Requirements
+request_cpus = 1
+request_memory = 8GB
+request_disk = 20GB
+
+# GPU if available (optional, can use CPU)
+# Uncomment below to use GPU:
+# +WantGPU = true
+# request_gpus = 1
+
+# Transfer output files back (or save to staging)
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+# Option 1: Transfer back to submit node
+transfer_output_files = model_latents/
+# Option 2: Save directly to staging (uncomment below and comment above)
+# transfer_output_remaps = "model_latents = /staging/groups/bhaskar_group/rho9/model_latents"
+
+# Queue with different model versions
+# Example usage:
+# checkpoint = checkpoints/checkpoint_epoch_50.pt
+# model_version = v1_baseline
+# queue
+
+# Or queue multiple models:
+# checkpoint = checkpoints/checkpoint_epoch_50.pt
+# model_version = v1_baseline
+# queue
+# 
+# checkpoint = checkpoints/checkpoint_epoch_50.pt
+# model_version = v2_no_smooth
+# queue
+

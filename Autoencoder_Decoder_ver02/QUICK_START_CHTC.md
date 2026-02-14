@@ -110,3 +110,7 @@ condor_tail <cluster.proc>
 ls -lh /staging/groups/bhaskar_group/ivf/results/
 ```
 
+
+
+
+

@@ -70,3 +70,7 @@ Example:
 - Remaining: (10/2) * (50-10) = 5 * 40 = 200 minutes = ~3.3 hours
 - Total: ~5.3 hours
 
+
+
+
+

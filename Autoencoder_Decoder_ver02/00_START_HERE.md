@@ -31,10 +31,11 @@ ls -lh
 ```
 
 應該看到這些文件：
-- ✅ `conv_lstm.py`
 - ✅ `model.py`
 - ✅ `losses.py`
 - ✅ `train.py`
+- ✅ `dataset_ivf.py`
+- ✅ `build_index.py`
 - ✅ `run_train.sh`
 - ✅ `train_h200_lab.sub`
 
@@ -175,4 +176,5 @@ tar -xzf results_<cluster>_<proc>.tgz
 1. 載入模型 checkpoint
 2. 提取 `z_seq` 和 `z_last` latent vectors
 3. 進行 T-PHATE 或 TDA 分析
+
 

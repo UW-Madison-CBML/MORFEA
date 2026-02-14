@@ -119,3 +119,7 @@ tail -f logs/train_2650361_0.out
 2. **Check `.out`** - see what happened before error
 3. **Check `.log`** - see if it's a system issue
 
+
+
+
+

@@ -1,0 +1,52 @@
+# HTCondor submit file for curvature analysis with GPU
+# 使用 group 的 GPU 資源
+# 注意：必須從 home 目錄提交，但可以訪問 staging 目錄
+
+universe = vanilla
+
+# 從 home 目錄運行（HTCondor 要求）
+initialdir = /home/rho9
+
+log = /home/rho9/curvature_analysis_$(VIDEO_NAME).log
+error = /home/rho9/curvature_analysis_$(VIDEO_NAME).err
+output = /home/rho9/curvature_analysis_$(VIDEO_NAME).out
+
+# 請求 GPU 資源
+request_gpus = 1
+request_cpus = 2
+request_memory = 4GB
+request_disk = 2GB
+
+# 指定執行節點 - 優先使用 GPU，但不強制（如果沒有 GPU 會用 CPU）
+# 如果需要特定 lab 的 GPU，取消下面的註釋並修改
+# requirements = (TARGET.HasGPU == true) && (TARGET.Machine == "gpu-node-name")
+# 或者使用 group/lab 特定的要求
+# requirements = (TARGET.HasGPU == true) && (TARGET.Owner == "bhaskar_group")
+
+# 更靈活的方式：優先 GPU，但允許 CPU
+# 如果需要指定特定 lab 的 GPU，取消下面的註釋並修改
+# requirements = (TARGET.HasGPU == true) && (substr(TARGET.Machine, 0, 3) == "gzk")
+# 或者指定 group
+# requirements = (TARGET.HasGPU == true) && (TARGET.Owner == "bhaskar_group")
+
+# 指定 bhaskar lab 的 GPU 節點
+# 使用 GPUs > 0 來匹配有 GPU 的 slots
+requirements = (TARGET.Machine == "bhaskargpu4000.chtc.wisc.edu") && (TARGET.GPUs > 0)
+
+# 環境設置
+getenv = true
+environment = "CUDA_VISIBLE_DEVICES=0"
+
+# 執行命令（使用 staging 目錄中的腳本）
+executable = /staging/groups/bhaskar_group/rho9/ivf_analysis/scripts/run_curvature_single.sh
+arguments = $(VIDEO_NAME)
+
+# 傳輸文件（如果需要）
+# transfer_input_files = /staging/groups/bhaskar_group/rho9/ivf_analysis/scripts/analyze_trajectory_curvature.py
+
+# 隊列
+queue VIDEO_NAME from (
+    ZS435-5
+    RS363-7
+)
+

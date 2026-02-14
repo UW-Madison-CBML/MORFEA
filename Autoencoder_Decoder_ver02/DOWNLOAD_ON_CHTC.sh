@@ -38,3 +38,7 @@ echo "Next steps:"
 echo "  condor_submit train_h200_lab.sub"
 echo "  condor_q"
 
+
+
+
+

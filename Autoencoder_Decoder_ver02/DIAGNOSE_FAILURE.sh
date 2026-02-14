@@ -1,39 +1,25 @@
 #!/bin/bash
-# Diagnose why training failed
+# 诊断任务失败原因
 
-JOB_ID="2650588.0"
-
-echo "=== 1. Checking for error/output files ==="
-cd ~/ivf/Raffael/2025-11-19 2>/dev/null || cd ~/ivf_train 2>/dev/null || pwd
-
-if [ -f "logs/train_${JOB_ID//./_}_0.err" ]; then
-    echo "ERROR FILE FOUND:"
-    cat "logs/train_${JOB_ID//./_}_0.err"
-else
-    echo "No .err file found"
-fi
-
+echo "=== 诊断任务失败原因 ==="
 echo ""
-echo "=== 2. Checking output file ==="
-if [ -f "logs/train_${JOB_ID//./_}_0.out" ]; then
-    echo "OUTPUT FILE FOUND (last 100 lines):"
-    tail -n 100 "logs/train_${JOB_ID//./_}_0.out"
-else
-    echo "No .out file found"
-fi
-
+echo "在CHTC上运行以下命令："
 echo ""
-echo "=== 3. Checking HTCondor log for errors ==="
-if [ -f "logs/train_${JOB_ID//./_}_0.log" ]; then
-    echo "Errors in HTCondor log:"
-    grep -i "error\|failed\|exception\|traceback\|file.*not found" "logs/train_${JOB_ID//./_}_0.log" | tail -20
-fi
-
+echo "# 1. 查看完整的condor日志（看任务执行过程）"
+echo "cat ~/logs/extract_latents_v1_baseline.log | tail -200"
 echo ""
-echo "=== 4. Trying condor_tail ==="
-condor_tail $JOB_ID 2>&1 | tail -50
-
+echo "# 2. 查看输出日志（看处理到哪个embryo）"
+echo "cat ~/logs/extract_latents_v1_baseline.out"
 echo ""
-echo "=== 5. Job status ==="
-condor_q -hold $JOB_ID
-
+echo "# 3. 查看错误日志（看具体错误）"
+echo "cat ~/logs/extract_latents_v1_baseline.err"
+echo ""
+echo "# 4. 查看任务执行时间线（从日志中提取关键事件）"
+echo "grep -E '(Job executing|Image size|MemoryUsage|Job terminated|ERROR|Error|Failed|failed)' ~/logs/extract_latents_v1_baseline.log | tail -50"
+echo ""
+echo "# 5. 查看内存使用变化（看是否内存溢出）"
+echo "grep 'MemoryUsage\|Image size' ~/logs/extract_latents_v1_baseline.log | tail -30"
+echo ""
+echo "# 6. 查看最后处理的embryo（从输出日志中）"
+echo "grep 'Processing embryo\|Found.*sequences\|Saved:' ~/logs/extract_latents_v1_baseline.out | tail -20"
+echo ""

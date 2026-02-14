@@ -1,0 +1,35 @@
+# HTCondor submit file - 修复文件传输问题
+# 问题：FileSystemDomain 限制导致无法匹配节点
+# 解决：启用文件传输，让 HTCondor 传输脚本到执行节点
+
+universe = vanilla
+log = $(HOME)/logs/generate_tphate_$(Cluster).log
+output = $(HOME)/logs/generate_tphate_$(Cluster).out
+error = $(HOME)/logs/generate_tphate_$(Cluster).err
+getenv = True
+
+executable = /usr/bin/python3
+
+# 传输脚本文件到执行节点
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+transfer_input_files = /staging/groups/bhaskar_group/rho9/generate_tphate_for_aadhitya.py
+
+# 使用相对路径（因为文件会被传输到工作目录）
+arguments = generate_tphate_for_aadhitya.py --npy_file /staging/groups/bhaskar_group/ivf/latents/latents.npy --csv_file /staging/groups/bhaskar_group/ivf/latents/latents.csv --output_base /staging/groups/bhaskar_group/rho9/aadhitya_v1_val --knn 5 --skip_existing
+
+request_cpus = 2
+request_memory = 4GB
+request_disk = 5GB
++MaxJobRuntime = 86400
+
+# 传输输出文件回 staging（如果需要）
+# transfer_output_files = 
+
+queue 1
+
+
+
+
+
+

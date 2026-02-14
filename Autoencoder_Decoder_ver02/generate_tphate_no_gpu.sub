@@ -1,0 +1,31 @@
+# HTCondor submit file - 不使用 GPU，降低资源要求
+# 如果 GPU 节点不可用，使用这个版本
+
+universe = vanilla
+log = $(HOME)/logs/generate_tphate_$(Cluster).log
+output = $(HOME)/logs/generate_tphate_$(Cluster).out
+error = $(HOME)/logs/generate_tphate_$(Cluster).err
+getenv = True
+
+executable = /usr/bin/python3
+arguments = /staging/groups/bhaskar_group/rho9/generate_tphate_for_aadhitya.py --npy_file /staging/groups/bhaskar_group/ivf/latents/latents.npy --csv_file /staging/groups/bhaskar_group/ivf/latents/latents.csv --output_base /staging/groups/bhaskar_group/rho9/aadhitya_v1_val --knn 5 --skip_existing
+
+# 降低资源要求，更容易匹配
+request_cpus = 2
+request_memory = 4GB
+request_disk = 5GB
++MaxJobRuntime = 86400
+
+# 不使用文件传输，直接访问 staging
+should_transfer_files = NO
+
+# 允许在任何节点运行（移除 FileSystemDomain 限制）
+Requirements = TARGET.HasCHTCStaging == true
+
+queue 1
+
+
+
+
+
+

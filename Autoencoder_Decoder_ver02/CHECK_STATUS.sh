@@ -57,3 +57,7 @@ echo "  View errors:     condor_tail -stderr $JOB_ID"
 echo "  Cancel job:      condor_rm $JOB_ID"
 echo "  Check results:   ls -lh /staging/groups/bhaskar_group/ivf/results/"
 
+
+
+
+

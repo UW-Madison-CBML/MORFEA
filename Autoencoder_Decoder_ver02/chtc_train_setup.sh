@@ -53,3 +53,7 @@ echo "1. Ensure index.csv is accessible (or use shared data at /project/bhaskar_
 echo "2. Create/update train_h200_lab.sub"
 echo "3. Submit: condor_submit train_h200_lab.sub"
 
+
+
+
+

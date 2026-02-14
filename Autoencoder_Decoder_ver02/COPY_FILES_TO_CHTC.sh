@@ -50,3 +50,7 @@ echo ""
 echo "=== Ready to submit ==="
 echo "Run: condor_submit train_h200_lab.sub"
 
+
+
+
+

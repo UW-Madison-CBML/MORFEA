@@ -20,3 +20,7 @@ echo ""
 echo "=== 5. Check if train.py was found ==="
 cat logs/train_2650510_0.out 2>/dev/null | grep -i "train.py\|python3\|command not found" | tail -5
 
+
+
+
+

@@ -51,3 +51,7 @@ Too complex, not recommended.
 4. Copy (Cmd+C)
 5. On CHTC: `nano train.py`, paste, save
 
+
+
+
+

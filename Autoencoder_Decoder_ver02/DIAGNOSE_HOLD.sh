@@ -66,3 +66,7 @@ echo "  condor_rm $JOB_ID"
 echo "  # Fix issue, then:"
 echo "  condor_submit train_h200_lab.sub"
 
+
+
+
+

@@ -1,198 +1,76 @@
 """
-Complete High-Quality ConvLSTM Autoencoder
-- Uses true ConvLSTM (not regular LSTM)
-- Complete Encoder (2D CNN + ConvLSTM)
-- Complete Decoder (ConvLSTM + ConvTranspose)
-- Optional Empty/Non-empty Classifier
-- Maximum quality configuration, no computational savings
+ConvLSTM Autoencoder Model
+- Frame-level CNN encoder/decoder
+- LSTM for temporal modeling
+- Optional classifier head
 """
 import torch
 import torch.nn as nn
-from conv_lstm import ConvLSTM
+import torch.nn.functional as F
 
 
-class Encoder(nn.Module):
-    """
-    Encoder: 2D CNN spatial compression + ConvLSTM temporal modeling
-    Output: z_seq (B, T, C, H, W) and z_last (B, C, H, W)
-    """
-    
-    def __init__(self, input_channels=1, hidden_dim=256, num_layers=2):
-        super(Encoder, self).__init__()
-        
-        # Spatial convolution: process each frame separately
-        # 128x128 -> 64x64 -> 32x32 -> 16x16
-        self.spatial_cnn = nn.Sequential(
-            # Layer 1: 128 -> 64
-            nn.Conv2d(input_channels, 64, kernel_size=3, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),  # 128 -> 64
-            
-            # Layer 2: 64 -> 32
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),  # 64 -> 32
-            
-            # Layer 3: 32 -> 16
-            nn.Conv2d(128, 256, kernel_size=3, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),  # 32 -> 16
+class FrameEncoder(nn.Module):
+    """CNN encoder for individual frames"""
+    def __init__(self, input_channels=1, out_dim=128):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Conv2d(input_channels, 32, 3, 2, 1),  # 128 -> 64
+            nn.ReLU(),
+            nn.Conv2d(32, 64, 3, 2, 1),  # 64 -> 32
+            nn.ReLU(),
+            nn.Conv2d(64, 128, 3, 2, 1),  # 32 -> 16
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d(1),  # -> [B, 128, 1, 1]
         )
-        
-        # ConvLSTM: process temporal sequence
-        # Input: (B, T, 256, 16, 16)
-        # Output: (B, T, hidden_dim, 16, 16)
-        self.convlstm = ConvLSTM(
-            input_dim=256,
-            hidden_dim=hidden_dim,
-            kernel_size=(3, 3),
-            num_layers=num_layers,
-            batch_first=True,
-            return_all_layers=False
-        )
+        self.proj = nn.Linear(128, out_dim)
     
     def forward(self, x):
         """
         Args:
-            x: (B, T, 1, H, W) - input video sequence
-        
+            x: (B, C, H, W) - single frame
         Returns:
-            z_seq: (B, T, hidden_dim, H_latent, W_latent) - full temporal sequence latent
-            z_last: (B, hidden_dim, H_latent, W_latent) - last timestep latent
+            (B, out_dim) - frame embedding
         """
-        B, T, C, H, W = x.shape
-        
-        # Spatial compression: process each frame separately
-        x = x.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
-        x = self.spatial_cnn(x)      # (B*T, 256, 16, 16)
-        _, C2, H2, W2 = x.shape
-        x = x.view(B, T, C2, H2, W2)  # (B, T, 256, 16, 16)
-        
-        # ConvLSTM processes temporal sequence
-        lstm_out, _ = self.convlstm(x)  # list of (B, T, hidden_dim, 16, 16)
-        h_seq = lstm_out[0]             # (B, T, hidden_dim, 16, 16)
-        
-        # Version A: keep full temporal sequence latent
-        z_seq = h_seq  # (B, T, hidden_dim, 16, 16)
-        
-        # Version B: take only last timestep
-        z_last = h_seq[:, -1]  # (B, hidden_dim, 16, 16)
-        
-        return z_seq, z_last
+        h = self.net(x).squeeze(-1).squeeze(-1)  # [B, 128]
+        return self.proj(h)  # [B, out_dim]
 
 
-class Decoder(nn.Module):
-    """
-    Decoder: ConvLSTM temporal decoding + ConvTranspose spatial reconstruction
-    Input: z_seq (B, T, C, H, W)
-    Output: x_rec (B, T, 1, 128, 128)
-    """
-    
-    def __init__(self, seq_len, latent_dim=256, hidden_dim=128, num_layers=2):
-        super(Decoder, self).__init__()
-        self.seq_len = seq_len
-        
-        # ConvLSTM decodes temporal dimension
-        self.convlstm = ConvLSTM(
-            input_dim=latent_dim,
-            hidden_dim=hidden_dim,
-            kernel_size=(3, 3),
-            num_layers=num_layers,
-            batch_first=True,
-            return_all_layers=False
-        )
-        
-        # Spatial decoding: 16x16 -> 32x32 -> 64x64 -> 128x128
-        self.spatial_decoder = nn.Sequential(
-            # 16 -> 32
-            nn.ConvTranspose2d(hidden_dim, 128, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            
-            # 32 -> 64
-            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            
-            # 64 -> 128
-            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            
-            # Final output layer
-            nn.Conv2d(32, 1, kernel_size=3, padding=1),
-            nn.Sigmoid()  # Assume pixels normalized to [0,1]
+class FrameDecoder(nn.Module):
+    """CNN decoder for individual frames"""
+    def __init__(self, in_dim=128, output_channels=1):
+        super().__init__()
+        self.fc = nn.Linear(in_dim, 8 * 8 * 128)
+        self.deconv = nn.Sequential(
+            nn.ConvTranspose2d(128, 64, 4, 2, 1),  # 8 -> 16
+            nn.ReLU(),
+            nn.ConvTranspose2d(64, 32, 4, 2, 1),  # 16 -> 32
+            nn.ReLU(),
+            nn.ConvTranspose2d(32, 16, 4, 2, 1),  # 32 -> 64
+            nn.ReLU(),
+            nn.ConvTranspose2d(16, output_channels, 4, 2, 1),  # 64 -> 128
+            nn.Sigmoid()
         )
     
-    def forward(self, z_seq):
+    def forward(self, z):
         """
         Args:
-            z_seq: (B, T, latent_dim, H_latent, W_latent) - latent sequence from encoder
-        
+            z: (B, in_dim) - latent vector
         Returns:
-            x_rec: (B, T, 1, 128, 128) - reconstructed video sequence
+            (B, C, H, W) - reconstructed frame
         """
-        # ConvLSTM decodes temporal dimension
-        lstm_out, _ = self.convlstm(z_seq)  # list of (B, T, hidden_dim, 16, 16)
-        h_seq = lstm_out[0]                 # (B, T, hidden_dim, 16, 16)
-        
-        # Spatial decoding: process each timestep separately
-        B, T, C, H, W = h_seq.shape
-        h_seq = h_seq.view(B * T, C, H, W)  # (B*T, hidden_dim, 16, 16)
-        x_rec = self.spatial_decoder(h_seq)  # (B*T, 1, 128, 128)
-        x_rec = x_rec.view(B, T, 1, 128, 128)  # (B, T, 1, 128, 128)
-        
-        return x_rec
-
-
-class LatentClassifier(nn.Module):
-    """
-    Empty / Non-empty Well Classifier
-    Classifies based on last timestep latent
-    """
-    
-    def __init__(self, latent_dim=256, num_classes=2, dropout=0.3):
-        super(LatentClassifier, self).__init__()
-        
-        self.head = nn.Sequential(
-            # Global Average Pooling
-            nn.AdaptiveAvgPool2d(1),  # (C, H, W) -> (C, 1, 1)
-            nn.Flatten(),              # (C,)
-            
-            # Classification head
-            nn.Linear(latent_dim, 512),
-            nn.BatchNorm1d(512),
-            nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
-            
-            nn.Linear(512, 256),
-            nn.BatchNorm1d(256),
-            nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
-            
-            nn.Linear(256, num_classes)
-        )
-    
-    def forward(self, z_last):
-        """
-        Args:
-            z_last: (B, latent_dim, H, W) - last timestep latent
-        
-        Returns:
-            logits: (B, num_classes) - classification logits
-        """
-        return self.head(z_last)
+        x = self.fc(z)  # [B, 8*8*128]
+        x = x.view(-1, 128, 8, 8)  # [B, 128, 8, 8]
+        return self.deconv(x)  # [B, C, 128, 128]
 
 
 class ConvLSTMAutoencoder(nn.Module):
     """
-    Complete ConvLSTM Autoencoder
-    Includes Encoder, Decoder, and optional Classifier
+    ConvLSTM Autoencoder
+    - Encodes each frame with CNN
+    - Models temporal dynamics with LSTM
+    - Decodes back to frames
+    - Optional classifier head
     """
-    
     def __init__(
         self,
         seq_len=20,
@@ -201,74 +79,127 @@ class ConvLSTMAutoencoder(nn.Module):
         encoder_layers=2,
         decoder_hidden_dim=128,
         decoder_layers=2,
-        use_classifier=True,
-        num_classes=2
+        use_classifier=False,
+        num_classes=3  # A, B, C 三个类别
     ):
-        super(ConvLSTMAutoencoder, self).__init__()
-        
+        super().__init__()
         self.seq_len = seq_len
+        self.input_channels = input_channels
         self.use_classifier = use_classifier
         
-        # Core components
-        self.encoder = Encoder(
+        # Frame encoder: CNN to encode each frame
+        self.frame_encoder = FrameEncoder(
             input_channels=input_channels,
-            hidden_dim=encoder_hidden_dim,
-            num_layers=encoder_layers
+            out_dim=encoder_hidden_dim
         )
         
-        self.decoder = Decoder(
-            seq_len=seq_len,
-            latent_dim=encoder_hidden_dim,
-            hidden_dim=decoder_hidden_dim,
-            num_layers=decoder_layers
+        # Encoder LSTM: processes frame embeddings
+        self.encoder_lstm = nn.LSTM(
+            input_size=encoder_hidden_dim,
+            hidden_size=encoder_hidden_dim,
+            num_layers=encoder_layers,
+            batch_first=True
         )
         
-        # Optional classifier
+        # Decoder LSTM: generates latent sequence
+        self.decoder_lstm = nn.LSTM(
+            input_size=encoder_hidden_dim,
+            hidden_size=decoder_hidden_dim,
+            num_layers=decoder_layers,
+            batch_first=True
+        )
+        
+        # Frame decoder: CNN to decode each frame
+        self.frame_decoder = FrameDecoder(
+            in_dim=decoder_hidden_dim,
+            output_channels=input_channels
+        )
+        
+        # Optional classifier head
         if use_classifier:
-            self.classifier = LatentClassifier(
-                latent_dim=encoder_hidden_dim,
-                num_classes=num_classes
+            self.classifier = nn.Sequential(
+                nn.Linear(decoder_hidden_dim, decoder_hidden_dim // 2),
+                nn.ReLU(),
+                nn.Dropout(0.5),
+                nn.Linear(decoder_hidden_dim // 2, num_classes)
             )
     
-    def forward(self, x, return_all=False):
-        """
-        Args:
-            x: (B, T, 1, H, W) - input video sequence
-            return_all: whether to return all intermediate results
-        
-        Returns:
-            dict with keys:
-                - reconstruction: (B, T, 1, H, W) - reconstructed video
-                - z_seq: (B, T, C, H, W) - full latent sequence
-                - z_last: (B, C, H, W) - last timestep latent
-                - logits: (B, num_classes) - classification logits (if enabled)
-        """
-        # Encode
-        z_seq, z_last = self.encoder(x)
-        
-        # Decode
-        x_rec = self.decoder(z_seq)
-        
-        # Build output dictionary
-        output = {
-            "reconstruction": x_rec,
-            "z_seq": z_seq,
-            "z_last": z_last,
-        }
-        
-        # Optional classification
-        if self.use_classifier:
-            logits = self.classifier(z_last)
-            output["logits"] = logits
-        
-        return output
-    
     def encode(self, x):
-        """Encode only, for extracting latent"""
-        z_seq, z_last = self.encoder(x)
+        """
+        Encode input sequence to latent space
+        Args:
+            x: (B, T, C, H, W) - input video sequence
+        Returns:
+            z_seq: (B, T, hidden_dim) - latent sequence
+            z_last: (B, hidden_dim) - last latent vector
+        """
+        B, T, C, H, W = x.shape
+        
+        # Encode each frame
+        x_flat = x.view(B * T, C, H, W)  # [B*T, C, H, W]
+        frame_embeds = self.frame_encoder(x_flat)  # [B*T, encoder_hidden_dim]
+        frame_embeds = frame_embeds.view(B, T, -1)  # [B, T, encoder_hidden_dim]
+        
+        # Process with encoder LSTM
+        z_seq, _ = self.encoder_lstm(frame_embeds)  # [B, T, encoder_hidden_dim]
+        
+        # Get last latent
+        z_last = z_seq[:, -1, :]  # [B, encoder_hidden_dim]
+        
         return z_seq, z_last
     
     def decode(self, z_seq):
-        """Decode only, for reconstructing from latent"""
-        return self.decoder(z_seq)
+        """
+        Decode latent sequence to reconstructed frames
+        Args:
+            z_seq: (B, T, hidden_dim) - latent sequence
+        Returns:
+            (B, T, C, H, W) - reconstructed video sequence
+        """
+        B, T, _ = z_seq.shape
+        
+        # Process with decoder LSTM
+        h_dec, _ = self.decoder_lstm(z_seq)  # [B, T, decoder_hidden_dim]
+        
+        # Decode each frame
+        recon_list = []
+        for t in range(T):
+            frame_latent = h_dec[:, t, :]  # [B, decoder_hidden_dim]
+            frame_recon = self.frame_decoder(frame_latent)  # [B, C, H, W]
+            recon_list.append(frame_recon)
+        
+        recon = torch.stack(recon_list, dim=1)  # [B, T, C, H, W]
+        return recon
+    
+    def forward(self, x):
+        """
+        Forward pass
+        Args:
+            x: (B, T, C, H, W) - input video sequence
+        Returns:
+            dict with:
+                - reconstruction: (B, T, C, H, W)
+                - z_seq: (B, T, hidden_dim)
+                - z_last: (B, hidden_dim)
+                - logits: (B, num_classes) [if use_classifier]
+        """
+        # Encode
+        z_seq, z_last = self.encode(x)
+        
+        # Decode
+        reconstruction = self.decode(z_seq)
+        
+        # Build output dict
+        output = {
+            "reconstruction": reconstruction,
+            "z_seq": z_seq,
+            "z_last": z_last
+        }
+        
+        # Add classifier output if enabled
+        if self.use_classifier:
+            logits = self.classifier(z_last)  # [B, num_classes]
+            output["logits"] = logits
+        
+        return output
 

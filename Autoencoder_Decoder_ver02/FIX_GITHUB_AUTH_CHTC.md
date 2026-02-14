@@ -74,3 +74,7 @@ mkdir -p logs
 condor_submit train_h200_lab.sub
 ```
 
+
+
+
+

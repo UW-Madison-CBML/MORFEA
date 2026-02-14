@@ -1,0 +1,57 @@
+# extract_latents_from_home.sub
+# HTCondor submit file for extracting latent trajectories
+# Submit from /home directory, but use files from staging
+
+universe = vanilla
+executable = /staging/groups/bhaskar_group/rho9/extract_latents.sh
+
+# Don't transfer files - script will copy from staging
+# transfer_input_files is empty because script handles file copying
+transfer_input_files = 
+
+# Arguments: checkpoint_path (absolute path to staging), model_version_name
+# Script will copy checkpoint from staging
+arguments = $(checkpoint) $(model_version)
+
+# Output files - 保存到staging（避免占用home空间）
+# 注意：HTCondor不允许日志直接写到staging，但我们可以用transfer_output_remaps
+output = logs/extract_latents_$(model_version).out
+error = logs/extract_latents_$(model_version).err
+log = logs/extract_latents_$(model_version).log
+
+# Requirements - Run on bhaskar lab GPU machine with staging access
+Requirements = (Machine == "bhaskargpu4000.chtc.wisc.edu") && (Target.HasCHTCStaging == true)
+
+# Use Singularity container with PyTorch
++SingularityImage = "docker://pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime"
++SingularityBind = "/staging:/staging"
+
+# Lab GPU settings
++WantGPULab = true
+# Changed from "short" to "long" to allow 24+ hours
++GPUJobLength = "long"
++ProjectName = "UWMadison_BME_Bhaskar"
+
+# Resources
+request_gpus = 1
+request_cpus = 1
+request_memory = 16GB
+request_disk = 20GB
+
+# Increase job runtime limit to 24 hours (default is 12 hours)
+# This prevents the job from being evicted mid-execution
++MaxJobRuntime = 86400
+
+# Transfer output files to staging (避免占用home空间)
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+# 将所有输出保存到staging
+transfer_output_remaps = "model_latents = /staging/groups/bhaskar_group/rho9/model_latents; \
+                          logs = /staging/groups/bhaskar_group/rho9/logs"
+
+# Queue with different model versions
+# Example usage:
+# checkpoint = /staging/groups/bhaskar_group/rho9/checkpoints/checkpoint_epoch_50.pt
+# model_version = v1_baseline
+# queue
+

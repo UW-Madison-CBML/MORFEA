@@ -16,7 +16,7 @@ fi
 
 # 1. Verify all required files exist
 echo "1. Verifying required files..."
-REQUIRED_FILES=("train.py" "model.py" "conv_lstm.py" "losses.py" "run_train.sh" "train_h200_lab.sub")
+REQUIRED_FILES=("train.py" "model.py" "losses.py" "run_train.sh" "train_h200_lab.sub" "dataset_ivf.py" "build_index.py")
 MISSING_FILES=()
 
 for file in "${REQUIRED_FILES[@]}"; do
@@ -92,4 +92,5 @@ else
     echo "❌ Job submission failed!"
     exit 1
 fi
+
 
