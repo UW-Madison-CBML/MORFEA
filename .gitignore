@@ -86,3 +86,7 @@ test_cell_groups.txt
 test_latents.csv
 docker_stderror
 docker_stdout
+clusters/clustering_comparison.png
+norec-2026-02-13_sigs.csv
+signatures/signatures/control-2026-01-06_sigs.csv
+clusters
