@@ -22,12 +22,12 @@ def main(model_name):
         print(grades_df.head())
         raise ValueError("no embryo_id column")
     sig_cols = [col for col in sig_df.columns if col.startswith("s_")]
-    df = sig_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", "TE"] + sig_cols].dropna(subset=["TE"])
+    df = sig_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", grade] + sig_cols].dropna(subset=[grade])
 
     # Extract features
     feature_cols = [col for col in df.columns if col.startswith('s_')]
     X = df[feature_cols].values
-    grades = df['TE'].values
+    grades = df[grade].values
 
     print(f"Starting with {X.shape[0]} samples, {X.shape[1]} features\n")
 
@@ -115,4 +115,5 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main(args.name)
+    main(args.name, "TE")
+    main(args.name, "ICM")
