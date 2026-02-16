@@ -244,56 +244,39 @@ def ssim(img1, img2, kernel_size=11, sigma=1.5, C1=0.01**2, C2=0.03**2):
 
 
 def ms_ssim(img1, img2, kernel_size=11, sigma=1.5, weights=None, levels=5):
-    """
-    Multi-Scale SSIM (MS-SSIM)
-    Args:
-        img1, img2: (B, C, H, W)
-        weights: weights for each scale, default [0.0448, 0.2856, 0.3001, 0.2363, 0.1333]
-        levels: number of scales
-    """
     if weights is None:
-        weights = torch.tensor([0.0448, 0.2856, 0.3001, 0.2363, 0.1333], 
-                              device=img1.device)
+        weights = torch.tensor([0.0448, 0.2856, 0.3001, 0.2363, 0.1333],
+                              device=img1.device)[:levels]
     
-    # Ensure weight count matches
-    weights = weights[:levels]
-    weights = weights / weights.sum()
+    kernel = gaussian_kernel(kernel_size, sigma).to(img1.device)
+    kernel = kernel.unsqueeze(0).unsqueeze(0).repeat(img1.shape[1], 1, 1, 1)
     
     mcs_list = []
-    ssim_val = None
     
     for i in range(levels):
         if i == levels - 1:
-            # Last layer computes SSIM
             ssim_val = ssim(img1, img2, kernel_size, sigma)
         else:
-            # Other layers compute contrast
-            kernel = gaussian_kernel(kernel_size, sigma).to(img1.device)
-            kernel = kernel.unsqueeze(0).unsqueeze(0)
+            # Compute CS (contrast-structure) only
+            mu1 = F.conv2d(img1, kernel, padding=kernel_size//2, groups=img1.shape[1])
+            mu2 = F.conv2d(img2, kernel, padding=kernel_size//2, groups=img1.shape[1])
             
-            mu1 = F.conv2d(img1, kernel, padding=kernel_size//2)
-            mu2 = F.conv2d(img2, kernel, padding=kernel_size//2)
+            sigma1_sq = F.conv2d(img1**2, kernel, padding=kernel_size//2, groups=img1.shape[1]) - mu1**2
+            sigma2_sq = F.conv2d(img2**2, kernel, padding=kernel_size//2, groups=img1.shape[1]) - mu2**2
+            sigma12 = F.conv2d(img1*img2, kernel, padding=kernel_size//2, groups=img1.shape[1]) - mu1*mu2
             
-            sigma1_sq = F.conv2d(img1 * img1, kernel, padding=kernel_size//2) - mu1 ** 2
-            sigma2_sq = F.conv2d(img2 * img2, kernel, padding=kernel_size//2) - mu2 ** 2
-            sigma12 = F.conv2d(img1 * img2, kernel, padding=kernel_size//2) - mu1 * mu2
+            C2 = 0.03**2
+            cs = (2 * sigma12 + C2) / (sigma1_sq + sigma2_sq + C2)
+            mcs_list.append(cs.mean())
             
-            C2 = 0.03 ** 2
-            mcs = (2 * sigma12 + C2) / (sigma1_sq + sigma2_sq + C2)
-            mcs_list.append(mcs.mean())
-        
-        # Downsample to next level
-        if i < levels - 1:
             img1 = F.avg_pool2d(img1, 2)
             img2 = F.avg_pool2d(img2, 2)
     
-    # Combine all scales
-    ms_ssim_val = ssim_val
-    for i, mcs in enumerate(mcs_list):
-        ms_ssim_val = ms_ssim_val ** weights[i] * mcs ** weights[i]
+    # Correct combination
+    ms_ssim_val = torch.prod(torch.stack([mcs ** w for mcs, w in zip(mcs_list, weights[:-1])]))
+    ms_ssim_val *= ssim_val ** weights[-1]
     
     return ms_ssim_val
-
 
 def reconstruction_loss(x_rec, x_true, l1_weight=0.5, ms_ssim_weight=0.5):
     """
