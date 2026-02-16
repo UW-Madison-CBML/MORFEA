@@ -153,8 +153,11 @@ class Encoder(nn.Module):
         x = x.view(B, T, C2, H2, W2)  # (B, T, 256, 16, 16)
 
         # ConvLSTM processes temporal sequence
-        lstm_out, _ = self.convlstm(x)  # list of (B, T, hidden_dim, 16, 16)
-        h_seq = lstm_out[0]             # (B, T, hidden_dim, 16, 16)
+        if(self.use_convlstm):
+            lstm_out, _ = self.convlstm(x)  # list of (B, T, hidden_dim, 16, 16)
+            h_seq = lstm_out[0]             # (B, T, hidden_dim, 16, 16)
+        else:
+            h_seq = x # just pass it forward if not
 
         # Flatten and compress spatial dimensions with linear layer
         B, T, C, H, W = h_seq.shape
@@ -229,8 +232,11 @@ class Decoder(nn.Module):
         z_spatial = z_expanded.view(B, T, self.latent_dim, 16, 16)  # (B, T, latent_dim, 16, 16)
 
         # ConvLSTM decodes temporal dimension
-        lstm_out, _ = self.convlstm(z_spatial)  # list of (B, T, hidden_dim, 16, 16)
-        h_seq = lstm_out[0]                 # (B, T, hidden_dim, 16, 16)
+        if(self.use_convlstm):
+            lstm_out, _ = self.convlstm(z_spatial)  # list of (B, T, hidden_dim, 16, 16)
+            h_seq = lstm_out[0]                 # (B, T, hidden_dim, 16, 16)
+        else:
+            h_seq = z_spatial # just pass it forward
 
         # Spatial decoding: process each timestep separately
         B, T, C, H, W = h_seq.shape
@@ -338,18 +344,14 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
 
             # Core components
         self.encoder = Encoder(
-            input_channels=input_channels,
-            hidden_dim=encoder_hidden_dim,
-            num_layers=encoder_layers,
-            latent_size=latent_size
+            latent_size=self.latent_size,
+            use_convlstm=self.use_convlstm
         )
 
         self.decoder = Decoder(
-            seq_len=seq_len,
-            latent_size=latent_size,
-            latent_dim=encoder_hidden_dim,
-            hidden_dim=decoder_hidden_dim,
-            num_layers=decoder_layers
+            seq_len=self.seq_len,
+            latent_size=self.latent_size,
+            use_convlstm=self.use_convlstm
         )
 
         # Optional classifier
