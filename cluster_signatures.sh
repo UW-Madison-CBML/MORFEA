@@ -15,5 +15,6 @@ ls -lh
 # Run export script
 echo "Running export_latents.py..."
 
-python cluster_signatures.py --name "$1"
+python cluster_signatures.py "$1" TE
+python cluster_signatures.py "$1" ICM
 tar -czvf clusters.tar.gz clusters

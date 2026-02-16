@@ -66,18 +66,21 @@ def main(model_name, grade):
     # Get signature columns
     sig_cols = [col for col in sig_df.columns if col.startswith("s_")]
     
-    # Merge and clean
+    # Merge - keep ALL samples (graded and ungraded)
     df = sig_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")
-    df = df[["embryo_id", grade] + sig_cols].dropna(subset=[grade])
-
-   
-
-    # Extract features and labels
-    X = df[sig_cols].values
-    grades = df[grade].values
+    df = df[["embryo_id", grade] + sig_cols]
     
-    print(f"Starting with {X.shape[0]} samples, {X.shape[1]} features")
-    print(f"Grade distribution: {dict(zip(*np.unique(grades, return_counts=True)))}\n")
+    # Extract features (ALL samples)
+    X = df[sig_cols].values
+    
+    # Track which samples are graded (mask for evaluation)
+    graded_mask = df[grade].notna().values
+    grades_all = df[grade].values  # Contains NaN for ungraded
+    grades_graded_only = df[grade][graded_mask].values  # Only graded samples
+    
+    print(f"Total samples: {X.shape[0]} ({graded_mask.sum()} graded, {(~graded_mask).sum()} ungraded)")
+    print(f"Features: {X.shape[1]}")
+    print(f"Graded distribution: {dict(zip(*np.unique(grades_graded_only, return_counts=True)))}\n")
     
     # Standardize once at the beginning
     scaler = StandardScaler()
@@ -129,15 +132,19 @@ def main(model_name, grade):
         print(f"[{config_num}/{total_configs}] {config_label}")
         
         try:
-            # Apply feature selection
+            # Apply feature selection (use ALL data)
             if feat_selector is not None:
-                X_transformed = feat_selector.fit_transform(X_scaled, grades)
+                # For supervised selectors, only fit on graded samples
+                X_graded_for_selection = X_scaled[graded_mask]
+                feat_selector.fit(X_graded_for_selection, grades_graded_only)
+                # But transform ALL samples
+                X_transformed = feat_selector.transform(X_scaled)
                 n_features = X_transformed.shape[1]
             else:
                 X_transformed = X_scaled.copy()
                 n_features = X_transformed.shape[1]
             
-            # Apply PCA
+            # Apply PCA (on ALL data)
             if pca_model is not None:
                 X_transformed = pca_model.fit_transform(X_transformed)
                 n_components = X_transformed.shape[1]
@@ -146,26 +153,30 @@ def main(model_name, grade):
                 n_components = X_transformed.shape[1]
                 variance_explained = 1.0
             
-            # Cluster
+            # Cluster ALL data (graded + ungraded)
             kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=20)
-            clusters = kmeans.fit_predict(X_transformed)
+            clusters_all = kmeans.fit_predict(X_transformed)
             
-            # Calculate metrics
-            silhouette = silhouette_score(X_transformed, clusters)
-            davies_bouldin = davies_bouldin_score(X_transformed, clusters)
+            # Extract clusters for graded samples only
+            clusters_graded = clusters_all[graded_mask]
+            X_transformed_graded = X_transformed[graded_mask]
+            
+            # Calculate metrics ONLY on graded samples
+            silhouette = silhouette_score(X_transformed_graded, clusters_graded)
+            davies_bouldin = davies_bouldin_score(X_transformed_graded, clusters_graded)
             
             # Calculate ARI for each grade vs clusters
-            grade_unique = np.unique(grades)
+            grade_unique = np.unique(grades_graded_only)
             ari_scores = {}
             for g in grade_unique:
-                ari = adjusted_rand_score(grades == g, clusters)
+                ari = adjusted_rand_score(grades_graded_only == g, clusters_graded)
                 ari_scores[f'ari_{g}'] = ari
             
             # Overall clustering quality with grades
-            ari_overall = adjusted_rand_score(grades, clusters)
+            ari_overall = adjusted_rand_score(grades_graded_only, clusters_graded)
             
             # Calculate cluster purity (how homogeneous each cluster is)
-            purity, cluster_purities, dominant_grades = calculate_cluster_purity(clusters, grades)
+            purity, cluster_purities, dominant_grades = calculate_cluster_purity(clusters_graded, grades_graded_only)
             
             # Store results
             result = {
@@ -187,17 +198,19 @@ def main(model_name, grade):
             
             print(f"  Features: {n_features} → Components: {n_components}")
             print(f"  Silhouette: {silhouette:.3f} | Davies-Bouldin: {davies_bouldin:.3f} | ARI: {ari_overall:.3f}")
-            print(f"  Purity: {purity:.3f} | Dominant grades: {dominant_grades}")
-            print(f"  Cluster sizes: {dict(zip(*np.unique(clusters, return_counts=True)))}")
+            print(f"  Purity (graded only): {purity:.3f} | Dominant grades: {dominant_grades}")
+            print(f"  All cluster sizes: {dict(zip(*np.unique(clusters_all, return_counts=True)))}")
+            print(f"  Graded cluster sizes: {dict(zip(*np.unique(clusters_graded, return_counts=True)))}")
             
             # Create visualization
             create_cluster_visualization(
-                X_transformed, clusters, grades, config_label, 
+                X_transformed, clusters_all, X_transformed_graded, clusters_graded, 
+                grades_graded_only, config_label, 
                 silhouette, davies_bouldin, ari_overall, purity, n_clusters
             )
             
-            # Create confusion matrix
-            create_confusion_matrix(clusters, grades, config_label, n_clusters)
+            # Create confusion matrix (only for graded samples)
+            create_confusion_matrix(clusters_graded, grades_graded_only, config_label, n_clusters)
             
         except Exception as e:
             print(f"  ERROR: {e}")
@@ -215,7 +228,7 @@ def main(model_name, grade):
     results_df.sort_values('davies_bouldin', ascending=True).to_csv('clusters/results_by_davies_bouldin.csv', index=False)
     
     # Create summary report
-    create_summary_report(results_df, grades)
+    create_summary_report(results_df, len(grades_graded_only))
     
     print("=" * 80)
     print(f"\nCompleted! Results saved to clusters/")
@@ -227,46 +240,61 @@ def main(model_name, grade):
     print(results_by_sil[['config', 'purity', 'silhouette', 'ari_overall', 'n_clusters']].head(10).to_string(index=False))
 
 
-def create_cluster_visualization(X_transformed, clusters, grades, config_label, 
+def create_cluster_visualization(X_transformed_all, clusters_all, X_transformed_graded, 
+                                  clusters_graded, grades_graded, config_label, 
                                   silhouette, davies_bouldin, ari, purity, n_clusters):
     """Create side-by-side visualization of actual grades and clusters"""
     
-    # If more than 2D, use PCA to visualize
-    if X_transformed.shape[1] > 2:
+    # If more than 2D, use PCA to visualize ALL data
+    if X_transformed_all.shape[1] > 2:
         pca_viz = PCA(n_components=2)
-        X_viz = pca_viz.fit_transform(X_transformed)
+        X_viz_all = pca_viz.fit_transform(X_transformed_all)
         var_explained = pca_viz.explained_variance_ratio_
     else:
-        X_viz = X_transformed
-        var_explained = [1.0, 0.0] if X_transformed.shape[1] == 1 else [1.0, 1.0]
+        X_viz_all = X_transformed_all
+        var_explained = [1.0, 0.0] if X_transformed_all.shape[1] == 1 else [1.0, 1.0]
+    
+    # Also transform graded subset using same PCA
+    if X_transformed_all.shape[1] > 2:
+        X_viz_graded = pca_viz.transform(X_transformed_graded)
+    else:
+        X_viz_graded = X_transformed_graded
     
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     
-    # Left plot: Actual grades
-    grade_colors = {'A': '#2ecc71', 'B': '#f39c12', 'C': '#e74c3c'}
-    colors_grade = [grade_colors.get(g, '#95a5a6') for g in grades]
+    # Left plot: Actual grades (only graded samples, with ungraded in background)
+    grade_colors_map = {'A': '#2ecc71', 'B': '#f39c12', 'C': '#e74c3c'}
     
-    axes[0].scatter(X_viz[:, 0], X_viz[:, 1], c=colors_grade, s=100, alpha=0.6, 
+    # Plot all samples in gray (ungraded background)
+    axes[0].scatter(X_viz_all[:, 0], X_viz_all[:, 1], c='lightgray', s=50, alpha=0.3, 
+                    edgecolors='none', label='Ungraded')
+    
+    # Overlay graded samples with colors
+    colors_grade = [grade_colors_map.get(g, '#95a5a6') for g in grades_graded]
+    axes[0].scatter(X_viz_graded[:, 0], X_viz_graded[:, 1], c=colors_grade, s=100, alpha=0.8, 
                     edgecolors='black', linewidth=0.5)
+    
     axes[0].set_xlabel(f'PC1 ({var_explained[0]:.1%})')
     axes[0].set_ylabel(f'PC2 ({var_explained[1]:.1%})')
-    axes[0].set_title('Actual Grades', fontsize=14, fontweight='bold')
+    axes[0].set_title(f'Actual Grades ({len(grades_graded)} graded)', fontsize=14, fontweight='bold')
     
     from matplotlib.patches import Patch
     legend_elements = [Patch(facecolor=color, edgecolor='black', label=label) 
-                       for label, color in grade_colors.items()]
+                       for label, color in grade_colors_map.items()]
+    legend_elements.append(Patch(facecolor='lightgray', edgecolor='none', label='Ungraded'))
     axes[0].legend(handles=legend_elements, loc='best')
     
-    # Right plot: Clusters
-    scatter = axes[1].scatter(X_viz[:, 0], X_viz[:, 1], c=clusters, cmap='viridis', 
+    # Right plot: Clusters (ALL samples)
+    scatter = axes[1].scatter(X_viz_all[:, 0], X_viz_all[:, 1], c=clusters_all, cmap='viridis', 
                               s=100, alpha=0.6, edgecolors='black', linewidth=0.5)
     axes[1].set_xlabel(f'PC1 ({var_explained[0]:.1%})')
     axes[1].set_ylabel(f'PC2 ({var_explained[1]:.1%})')
-    axes[1].set_title(f'KMeans Clusters (k={n_clusters})', fontsize=14, fontweight='bold')
+    axes[1].set_title(f'KMeans Clusters (k={n_clusters}, all {len(clusters_all)} samples)', 
+                      fontsize=14, fontweight='bold')
     plt.colorbar(scatter, ax=axes[1], label='Cluster')
     
-    # Add metrics as text
-    metrics_text = f'Purity: {purity:.3f}\nSilhouette: {silhouette:.3f}\nDavies-Bouldin: {davies_bouldin:.3f}\nARI: {ari:.3f}'
+    # Add metrics as text (based on graded subset only)
+    metrics_text = f'Metrics (graded only):\nPurity: {purity:.3f}\nSilhouette: {silhouette:.3f}\nDavies-Bouldin: {davies_bouldin:.3f}\nARI: {ari:.3f}'
     axes[1].text(0.02, 0.98, metrics_text, transform=axes[1].transAxes, 
                  fontsize=10, verticalalignment='top',
                  bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
@@ -321,7 +349,7 @@ def create_confusion_matrix(clusters, grades, config_label, n_clusters):
     plt.close()
 
 
-def create_summary_report(results_df, grades):
+def create_summary_report(results_df, n_graded_samples):
     """Create summary visualizations comparing all methods"""
     
     # 1. Best methods by metric
@@ -333,7 +361,8 @@ def create_summary_report(results_df, grades):
     axes[0, 0].set_yticks(range(len(top_purity)))
     axes[0, 0].set_yticklabels(top_purity['config'], fontsize=8)
     axes[0, 0].set_xlabel('Cluster Purity (Grade Agreement)')
-    axes[0, 0].set_title('Top 15 Configurations by Purity (CLUSTER-GRADE AGREEMENT)', fontweight='bold')
+    axes[0, 0].set_title(f'Top 15 by Purity - CLUSTER-GRADE AGREEMENT\n(evaluated on {n_graded_samples} graded samples)', 
+                         fontweight='bold', fontsize=12)
     axes[0, 0].invert_yaxis()
     
     # Top 15 by Silhouette
