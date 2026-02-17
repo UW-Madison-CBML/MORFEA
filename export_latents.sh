@@ -7,6 +7,8 @@ pip install safetensors huggingface_hub wandb
 # Extract dataset
 echo "Extracting dataset..."
 tar -zxf embryo_dataset.tar.gz
+tar -zxf latents.tar.gz
+tar -zxf embryo_dataset_annotations.tar.gz
 # Set HuggingFace token from api_keys.txt
 if [ -f "api_keys.txt" ]; then
     HF_KEY=$(head -n 1 api_keys.txt)
@@ -18,12 +20,14 @@ ls -lh
 echo "Running export_latents.py..."
 IFS="_" read -ra ADDR <<< "$1"
 
-for i in "${ADDR[@]}"; do
-	    python export_latents.py --name "$i"
-done
+#for i in "${ADDR[@]}"; do
+#done
+python export_latents.py --name control-2026-02-16 
+python export_latents.py --name noconv-2026-02-16 
+python export_latents.py --name notemp-2026-02-16 
 
 #cat get_latents.txt | xargs -I {} sh -c 'python export_latents.py --name "{}" --limit 50'
-mkdir latents
+mkdir -p latents
 mv *.csv latents
 mv *.npy latents
 tar -czvf latents.tar.gz latents

@@ -12,6 +12,27 @@ from datetime import datetime, timedelta
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {DEVICE}")
 
+def addAnnotations(group_name, group, annotations_dir):
+    annotation_file = os.path.join(annotations_dir, f"{group_name}_phases.csv")
+    df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
+    new_column = []
+
+    new_column += ["pre_phase"] * (df.iloc[0]["stage_begin"] - 1)
+    col_len_seq = []
+    for index, row in df.iterrows():
+        new_column += [row["stage_id"]] * (row["stage_end"] - row["stage_begin"]+1)
+        col_len_seq.append(len(new_column))
+
+    
+
+
+    new_column += ["post_phase"] * (len(group) - len(new_column))
+    new_column = new_column[:len(group)]
+    
+    group["phase"] = new_column
+
+    
+    return group
 
 def load_model(model_name=None, days_back=30):
     """
@@ -124,7 +145,7 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
     print("LOADING MODEL")
     print(f"{'='*60}")
     model = load_model(model_name=model_name, days_back=30)
-    model.to(DEVICE)
+    model.to(DEVICE).half()
     model.eval()
     print(f"Model loaded successfully on {DEVICE}!")
     print(f"{'='*60}\n")
@@ -146,7 +167,7 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
         embryo_id = row.get("embryo_id", f"embryo_{idx}")
 
         # embryo_vol is already (B=1, T, 1, 128, 128) from dataloader
-        embryo_vol = embryo_vol.to(DEVICE)
+        embryo_vol = embryo_vol.to(DEVICE).half()
 
         with torch.no_grad():
             _, z_seq = model(embryo_vol)  # z_seq: (B=1, T, 4096)
@@ -154,7 +175,7 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
             num_latents = z_seq.shape[2] 
 
         # Extract the batch dimension
-        z = z_seq[0].cpu().to(torch.float32).numpy()
+        z = z_seq[0].cpu().float().numpy()
         # After you are done with the large tensors in the loop:
         del embryo_vol
         del z_seq
@@ -207,9 +228,10 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
         print(f"Joined with grades. Columns: {list(metadata.columns)}")
     else:
         print(f"Grades file {grades_file} not found, skipping grade join")
-
+    annotations_dir = "embryo_dataset_annotations"
+    metadata = metadata.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,annotations_dir)).reset_index()
     metadata.to_csv(model_name + '.csv', index=False)
-
+    torch.cuda.empty_cache()
     print(f"\n{'='*60}")
     print("EXPORT COMPLETE")
     print(f"{'='*60}")
