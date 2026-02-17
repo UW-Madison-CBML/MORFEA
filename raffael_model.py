@@ -92,7 +92,7 @@ class Encoder(nn.Module):
     Output: z_seq (B, T, latent_size) and z_last (B, latent_size)
     """
 
-    def __init__(self, input_channels=1, hidden_dim=256, num_layers=2, latent_size=4096):
+    def __init__(self, input_channels=1, hidden_dim=256, num_layers=2, latent_size=4096, use_convlstm=True):
         super(Encoder, self).__init__()
 
         self.hidden_dim = hidden_dim
@@ -130,6 +130,7 @@ class Encoder(nn.Module):
         # Input: (B*T, hidden_dim * 16 * 16)
         # Output: (B*T, latent_size)
         self.latent_compress = nn.Linear(hidden_dim * 16 * 16, latent_size)
+        self.use_convlstm = use_convlstm
 
     def forward(self, x):
         """
@@ -179,7 +180,7 @@ class Decoder(nn.Module):
     Output: x_rec (B, T, 1, 128, 128)
     """
 
-    def __init__(self, seq_len, latent_size=4096, latent_dim=256, hidden_dim=128, num_layers=2):
+    def __init__(self, seq_len, latent_size=4096, latent_dim=256, hidden_dim=256, num_layers=2, use_convlstm=True):
         super(Decoder, self).__init__()
         self.seq_len = seq_len
         self.latent_dim = latent_dim
@@ -215,6 +216,7 @@ class Decoder(nn.Module):
             nn.Conv2d(32, 1, kernel_size=3, padding=1),
             nn.Sigmoid()  # Assume pixels normalized to [0,1]
         )
+        self.use_convlstm = use_convlstm
 
     def forward(self, z_seq):
         """
@@ -361,7 +363,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
                 num_classes=num_classes
             )
 
-    def forward(self, x, return_all=False):
+    def forward(self, x, return_all=False, hidden=None):
         """
         Args:
             x: (B, T, 1, H, W) - input video sequence (any size, will be resized internally)
@@ -381,10 +383,19 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         B, T, C, orig_H, orig_W = x.shape
 
         # Encode (will resize to 128x128 internally)
-        z_seq, z_last = self.encoder(x)
+        if return_all:
+            z_seq, z_last, h_last_enc, c_last_enc = self.encoder(x, return_all=return_all, hidden_state=hidden_state['enc'] if hidden_state != None else None)
+
+        else:
+            z_seq, z_last = self.encoder(x, hidden_state=hidden_state['enc'] if hidden_state != None else None)
+
 
         # Decode (outputs 128x128)
-        x_rec = self.decoder(z_seq)
+        if return_all:
+            x_rec, h_last_dec, c_last_dec = self.decoder(z_seq, return_all=return_all, hidden_state=hidden_state['dec'] if hidden_state != None else None)
+
+        else:
+            x_rec = self.decoder(z_seq, hidden_state=hidden_state['dec'] if hidden_state != None else None)
 
         # Resize back to original input size if needed
         if orig_H != 128 or orig_W != 128:
