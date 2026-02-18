@@ -126,7 +126,7 @@ def main(model_name):
     for epoch in range(20):
         model.train()
         for lats, labels in loader:
-            lats = lats.to(DEVICE)
+            lats = lats.to(DEVICE).float()
             labels = labels.to(DEVICE).long()
             logits = model(lats)
             loss = crit(logits.view(-1, 18), labels.view(-1))
@@ -141,7 +141,7 @@ def main(model_name):
 
         with torch.no_grad():
             for lats, labels in loader_te_val:
-                lats = lats.to(DEVICE)
+                lats = lats.to(DEVICE).float()
                 labels = labels.to(DEVICE).long()
                 logits = model(lats)
                 loss = crit(logits.view(-1, 18), labels.view(-1))
