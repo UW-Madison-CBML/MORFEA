@@ -9,7 +9,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score, adjusted_rand_score, davies_bouldin_score
 import seaborn as sns
 from itertools import product
-
+import umap
 def calculate_cluster_purity(clusters, grades):
     """
     Calculate cluster purity: for each cluster, what % is the dominant grade?
