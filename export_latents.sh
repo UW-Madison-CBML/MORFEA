@@ -30,8 +30,3 @@ python export_latents.py --name notemp-2026-02-16
 # Combine into one pass, using pigz for speed
 tar -I 'gzip -1' -cf latents.tar.gz latents/
 
-# Cleanup
-echo "Cleaning up..."
-rm -r embryo_dataset
-
-echo "Export complete!" 
