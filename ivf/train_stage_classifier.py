@@ -136,6 +136,9 @@ def main(model_name):
             optimizer.step()
             run.log({"loss": loss.item()})
         model.eval()
+        loss_stats = RunningStats()
+        acc_stats = RunningStats()
+
         with torch.no_grad():
             for lats, labels in loader_te_val:
                 lats = lats.to(DEVICE)
@@ -144,16 +147,14 @@ def main(model_name):
                 loss = crit(logits.view(-1, 18), labels.view(-1))
                 loss_stats.push(loss.item())
  
-            # Calculate accuracy
-            preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
-            acc_stats.push((preds == labels).sum().item()/(labels.shape[0] * labels.shape[0]))
+                # Calculate accuracy
+                preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
+                acc_stats.push((preds == labels).sum().item()/(labels.shape[0] * labels.shape[0]))
         run.log({"val_loss":loss_stats.mean,
             "val_loss_std":loss_stats.std_dev,
             "val_acc":acc_stats.mean,
             "val_acc_std":acc_stats.std_dev})
-    loss_stats = RunningStats()
-    acc_stats = RunningStats()
- 
+     
 
  
  

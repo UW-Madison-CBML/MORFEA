@@ -4,7 +4,7 @@ pip install safetensors wandb
  
 # Extract dataset
 echo "Extracting dataset..."
-tar -zxf latents.tar.gz
+tar -I zstd -xf latents.tar.zst
 tar -zxf embryo_dataset_annotations.tar.gz
 # Set HuggingFace token from api_keys.txt
 if [ -f "api_keys.txt" ]; then
