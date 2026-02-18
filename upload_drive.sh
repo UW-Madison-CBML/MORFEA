@@ -2,7 +2,7 @@
 
 # 2. Install required Google API libraries
 echo "Installing Google API libraries..."
-pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+python -m pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib google-auth
 
 # 3. Set the Environment Variable for credentials
 # REPLACE 'your-service-account-file.json' with your actual filename

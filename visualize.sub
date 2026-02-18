@@ -21,7 +21,6 @@ transfer_input_files = visualize.sh, visualize.py, file:///staging/groups/bhaska
 
  
 Requirements = (Target.HasCHTCStaging == true)
-transfer_output_remaps = "plots.tar.gz = (model)_plots.tar.gz;"
 
 transfer_output_files = plots.tar.gz
 # Requirements (e.g., operating system) your job needs, what amount of
