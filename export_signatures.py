@@ -181,7 +181,7 @@ def get_new_row(group, cell_id, max_len=0):
     #interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T if max_len == 0 else group
     #if(np.isnan(interped_latents).any()):
     #    print(f"{cell_id} has nan!!!")
-    #signature = np.array(calculate_curvatures(interped_latents))
+    curvature = np.array(calculate_curvatures(interped_latents))
     trajectory = group
     # Basic velocity
     velocity = np.linalg.norm(np.diff(trajectory, axis=0), axis=1)
@@ -349,7 +349,7 @@ def get_new_row(group, cell_id, max_len=0):
             pad_width = max(0, max_len - len(signature))
             #signature = np.pad(signature, ((0, pad_width), (0, 0)), mode='constant') 
             signature = np.pad(signature, (0, pad_width), mode='constant') 
-    signature = np.array([val for val in features.values()])
+    signature = np.concatenate((np.array([val for val in features.values()]), np.array(curvature)))
     #    #new_rows.append(signature)
     #    new_rows.append( 
     #new_rows = np.array(new_rows).T 

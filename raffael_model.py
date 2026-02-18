@@ -384,18 +384,18 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
 
         # Encode (will resize to 128x128 internally)
         if return_all:
-            z_seq, z_last, h_last_enc, c_last_enc = self.encoder(x, return_all=return_all, hidden_state=hidden_state['enc'] if hidden_state != None else None)
+            z_seq, z_last, h_last_enc, c_last_enc = self.encoder(x, return_all=return_all)#, hidden_state=hidden_state['enc'] if hidden_state != None else None)
 
         else:
-            z_seq, z_last = self.encoder(x, hidden_state=hidden_state['enc'] if hidden_state != None else None)
+            z_seq, z_last = self.encoder(x)#, hidden_state=hidden_state['enc'] if hidden_state != None else None)
 
 
         # Decode (outputs 128x128)
         if return_all:
-            x_rec, h_last_dec, c_last_dec = self.decoder(z_seq, return_all=return_all, hidden_state=hidden_state['dec'] if hidden_state != None else None)
+            x_rec, h_last_dec, c_last_dec = self.decoder(z_seq, return_all=return_all)#, hidden_state=hidden_state['dec'] if hidden_state != None else None)
 
         else:
-            x_rec = self.decoder(z_seq, hidden_state=hidden_state['dec'] if hidden_state != None else None)
+            x_rec = self.decoder(z_seq)#, hidden_state=hidden_state['dec'] if hidden_state != None else None)
 
         # Resize back to original input size if needed
         if orig_H != 128 or orig_W != 128:

@@ -1,6 +1,7 @@
 # export_latents.py - Export latent embeddings to CSV
 import numpy as np
 import torch
+import torch.nn.functional as F
 import pandas as pd
 import os
 from torch.utils.data import DataLoader
@@ -145,11 +146,30 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
     print("LOADING MODEL")
     print(f"{'='*60}")
     model = load_model(model_name=model_name, days_back=30)
-    model.to(DEVICE).half()
+    
+    model = model.to(DEVICE)
     model.eval()
     print(f"Model loaded successfully on {DEVICE}!")
     print(f"{'='*60}\n")
+    model = model.to(DEVICE)
 
+    # Get outputs from both models
+    
+    for idx, embryo_vol in enumerate(loader):
+        if idx > 10:
+            break
+        embryo_vol = embryo_vol.to(DEVICE)
+        embryo_vol_half = embryo_vol.half()
+        with torch.no_grad():
+            _, output_full = model(embryo_vol[:,40:50])
+            with torch.amp.autocast(device_type='cuda', dtype=torch.float16):    
+                _, output_half = model(embryo_vol[:,40:50])
+
+        # Ensure outputs are in the same precision for similarity calculation
+        output_half_fp32 = output_half.to(torch.float32)
+        similarity_outputs = F.cosine_similarity(output_full, output_half_fp32, dim=1)
+    return
+    print(f"Average Cosine Similarity of model outputs: {similarity_outputs.mean().item()}")
     # Collect all latent vectors
     all_latents = []
     embryo_ids = []
@@ -170,9 +190,12 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
         embryo_vol = embryo_vol.to(DEVICE).half()
 
         with torch.no_grad():
-            _, z_seq = model(embryo_vol)  # z_seq: (B=1, T, 4096)
+            with torch.amp.autocast(device_type='cuda', dtype=torch.float16):    
+                _, z_seq = model(embryo_vol)  # z_seq: (B=1, T, 4096)
         if(num_latents != z_seq.shape[2]):
             num_latents = z_seq.shape[2] 
+        if torch.isinf(z_seq).any():
+            raise ValueError("WARNING: Infinite values detected in FP16 latents! (Overflow)")
 
         # Extract the batch dimension
         z = z_seq[0].cpu().float().numpy()
