@@ -115,7 +115,7 @@ def main(model_name):
         pin_memory=True,
         drop_last=True
     )
-    loader_te_val = DataLoader(
+    loader_val = DataLoader(
         dataset_te_val,
         batch_size=1,
         shuffle=False,
@@ -123,6 +123,7 @@ def main(model_name):
         pin_memory=True,
         drop_last=False
     )
+    print(len(loader))
     for epoch in range(20):
         model.train()
         for lats, labels in loader:
@@ -140,7 +141,7 @@ def main(model_name):
         acc_stats = RunningStats()
 
         with torch.no_grad():
-            for lats, labels in loader_te_val:
+            for lats, labels in loader_val:
                 lats = lats.to(DEVICE).float()
                 labels = labels.to(DEVICE).long()
                 logits = model(lats)
