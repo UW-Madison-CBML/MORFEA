@@ -154,22 +154,25 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
     model = model.to(DEVICE)
 
     # Get outputs from both models
-    
+    print("testing cosine similariy on half precision model") 
     for idx, embryo_vol in enumerate(loader):
         if idx > 10:
             break
+        rand_index = np.random.randint(embryo_vol.shape[1]-10)
         embryo_vol = embryo_vol.to(DEVICE)
         embryo_vol_half = embryo_vol.half()
         with torch.no_grad():
-            _, output_full = model(embryo_vol[:,40:50])
+            _, output_full = model(embryo_vol[:,rand_index:rand_index+10])
             with torch.amp.autocast(device_type='cuda', dtype=torch.float16):    
-                _, output_half = model(embryo_vol[:,40:50])
+                _, output_half = model(embryo_vol[:,rand_index:rand_index+10])
 
         # Ensure outputs are in the same precision for similarity calculation
         output_half_fp32 = output_half.to(torch.float32)
         similarity_outputs = F.cosine_similarity(output_full, output_half_fp32, dim=1)
-    return
-    print(f"Average Cosine Similarity of model outputs: {similarity_outputs.mean().item()}")
+
+        print(f"Average Cosine Similarity of model outputs: {similarity_outputs.mean().item()}")
+        if(similarity_outputs.mean().item() < 0.98):
+            raise ValueError("bad cosine similarity")
     # Collect all latent vectors
     all_latents = []
     embryo_ids = []
