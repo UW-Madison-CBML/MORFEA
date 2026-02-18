@@ -465,7 +465,7 @@ ABLATION STUDY CONFIGURATION
     # Create DataLoaders
     loader = DataLoader(
         train_dataset,
-        batch_size=1,
+        batch_size=10,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
