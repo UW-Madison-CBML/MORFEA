@@ -155,8 +155,9 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
 
     # Get outputs from both models
     print("testing cosine similariy on half precision model") 
+    mod_base = np.random.randint(11,23)
     for idx, embryo_vol in enumerate(loader):
-        if idx % np.random.randint(12) == 0:
+        if idx % mod_base != 0:
             break
         rand_index = np.random.randint(embryo_vol.shape[1]-10)
         embryo_vol = embryo_vol.to(DEVICE)
@@ -262,7 +263,6 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
     print(f"{'='*60}")
     print(f"  Latent embeddings saved to: {model_name}.npy")
     print(f"  Metadata saved to: {model_name}.csv")
-    print(f"  Shape: {latent_data.shape}")
     print(f"{'='*60}\n")
 
 if __name__ == "__main__":
