@@ -79,7 +79,7 @@ def main(model_name):
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
- 
+     
     wandb.login(key=os.getenv("WANDB_KEY"))
     run = wandb.init(
         entity="jenslundsgaard7-uw-madison",
@@ -88,22 +88,22 @@ def main(model_name):
  
     learning_rate = 0.001
     lat_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv")).rename(columns={"cell_id":"embryo_id"})
-    lat_np = np.load(os.path.abspath(f"latents/{model_name}.csv"))
+    lat_np = np.load(os.path.abspath(f"latents/{model_name}.npy"))
     if(len(lat_df) != lat_np.shape[0]):
         raise ValueError("keys and values sizes do not match")
-    lat_columns = [f"z_{i}" for i in range(values.shape[1])]
+    lat_columns = [f"z_{i}" for i in range(lat_np.shape[1])]
     values_df = pd.DataFrame(lat_np, columns=lat_columns)
     df = pd.concat([lat_df, values_df], axis = 1)
     mask = df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = df[mask]
-    print(len(val_df)/len(df))
     df = df[~mask]
  
  
-    dataset = StageDataset(df, "embryo_grade_annotations")
-    dataset_val = StageDataset(val_df, "embryo_grade_annotations")
+    dataset = StageDataset(df, "embryo_dataset_annotations")
+    dataset_te_val = StageDataset(val_df, "embryo_dataset_annotations")
     crit = torch.nn.CrossEntropyLoss()
-    model = SignatureModel(in_size = len(lat_columns))
+    model = StageModel(input_size = len(lat_columns))
+    model.to(DEVICE)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
  
  
@@ -122,39 +122,39 @@ def main(model_name):
         num_workers=4,
         pin_memory=True,
         drop_last=False
-    ) 
+    )
     for epoch in range(20):
         model.train()
         for lats, labels in loader:
             lats = lats.to(DEVICE)
             labels = labels.to(DEVICE).long()
             logits = model(lats)
-            loss = crit(logits, labels)
+            loss = crit(logits.view(-1, 18), labels.view(-1))
  
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             run.log({"loss": loss.item()})
- 
-    loss_stats = RunningStats()
-    acc_stats = RunningStats()
- 
-    model.eval()
-    with torch.no_grad():
-        for lats, labels in loader_te_val:
-            lats = lats.to(DEVICE)
-            labels = labels.to(DEVICE).long()
-            logits = model(lats)
-            loss = crit(logits, labels)
-            loss_stats.push(loss.item())
+        model.eval()
+        with torch.no_grad():
+            for lats, labels in loader_te_val:
+                lats = lats.to(DEVICE)
+                labels = labels.to(DEVICE).long()
+                logits = model(lats)
+                loss = crit(logits.view(-1, 18), labels.view(-1))
+                loss_stats.push(loss.item())
  
             # Calculate accuracy
             preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
-            acc_stats.push((preds == labels).sum().item()/(labels.shape[1] * labels.shape[0]))
-    run.log({"val_loss":loss_stats.mean,
-        "val_loss_std":loss_stats.std_dev,
-        "val_acc":acc_stats.mean,
-        "val_acc_std":acc_stats.std_dev})
+            acc_stats.push((preds == labels).sum().item()/(labels.shape[0] * labels.shape[0]))
+        run.log({"val_loss":loss_stats.mean,
+            "val_loss_std":loss_stats.std_dev,
+            "val_acc":acc_stats.mean,
+            "val_acc_std":acc_stats.std_dev})
+    loss_stats = RunningStats()
+    acc_stats = RunningStats()
+ 
+
  
  
 if __name__ == "__main__":
