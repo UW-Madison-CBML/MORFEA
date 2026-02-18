@@ -156,7 +156,7 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
     # Get outputs from both models
     print("testing cosine similariy on half precision model") 
     for idx, embryo_vol in enumerate(loader):
-        if idx > 10:
+        if idx % np.random.randint(12) == 0:
             break
         rand_index = np.random.randint(embryo_vol.shape[1]-10)
         embryo_vol = embryo_vol.to(DEVICE)
@@ -201,7 +201,7 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
             raise ValueError("WARNING: Infinite values detected in FP16 latents! (Overflow)")
 
         # Extract the batch dimension
-        z = z_seq[0].cpu().float().numpy()
+        z = z_seq[0].cpu().half().numpy()
         # After you are done with the large tensors in the loop:
         del embryo_vol
         del z_seq
@@ -216,8 +216,8 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
     print(f"Creating CSV with {len(all_latents)} samples...")
     latent_columns = [f"z_{i}" for i in range(num_latents)]
 
-    latents_array = np.array(all_latents)  # Shape: (num_samples, latent_size)
-    df = pd.DataFrame(latents_array, columns=latent_columns)
+    latents_data = np.array(all_latents, dtype=np.float16)  # Shape: (num_samples, latent_size)
+    df = pd.DataFrame()
     df.insert(0, "embryo_id", embryo_ids)
     df.insert(1, "time_step", time_steps)
 
@@ -225,10 +225,9 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
     print(f"Total samples: {len(df)}")
     print(f"Unique embryos: {df['embryo_id'].nunique()}")
     normed_df = df
-    latent_data = normed_df[latent_columns].values  # Shape: (num_rows, 4096)
 
     # Save the latent data as npy
-    np.save(model_name + '.npy', latent_data)
+    np.save(model_name + '.npy', latents_data)
 
     # Save embryo_id and timestep as CSV, optionally joined with grades
     metadata = normed_df[['embryo_id', 'time_step']]
