@@ -149,8 +149,8 @@ def main(model_name):
                 loss_stats.push(loss.item())
  
                 # Calculate accuracy
-                preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
-                acc_stats.push((preds == labels).sum().item()/(labels.shape[0] * labels.shape[0]))
+                preds = logits.view(-1,18).argmax(dim=1)  # Get predicted class (0, 1, or 2)
+                acc_stats.push((preds == labels.view(-1)).sum().item()/labels.view(-1).shape[0])
         run.log({"val_loss":loss_stats.mean,
             "val_loss_std":loss_stats.std_dev,
             "val_acc":acc_stats.mean,
