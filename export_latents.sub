@@ -19,7 +19,7 @@ when_to_transfer_output = ON_EXIT_OR_EVICT
 Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
-transfer_output_remaps = "latents.tar.gz =  file:///staging/groups/bhaskar_group/ivf/latents.tar.gz;"
+transfer_output_remaps = "latents.tar.zst =  file:///staging/groups/bhaskar_group/ivf/latents.tar.zst;"
 transfer_input_files = export_latents.sh, export_latents.py, get_latents.txt, raffael_model.py, raffael_conv_lstm.py, dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, api_keys.txt,  file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv,file:///staging/groups/bhaskar_group/ivf/latents.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz
 
 
@@ -29,7 +29,7 @@ gpus_minimum_capability = 7.0
 #Requirements = (Machine == "bhaskargpu4000.chtc.wisc.edu") && (DriverVersion == "12.8") && (DeviceName == "NVIDIA H200")
  
 +GPUModel = "NVIDIA H200"
-transfer_output_files = latents.tar.gz
+transfer_output_files = latents.tar.zst
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
 request_cpus = 4
