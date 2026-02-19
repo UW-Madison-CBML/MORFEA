@@ -11,7 +11,8 @@ import os
 from model import Model
 from raffael_model import ConvLSTMAutoencoder
 import sys
-
+import matplotlib.pyplot as plt
+from scipy.spatial import distance_matrix
 from torch.utils.data import DataLoader
 from dataset_ivf import IVFSequenceDataset
 from tqdm import tqdm
@@ -290,7 +291,7 @@ def ms_ssim(img1, img2, kernel_size=11, sigma=1.5, weights=None, levels=5):
     
     # Correct combination
     ms_ssim_val = torch.prod(torch.stack([mcs ** w for mcs, w in zip(mcs_list, weights[:-1])]))
-    ms_ssim_val *= ssim_val ** weights[-1]
+    ms_ssim_val = (ssim_val ** weights[-1]) * ms_ssim_val
     
     return ms_ssim_val
 
@@ -481,7 +482,7 @@ ABLATION STUDY CONFIGURATION
     # Create DataLoaders
     loader = DataLoader(
         train_dataset,
-        batch_size=10,
+        batch_size=16,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
@@ -520,10 +521,20 @@ ABLATION STUDY CONFIGURATION
      
                 images = wandb.Image(comparison, caption="Embryo vs Recon comparison")
                 run.log({"reconstruction": images})
+                traj = embryo_lat.cpu().detach().numpy()[0]
+                dist_matrix = distance_matrix(traj, traj)
+                fig, ax = plt.subplots(figsize=(8, 6))
+                im = ax.imshow(dist_matrix, cmap='viridis')
 
+                ax.set_xlabel("Time Index")
+                ax.set_ylabel("Time Index")
+                plt.colorbar(im, ax=ax)
+                wandb.log({"temp_smoothness": wandb.Image(fig)})
+
+                plt.close(fig)
             # Reconstruction loss using MS-SSIM + L1 or MSE (with configurable weights)
             if loss_type == "l1":
-                rec_loss, rec_metrics = convlstm_reconstruction_loss(
+                rec_loss, rec_metrics = reconstruction_loss(
                     embryo_recon, embryo_vol, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight
                 )
             elif loss_type == "mse":
@@ -545,8 +556,6 @@ ABLATION STUDY CONFIGURATION
             else:
                 raise ValueError(f"Invalid loss_type: {loss_type}. Must be 'l1' or 'mse'")
 
-            # Temporal smoothness loss (with configurable weight)
-            # embryo_lat is (1, T, 4096) - encourages smooth transitions between frames
             if temporal_weight > 0:
                 smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
                 loss = rec_loss + smooth_loss
@@ -721,8 +730,7 @@ ABLATION STUDY CONFIGURATION
                 # Temporal smoothness of latents
                 # val_lat is (B, T, latent_size)
                 if T > 1:
-                    lat_diff = torch.diff(val_lat, dim=1)  # (B, T-1, latent_size)
-                    temporal_smooth = lat_diff.norm(dim=-1).mean()  # Average L2 norm of differences
+                    val_metrics['temp'].push(temporal_smoothness_loss(val_lat).item())
         # Log to wandb with val_ prefix
         val_log_dict = {
             f"val_{key}": value.mean for key, value in val_metrics.items()
