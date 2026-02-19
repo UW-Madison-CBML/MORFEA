@@ -1,1 +1,2 @@
 convlstm l1 --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.05 --size 4096 --name batchtest
+convlstm l1 --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.00 --size 4096 --name batchtestnotemp

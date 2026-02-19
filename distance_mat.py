@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.spatial import distance_matrix
+import os
 def get_mat(traj, embryo_id, model_name):
     output_dir = f"{model_name}_distances"
     if not os.path.exists(output_dir):

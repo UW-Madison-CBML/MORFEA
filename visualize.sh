@@ -120,7 +120,6 @@ tar -xzvf latents.tar.gz
 # Run visualization
 echo "Running: $CMD"
 eval $CMD
-
 # Check if visualization succeeded
 if [ $? -eq 0 ]; then
     # Rezip the plots
@@ -131,3 +130,4 @@ else
     echo "Error: Visualization failed"
     exit 1
 fi
+ls -lh

@@ -21,7 +21,9 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 from matplotlib.gridspec import GridSpec
 import argparse
-
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from scipy.optimize import least_squares
 # Suppress statsmodels warnings from TPHATE's autocorrelation calculations
 warnings.filterwarnings('ignore', message='invalid value encountered in divide', category=RuntimeWarning)
 
@@ -51,87 +53,90 @@ def apply_tphate(data, n_jobs=-1):
 
     return tphate_data
 
-
-
-def fit_circle_2d(x, y, w=[]):
-
-    A = np.array([x, y, np.ones(len(x))]).T
-    b = x**2 + y**2
-
-    # Modify A,b for weighted least squares
-    if len(w) == len(x):
-        W = np.diag(w)
-        A = np.dot(W,A)
-        b = np.dot(W,b)
-
-    # Solve by method of least squares with error handling
-    try:
-        c = np.linalg.lstsq(A, b, rcond=None)[0]
-    except np.linalg.LinAlgError:
-        # If SVD fails, return default values
-        return 0, 0, 1e10
-
-    # Get circle parameters from solution c
-    xc = c[0]/2
-    yc = c[1]/2
-    r_sq = c[2] + xc**2 + yc**2
-
-    # Ensure radius is positive and reasonable
-    if r_sq <= 0:
-        return xc, yc, 1e10
-    r = np.sqrt(r_sq)
-    return xc, yc, r
-
-def rodrigues_rot(P, n0, n1):
-
-    # If P is only 1d array (coords of single point), fix it to be matrix
-    if P.ndim == 1:
-        P = P[np.newaxis, :]
+def fit_circle_curvature(points, how=""):
+    """
+    Fit a circle to 3 consecutive points and return curvature (1/radius).
+    If points are collinear or too close, return 0.
+    """
+    if(how == "triangle"):
     
-    # Get vector of rotation k and angle theta
-    n0 = n0/np.linalg.norm(n0)
-    n1 = n1/np.linalg.norm(n1)
-    k = np.cross(n0,n1)
-    k = k/np.linalg.norm(k)
-    theta = np.arccos(np.dot(n0,n1))
-    
-    # Compute rotated points
-    P_rot = np.zeros((len(P),3))
-    for i in range(len(P)):
-        P_rot[i] = P[i]*np.cos(theta) + np.cross(k,P[i])*np.sin(theta) + k*np.dot(k,P[i])*(1-np.cos(theta))
+        # Get three points
+        points = points[::max(1,len(points)//3)]
+        p1, p2, p3 = points[0], points[1], points[2]
 
-    return P_rot
-
-def angle_between(u, v, n=None):
-    
-    if n is None:
-        return np.arctan2(np.linalg.norm(np.cross(u,v)), np.dot(u,v))
+        # Calculate the radius using the circumradius formula
+        a = np.linalg.norm(p2 - p1)
+        b = np.linalg.norm(p3 - p2)
+        c = np.linalg.norm(p3 - p1)
+        
+        # Area using Heron's formula
+        s = (a + b + c) / 2
+        area_squared = s * (s - a) * (s - b) * (s - c)
+        
+        if area_squared <= 0:
+            return 0  # Collinear points
+        
+        area = np.sqrt(area_squared)
+         
+        if area == 0:
+            return 0
+        
+        # Radius = (a*b*c) / (4*Area)
+        radius = (a * b * c) / (4 * area)
+        if radius == 0:
+            return 0
+        return 1 / radius
     else:
-        return np.arctan2(np.dot(n,np.cross(u,v)), np.dot(u,v))
-    
-def compute_curvature(nbd, traj, num_pts):
-
-    kappa = []
-
-    for pt_idx in range(0, num_pts):
-
-        P = traj[max(0, pt_idx-nbd):min(num_pts, pt_idx+nbd),:]
-        P_mean = P.mean(axis=0)
-        P_centered = P - P_mean
-
+        if(np.isnan(points).any()):
+            return 0 
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(points)
+        pca = PCA(n_components=2)
+        pca.fit(X_scaled)
+        points_2d = pca.transform(X_scaled)       
+        def circle_residuals(params, points):
+            xc, yc, R = params
+            # Calculate distance from each point to the center (xc, yc)
+            distances = np.sqrt((points[:, 0] - xc)**2 + (points[:, 1] - yc)**2)
+            # The residual is the difference between these distances and the radius R
+            return distances - R
+        x = points_2d[:,0]
+        y = points_2d[:,1]
+        points = np.column_stack((x, y))
+   
+        x0 = [np.mean(x), np.mean(y), np.std(np.sqrt(x**2 + y**2))]
         try:
-            U, s, V = np.linalg.svd(P_centered, full_matrices=True)
-            # Handle low-rank case: if last singular value is very small, use it anyway
-            normal = V[-1, :]
-            P_xy = rodrigues_rot(P_centered, normal, [0, 0, 1])
-            xc, yc, r = fit_circle_2d(P_xy[:, 0], P_xy[:, 1])
-            # Clamp curvature to reasonable range
-            kappa.append(min(1.0 / r, 1e10) if r > 0 else 0)
-        except (np.linalg.LinAlgError, ValueError, ZeroDivisionError):
-            # If curvature computation fails, use zero curvature
-            kappa.append(0)
+            res = least_squares(circle_residuals, x0, args=(points,))
+        except ValueError as e:
+            print(e)
+            return 0
+        if not res.success:
+            return 0
+        _, _, radius = res.x
+        
+        if(radius == 0):
+            return 0 
+        return 1/radius
+ 
+def compute_curvature(offset, trajectory, num_pts):
+    """Calculate curvature for each point in trajectory using sliding window."""
+    curvatures = []
+    
+    for i in range(len(trajectory)):
+        if i < offset:
+            points = trajectory[i:i+(2*offset)]
+            curvatures.append(fit_circle_curvature(points))
+        elif i >= len(trajectory) - offset:
+            points = trajectory[i-(2*offset):i]
+            curvatures.append(fit_circle_curvature(points))
+        else:
+            points = trajectory[i-offset:i+offset]
+            curvatures.append(fit_circle_curvature(points))
+    
+    return np.array(curvatures)
 
-    return kappa
+
+
 def plot_cell_trajectory_circle(cell_id, tphate_data, time_steps, output_dir="plots"):
     fig = plt.figure(figsize=(12, 10))
     ax = fig.add_subplot(111, projection='3d')
