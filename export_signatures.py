@@ -181,7 +181,7 @@ def get_new_row(group, cell_id, max_len=0):
     #interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T if max_len == 0 else group
     #if(np.isnan(interped_latents).any()):
     #    print(f"{cell_id} has nan!!!")
-    curvature = np.array(calculate_curvatures(interped_latents))
+    curvature = np.array(calculate_curvatures(group))
     trajectory = group
     # Basic velocity
     velocity = np.linalg.norm(np.diff(trajectory, axis=0), axis=1)
@@ -385,7 +385,7 @@ def main(model_name):
     max_points = sizes.max()
     print("max points", max_points)
     signatures_df = df.groupby('embryo_id').apply(
-        lambda group: get_new_row(group[lat_columns].to_numpy(), group.name)#, max_len=max_points)
+        lambda group: get_new_row(group[lat_columns].to_numpy().astype(np.float32), group.name)#, max_len=max_points)
     ).reset_index(drop=True)
 
     # Save to CSV

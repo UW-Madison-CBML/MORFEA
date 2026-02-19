@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Default values
-OUTPUT_DIR="plots"
+OUTPUT_DIR="$1_plots"
 BATCH_SIZE=50
 GRADES_FILE="embryo_dataset_grades.csv"
 
@@ -125,7 +125,7 @@ eval $CMD
 if [ $? -eq 0 ]; then
     # Rezip the plots
     echo "Compressing plots..."
-    tar -czvf plots.tar.gz "$OUTPUT_DIR"
+    tar -czvf "$1"_plots.tar.gz "$OUTPUT_DIR"
     echo "Plots saved to plots.tar.gz"
 else
     echo "Error: Visualization failed"

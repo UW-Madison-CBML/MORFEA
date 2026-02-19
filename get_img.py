@@ -61,7 +61,7 @@ def main(model_name):
                     print("Using untrained model - results will be poor!")
 
     else:
-        model = ConvLSTMAutoencoder.from_pretrained(model_name)
+        model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/" + model_name)
     model = model.to(DEVICE)
     for idx, (embryo_vol, _, _) in enumerate(loader):
         model.eval()
@@ -75,18 +75,22 @@ def main(model_name):
         with torch.no_grad():
             recon, _ = model(embryo_vol)
 
-        vol_img = embryo_vol[0, -1, 0].cpu().detach().numpy()
-        recon_img = recon[0, -1, 0].cpu().detach().numpy()
+        vol_img = embryo_vol[0, :, 0].cpu().detach().numpy()
+        recon_img = recon[0, :, 0].cpu().detach().numpy()
+        
+        # Select subsequence indices
+        indices = [0, 10, 20, 30]
 
-        # Debug: print stats
-        print(f"Cell {cell_id}:")
-        print(f"  Original - min: {vol_img.min():.3f}, max: {vol_img.max():.3f}, mean: {vol_img.mean():.3f}, std: {vol_img.std():.3f}")
-        print(f"  Recon    - min: {recon_img.min():.3f}, max: {recon_img.max():.3f}, mean: {recon_img.mean():.3f}, std: {recon_img.std():.3f}")
+        # Extract slices and concatenate horizontally along the width (axis=1)
+        img_strip = np.hstack([vol_img[i] for i in indices])
+        rec_strip = np.hstack([recon_img[i] for i in indices])
 
-        vol_img = (vol_img * 255).astype(np.uint8)
-        recon_img = (recon_img * 255).astype(np.uint8)
-        comparison = np.concatenate((vol_img, recon_img), axis=1)
-        plt.imsave("./imgs/"+str(cell_id)+".png", comparison, cmap='gray')
+        # Stack the two strips vertically to put them on top of each other
+        final_comparison = np.vstack([img_strip, rec_strip])
+
+        # Convert to uint8 (0-255) for standard image formats
+        final_img = (final_comparison * 255).astype(np.uint8)
+        plt.imsave(f"./{model_name}_imgs/"+str(cell_id)+str(idx)+".png", final_img, cmap='gray')
         plt.close()
 
 if __name__ == "__main__":
