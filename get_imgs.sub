@@ -8,7 +8,7 @@ universe = docker
 #  commands) and arguments to be passed to jobs. 
 #  $(Process) will be a integer number for each job, starting with "0"
 #  and increasing for the relevant number of jobs.
-shell = ./get_imgs.sh
+shell = ./get_imgs.sh $(model)
    		
 # Specify the name of the log, standard error, and standard output (or
 # "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
@@ -21,7 +21,7 @@ when_to_transfer_output = ON_EXIT_OR_EVICT
 Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
-transfer_output_remaps = "imgs.tar.gz =  file:///staging/groups/bhaskar_group/ivf/imgs.tar.gz;"
+#transfer_output_remaps = "imgs.tar.gz =  file:///staging/groups/bhaskar_group/ivf/imgs.tar.gz;"
 transfer_input_files = get_imgs.sh, get_img.py, model.py, train_requirements.txt, dataset_ivf.py, Dockerfile, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz,file:///staging/groups/bhaskar_group/ivf/index.csv, api_keys.txt, raffael_model.py, raffael_conv_lstm.py
 +WantGPULab = true
 +GPUJobLength = "short"
@@ -29,7 +29,7 @@ gpus_minimum_capability = 7.0
 #Requirements = (Machine == "bhaskargpu4000.chtc.wisc.edu") && (DriverVersion == "12.8") && (DeviceName == "NVIDIA H200")
  
 #+GPUModel = "NVIDIA H200"
-transfer_output_files = imgs.tar.gz
+transfer_output_files = $(model)_imgs.tar.gz
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
 request_cpus = 4
@@ -38,4 +38,5 @@ request_disk = 80GB
 request_gpus = 1
 
 
-queue 1
+queue model in (notemp-2026-02-16,noconv-2026-02-16,control-2026-02-16)
+

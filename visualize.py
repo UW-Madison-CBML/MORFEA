@@ -29,7 +29,7 @@ warnings.filterwarnings('ignore', message='invalid value encountered in divide',
 def load_latents(csv_file):
     print(f"Loading latent embeddings from: {csv_file}")
     file_name = "latents/" + csv_file
-    df = pd.read_csv(file_name + ".csv")
+    df = pd.read_csv(file_name + ".csv").rename(columns={"embryo_id":"cell_id"})
     data = np.load(file_name + ".npy")
     
     print(f"  Loaded {len(df)} samples with {len(df.columns)} columns")
@@ -618,6 +618,7 @@ Examples:
 
     # Load latents
     df, latent_cols = load_latents(args.latents_csv)
+
     index_df = pd.read_csv("index_embryo.csv").rename(columns={"embryo_id":"cell_id"})
     # Load grades if requested
     grades_df = None

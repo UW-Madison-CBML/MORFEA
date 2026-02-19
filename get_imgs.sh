@@ -2,14 +2,11 @@
 echo "Hello CHTC from Job $1 running on `whoami`@`hostname`"
 pip install safetensors huggingface_hub
 tar -zxf embryo_dataset.tar.gz
-rm -r imgs 
-rm imgs.tar.gz
-mkdir imgs
+mkdir "$1"_imgs
 pip install huggingface_hub wandb safetensors
 HF_KEY=$(head -n 1 api_keys.txt)
 export HF_TOKEN=$HF_KEY
+echo "$1"
+python get_img.py --name "$1"
+tar -czvf "$1"_imgs.tar.gz "$1"_imgs
 
-python get_img.py --name JensLundsgaard/control-2026-01-06
-tar -czvf imgs.tar.gz imgs
-
-rm -r embryo_dataset
