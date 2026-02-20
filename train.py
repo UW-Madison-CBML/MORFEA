@@ -628,7 +628,7 @@ ABLATION STUDY CONFIGURATION
 
         duration = end_time - start_time
         print(f"Duration: {duration}")
-        run.log({"epoch_time":duration.total_seconds()})
+        run.log({"epoch_time":duration})
         avg_loss = total/max(1, count)
         run.log({"avg_loss": avg_loss})
         print(f"epoch {epoch} avg loss={avg_loss:.4f}")
