@@ -155,10 +155,9 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
 
     # Get outputs from both models
     print("testing cosine similariy on half precision model") 
-    mod_base = np.random.randint(11,23)
     for idx, embryo_vol in enumerate(loader):
-        if idx % mod_base != 0:
-            break
+        if idx % 10 != 0:
+            continue
         rand_index = np.random.randint(embryo_vol.shape[1]-10)
         embryo_vol = embryo_vol.to(DEVICE)
         embryo_vol_half = embryo_vol.half()
