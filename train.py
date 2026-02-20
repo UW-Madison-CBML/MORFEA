@@ -30,10 +30,13 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
 import os
+import time
+
 from huggingface_hub import login
 import shutil
 import hashlib
 import json
+from torchsummary import summary
 class RunningStats:
     def __init__(self):
         self.n = 0
@@ -58,7 +61,7 @@ class RunningStats:
         """Returns sample standard deviation."""
         return math.sqrt(self.variance)
 
-VAL_EMBRYOS = ["CZ594-5","CJ261-10","RL747-8","TM272-9","LFA766-1","GT353-3","LGA881-2-5","LBE649-3","TH481-5","LTA908-2","BS648-7","GS955-7","HA1040-4","CM892-5","FC048-6","GC702-6","DI358-3","MM912-4","RK787-3","GSS052-2","OJ319-5","DML373-2","PS292-4","TM294-2","KT573-4","DJC641-4","FE14-020","LD400-1","MV930-2","MDCH869-4","AS662-2","LH1169-8","GA664-1","PMDPI029-1-3","DV116-3","FV709-11","GM456-3","RA361-4","LM844-1","DL020-3","VM570-4","MC833-6","LV613-2","ZS435-5","RM126-7","BK428-2","LS93-8","GS490-7","GF976-4","PMDPI029-1-11","DRL1048-1","BS294-7","CA658-12","RO793-2","GJ191-1","CC007-2","SL313-11","RC545-2-8","OJ319-9","PA289-8","TK319-10","SM686-7","KJ1077-3","BE645-10","BC167-4","VC581-1","FM162-6","PC758-2","HC459-6","DE069-10","GC340-3","BS596-5","PE256-2","LBE857-1","PH783-3","LS1045-4","CC455-3","DL617-6","BS1086-1","CK601-4","DA309-5","LTE064-1","KF460-4","LP181-1","GS349-4","LC47-8","GS205-6","EH309-8","BS1033-2","LL854-1","DHDPI042-6","BN356-6","PA145-2","GC340-1","MM334-5","AG274-2","BA518-7","BC973-4","BA1195-9","AM33-2","AB91-1","AB028-6","BC167-4","AL884-2","AM685-3"]
+VAL_EMBRYOS = []#"RS363-7", "CZ594-5","CJ261-10","RL747-8","TM272-9","LFA766-1","GT353-3","LGA881-2-5","LBE649-3","TH481-5","LTA908-2","BS648-7","GS955-7","HA1040-4","CM892-5","FC048-6","GC702-6","DI358-3","MM912-4","RK787-3","GSS052-2","OJ319-5","DML373-2","PS292-4","TM294-2","KT573-4","DJC641-4","FE14-020","LD400-1","MV930-2","MDCH869-4","AS662-2","LH1169-8","GA664-1","PMDPI029-1-3","DV116-3","FV709-11","GM456-3","RA361-4","LM844-1","DL020-3","VM570-4","MC833-6","LV613-2","ZS435-5","RM126-7","BK428-2","LS93-8","GS490-7","GF976-4","PMDPI029-1-11","DRL1048-1","BS294-7","CA658-12","RO793-2","GJ191-1","CC007-2","SL313-11","RC545-2-8","OJ319-9","PA289-8","TK319-10","SM686-7","KJ1077-3","BE645-10","BC167-4","VC581-1","FM162-6","PC758-2","HC459-6","DE069-10","GC340-3","BS596-5","PE256-2","LBE857-1","PH783-3","LS1045-4","CC455-3","DL617-6","BS1086-1","CK601-4","DA309-5","LTE064-1","KF460-4","LP181-1","GS349-4","LC47-8","GS205-6","EH309-8","BS1033-2","LL854-1","DHDPI042-6","BN356-6","PA145-2","GC340-1","MM334-5","AG274-2","BA518-7","BC973-4","BA1195-9","AM33-2","AB91-1","AB028-6","BC167-4","AL884-2","AM685-3"]
 def temporal_smoothness_loss(z_seq, weight=0.1):
     """
     Temporal smoothness loss: encourages similar latents for adjacent timesteps
@@ -356,7 +359,7 @@ def train_convlstm(
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    VAL_EMBRYOS = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"}).dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
     # Build loss description for logging
     loss_components = []
     if ms_ssim_weight > 0:
@@ -464,7 +467,17 @@ ABLATION STUDY CONFIGURATION
     )
 
     model = model.to(DEVICE)
-
+    trainable_params = 0
+    all_params = 0
+    for _, param in model.named_parameters():
+        all_params += param.numel()
+        if param.requires_grad:
+            trainable_params += param.numel()
+    print(
+        f"trainable params: {trainable_params} || all params: {all_params} || trainable%: {100 * trainable_params / all_params}"
+    )
+    run.log({"train_params":trainable_params})
+    run.log({"params":all_params})
     learning_rate = 2e-4
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
@@ -482,7 +495,7 @@ ABLATION STUDY CONFIGURATION
     # Create DataLoaders
     loader = DataLoader(
         train_dataset,
-        batch_size=16,
+        batch_size=64,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
@@ -503,7 +516,8 @@ ABLATION STUDY CONFIGURATION
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
         count = 0
-
+        start_time = time.perf_counter()
+        end_time = time.perf_counter()
         for index, (embryo_vol, _, _) in enumerate(pbar):
             optimizer.zero_grad()
 
@@ -581,6 +595,9 @@ ABLATION STUDY CONFIGURATION
             torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
             scheduler.step()
             optimizer.step()
+            end_time = time.perf_counter()
+
+            
             total += loss.item()
             count += 1
 
@@ -609,7 +626,9 @@ ABLATION STUDY CONFIGURATION
                 )
 
 
-
+        duration = end_time - start_time
+        print(f"Duration: {duration}")
+        run.log({"epoch_time":duration.total_seconds()})
         avg_loss = total/max(1, count)
         run.log({"avg_loss": avg_loss})
         print(f"epoch {epoch} avg loss={avg_loss:.4f}")
