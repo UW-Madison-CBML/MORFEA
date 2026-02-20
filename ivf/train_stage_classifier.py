@@ -75,7 +75,7 @@ VAL_EMBRYOS =[
     "AM918-2-5",
     "LNA592-9",
     ]
-def main(model_name):
+def main(model_name, curvature = True, velocity = True, acceleration = True, path_signatures = None, latents = True):
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -102,7 +102,7 @@ def main(model_name):
     dataset = StageDataset(df, "embryo_dataset_annotations")
     dataset_te_val = StageDataset(val_df, "embryo_dataset_annotations")
     crit = torch.nn.CrossEntropyLoss()
-    model = StageModel(input_size = len(lat_columns))
+    model = StageModel(input_size = len(dataset.lat_cols))
     model.to(DEVICE)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
  
@@ -165,7 +165,13 @@ if __name__ == "__main__":
  
  
     parser.add_argument("--name", help="Model name. Must have already exported latents")
+    parser.add_argument("--curvature", action="store_true", help="Use to include curvature")
+    parser.add_argument("--latents", action="store_true", help="Use to include latents")
+    parser.add_argument("--path_signatures", action="store_true", help="Use to include path signatures")
+    parser.add_argument("--velocity", action="store_true", help="Use to include velocity")
+    parser.add_argument("--acceleration", action="store_true", help="Use to include acceleration")
  
+  
     args = parser.parse_args()
  
     main(args.name)
