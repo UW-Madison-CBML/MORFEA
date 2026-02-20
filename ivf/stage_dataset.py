@@ -134,8 +134,8 @@ def calculate_curvatures(group, offset):
     return np.array(curvatures)
  
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-
-def addAnnotations(group_name, group, annotations_dir, curvature = True, velocity = True, latents = True, acceleration = True, path_signatures = None):
+from scipy.spatial import distance_matrix
+def addAnnotations(group_name, group, annotations_dir, max_points, curvature = True, velocity = True, latents = True, acceleration = True, path_signatures = None, distance_mat=True):
     annotation_file = os.path.join(annotations_dir, f"{group_name}_phases.csv")
     df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
 
@@ -171,10 +171,20 @@ def addAnnotations(group_name, group, annotations_dir, curvature = True, velocit
 
     if (path_signatures != None):
         print(" ")
+    if(distance_mat):
+        mat = distance_matrix(trajectory, trajectory)
+        
+        num_points = mat.shape[0]
+        
+        padded_features = np.zeros((num_points, max_points))
+        
+        padded_features[:, :num_points] = mat
+        for i in range(padded_features.shape[1]):
+            group["z_dist_{i}"] = padded_features[:,i]
 
     if (not latents):
         group.drop(columns=lat_cols)
-
+    
     
     return group
 
@@ -183,18 +193,19 @@ class StageDataset(Dataset):
     Dataset that loads complete embryo sequences.
     Each sample is one full embryo with all its frames.
     """
-    def __init__(self, latents_df, annotations_dir, curvature=True, velocity=True, latents=True, acceleration=True, path_signatures=True, return_embryo_id=False): # preparing latents_df outside of the class i.e. from .csv .npy in latents/
+    def __init__(self, latents_df, annotations_dir, curvature=True, velocity=True, latents=True, acceleration=True, path_signatures=True, return_embryo_id=False, distance_mat=True): # preparing latents_df outside of the class i.e. from .csv .npy in latents/
         """
         Args: pd.read_csv(grades_csv, keep_default_na=False).
         """
         self.latents_df = latents_df
         self.annotations_dir = annotations_dir
         self.return_embryo_id = return_embryo_id
-
-        self.df = self.latents_df.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,self.annotations_dir, curvature = curvature, velocity = velocity, latents = latents, acceleration = acceleration, path_signatures = None)).reset_index()
+        sizes = df.groupby("embryo_id")["time_step"].size()
+        self.max_points = sizes.max()
+        self.df = self.latents_df.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,self.annotations_dir, max_points, curvature = curvature, velocity = velocity, latents = latents, acceleration = acceleration, path_signatures = None, distance_mat=distance_mat)).reset_index()
         self.groups = self.df.groupby("embryo_id")
         self.seqlength = 64
-
+        
 
         self.phases = ['t2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tB', 'tEB', 'tHB', 'tM', 'tPB2', 'tPNa', 'tPNf', 'tSB', 'pre_phase', 'post_phase']
         self.lat_cols = [column for column in self.df.columns if column.startswith("z_")]

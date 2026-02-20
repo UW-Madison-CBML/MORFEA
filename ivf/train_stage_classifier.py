@@ -75,7 +75,7 @@ VAL_EMBRYOS =[
     "AM918-2-5",
     "LNA592-9",
     ]
-def main(model_name, curvature = True, velocity = True, acceleration = True, path_signatures = None, latents = True):
+def main(model_name, curvature = True, velocity = True, acceleration = True, path_signatures = None, latents = True, distance_mat=True):
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -99,8 +99,8 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
     df = df[~mask]
  
  
-    dataset = StageDataset(df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature)
-    dataset_val = StageDataset(val_df, "embryo_dataset_annotations", return_embryo_id=True)
+    dataset = StageDataset(df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, distance_mat=distance_mat)
+    dataset_val = StageDataset(val_df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, return_embryo_id=True)
     crit = torch.nn.CrossEntropyLoss()
     model = StageModel(input_size = len(dataset.lat_cols))
     model.to(DEVICE)
@@ -111,7 +111,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
         dataset,
         batch_size=128,
         shuffle=True,
-        num_workers=4,
+        num_workers=16,
         pin_memory=True,
         drop_last=True
     )
@@ -182,8 +182,8 @@ if __name__ == "__main__":
     parser.add_argument("--path-signatures", default=True,action="store_true", help="Use to include path signatures")
     parser.add_argument("--velocity", default=True,action="store_true", help="Use to include velocity")
     parser.add_argument("--acceleration", default=True, action="store_true", help="Use to include acceleration")
- 
+    parser.add_argument("--distance-mat", default=True, action="store_true", help="Use to include acceleration")
   
     args = parser.parse_args()
  
-    main(args.name,curvature=args.curvature,latents=args.latents,velocity=args.velocity)
+    main(args.name,curvature=args.curvature,latents=args.latents,velocity=args.velocity, distance_mat=args.distance_mat)
