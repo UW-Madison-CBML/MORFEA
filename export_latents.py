@@ -139,7 +139,7 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
         original_len = len(ds.df)
         ds.df = ds.df.iloc[:limit]
         print(f"Limited dataset from {original_len} to {len(ds.df)} embryos")
-    loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
+    loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=16, pin_memory=True)
 
     # Load model
     print(f"\n{'='*60}")

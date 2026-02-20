@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.spatial import distance_matrix
 import os
+import matplotlib.patches as patches
 import matplotlib.ticker as ticker
 def get_mat(traj, embryo_id, model_name, annotations_dir):
     if "AG78" not in embryo_id:
@@ -12,7 +13,7 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
         raise ValueError("output folder DNE")
     dist_matrix = distance_matrix(traj, traj)
     phase_matrix = np.full(dist_matrix.shape, np.nan)
-    annotation_file = os.path.join(annotations_dir, f"{group_name}_phases.csv")
+    annotation_file = os.path.join(annotations_dir, f"{embryo_id}_phases.csv")
     df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
     for i, row in df.iterrows():
         phase_matrix[row["stage_begin"]:row["stage_end"]+1, row["stage_begin"]:row["stage_end"]+1] = i
@@ -23,7 +24,7 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
     im_phase = ax.imshow(phase_matrix_lower, cmap='Set3', interpolation='none', alpha=0.6)
     num_phases = len(df)
     patches = [
-        mpatches.Patch(color=plt.cm.Set3(i), label=row['stage_id'])
+        patches.Patch(color=plt.cm.Set3(i), label=row['stage_id'])
         for i, row in df.iterrows()
     ]
     ax.legend(handles=patches, bbox_to_anchor=(1.25, 1), loc='upper left', title="Phases")

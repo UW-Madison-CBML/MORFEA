@@ -32,7 +32,7 @@ gpus_minimum_capability = 7.0
 transfer_output_files = latents.tar.gz
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
-request_cpus = 4
+request_cpus = 16
 request_memory = 64GB
 request_disk = 80GB
 request_gpus = 1
