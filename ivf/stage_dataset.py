@@ -183,13 +183,13 @@ class StageDataset(Dataset):
     Dataset that loads complete embryo sequences.
     Each sample is one full embryo with all its frames.
     """
-    def __init__(self, latents_df, annotations_dir, curvature=True, velocity=True, latents=True, acceleration=True, path_signatures=True): # preparing latents_df outside of the class i.e. from .csv .npy in latents/
+    def __init__(self, latents_df, annotations_dir, curvature=True, velocity=True, latents=True, acceleration=True, path_signatures=True, return_embryo_id=False): # preparing latents_df outside of the class i.e. from .csv .npy in latents/
         """
         Args: pd.read_csv(grades_csv, keep_default_na=False).
         """
         self.latents_df = latents_df
         self.annotations_dir = annotations_dir
-
+        self.return_embryo_id = return_embryo_id
 
         self.df = self.latents_df.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,self.annotations_dir, curvature = curvature, velocity = velocity, latents = latents, acceleration = acceleration, path_signatures = None)).reset_index()
         self.groups = self.df.groupby("embryo_id")
@@ -212,11 +212,17 @@ class StageDataset(Dataset):
 
         group = self.groups.get_group(row["embryo_id"])
 
+        
         seqindex = int(((row["time_step"] - 1) / len(group)) * (len(group) - self.seqlength - 1))
 
         seq_df = group.iloc[seqindex : seqindex + self.seqlength]
-        return seq_df[self.lat_cols].to_numpy(), torch.tensor([self.phases.index(row["phase"]) for _,row in seq_df.iterrows()], dtype = torch.long)
 
+        if (self.return_embryo_id):
+
+            return seq_df[self.lat_cols].to_numpy(), torch.tensor([self.phases.index(r["phase"]) for _,r in seq_df.iterrows()], dtype = torch.long), row["embryo_id"]
+
+        return seq_df[self.lat_cols].to_numpy(), torch.tensor([self.phases.index(r["phase"]) for _,r in seq_df.iterrows()], dtype = torch.long)
+        
 
         # [EMBRYO1, 0, .... (latent vector),
         # EMBRYO1, 1, .... (latent vector)]

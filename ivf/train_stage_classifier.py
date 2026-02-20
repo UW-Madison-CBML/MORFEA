@@ -100,7 +100,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
  
  
     dataset = StageDataset(df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature)
-    dataset_te_val = StageDataset(val_df, "embryo_dataset_annotations")
+    dataset_val = StageDataset(val_df, "embryo_dataset_annotations", return_embryo_id=True)
     crit = torch.nn.CrossEntropyLoss()
     model = StageModel(input_size = len(dataset.lat_cols))
     model.to(DEVICE)
@@ -116,7 +116,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
         drop_last=True
     )
     loader_val = DataLoader(
-        dataset_te_val,
+        dataset_val,
         batch_size=1,
         shuffle=False,
         num_workers=4,
@@ -140,13 +140,22 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
         loss_stats = RunningStats()
         acc_stats = RunningStats()
 
+        stats_dict = {} 
+
         with torch.no_grad():
-            for lats, labels in loader_val:
+            for lats, labels, embryo_id in loader_val:
                 lats = lats.to(DEVICE).float()
                 labels = labels.to(DEVICE).long()
                 logits = model(lats)
                 loss = crit(logits.view(-1, 18), labels.view(-1))
                 loss_stats.push(loss.item())
+
+                embryo_id = embryo_id[0]
+
+                if (embryo_id in stats_dict.keys()):
+                    stats_dict[embryo_id].push(loss.item())
+                else:
+                    stats_dict[embryo_id] = RunningStats()
  
                 # Calculate accuracy
                 preds = logits.view(-1,18).argmax(dim=1)  # Get predicted class (0, 1, or 2)
@@ -155,7 +164,10 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
             "val_loss_std":loss_stats.std_dev,
             "val_acc":acc_stats.mean,
             "val_acc_std":acc_stats.std_dev})
-     
+        for k, v in stats_dict.items():
+            run.log({k : v.mean})
+            run.log({k + "standard dev"  : v.std_dev})
+
 
  
  
