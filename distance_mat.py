@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.spatial import distance_matrix
 import os
-import matplotlib.patches as patches
+import matplotlib.patches as mpatches
 import matplotlib.ticker as ticker
 def get_mat(traj, embryo_id, model_name, annotations_dir):
     if "AG78" not in embryo_id:
@@ -16,15 +16,16 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
     annotation_file = os.path.join(annotations_dir, f"{embryo_id}_phases.csv")
     df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
     for i, row in df.iterrows():
-        phase_matrix[row["stage_begin"]:row["stage_end"]+1, row["stage_begin"]:row["stage_end"]+1] = i
+        start, end = int(row["stage_begin"]), int(row["stage_end"])
+        phase_matrix[start:end+1, :] = i  
     mask = np.triu(np.ones_like(phase_matrix, dtype=bool), k=1)
     phase_matrix_lower = np.ma.masked_where(mask, phase_matrix)
     fig, ax = plt.subplots(figsize=(10, 8)) # Slightly wider for the legend
     im_dist = ax.imshow(dist_matrix, cmap='viridis', interpolation='none')
-    im_phase = ax.imshow(phase_matrix_lower, cmap='Set3', interpolation='none', alpha=0.6)
+    im_phase = ax.imshow(phase_matrix_lower, cmap='Set3', interpolation='none', alpha=1.0)
     num_phases = len(df)
     patches = [
-        patches.Patch(color=plt.cm.Set3(i), label=row['stage_id'])
+        mpatches.Patch(color=plt.cm.Set3(i), label=row['stage_id'])
         for i, row in df.iterrows()
     ]
     ax.legend(handles=patches, bbox_to_anchor=(1.25, 1), loc='upper left', title="Phases")
