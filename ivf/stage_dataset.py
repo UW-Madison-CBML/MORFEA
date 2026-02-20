@@ -135,7 +135,7 @@ def calculate_curvatures(group, offset):
  
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-def addAnnotations(group_name, group, annotations_dir, curvatures = True, velocity = True, latents = True, acceleration = True, path_signatures = None):
+def addAnnotations(group_name, group, annotations_dir, curvature = True, velocity = True, latents = True, acceleration = True, path_signatures = None):
     annotation_file = os.path.join(annotations_dir, f"{group_name}_phases.csv")
     df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
 
@@ -164,13 +164,12 @@ def addAnnotations(group_name, group, annotations_dir, curvatures = True, veloci
         speed = np.concatenate((vel, np.zeros(1)))
         group["z_speed"] = speed
 
-    if (curvatures):
-    
+    if (curvature):
         group["z_curvature_6"] = calculate_curvatures(group, 6)
         group["z_curvature_10"] = calculate_curvatures(group, 10)
         group["z_curvature_2"] = calculate_curvatures(group, 2)
 
-    if (path_signatures != None and path_signatures = True):
+    if (path_signatures != None):
         print(" ")
 
     if (not latents):
@@ -184,7 +183,7 @@ class StageDataset(Dataset):
     Dataset that loads complete embryo sequences.
     Each sample is one full embryo with all its frames.
     """
-    def __init__(self, latents_df, annotations_dir, curvature, velocity, latents, acceleration, path_signatures): # preparing latents_df outside of the class i.e. from .csv .npy in latents/
+    def __init__(self, latents_df, annotations_dir, curvature=True, velocity=True, latents=True, acceleration=True, path_signatures=True): # preparing latents_df outside of the class i.e. from .csv .npy in latents/
         """
         Args: pd.read_csv(grades_csv, keep_default_na=False).
         """

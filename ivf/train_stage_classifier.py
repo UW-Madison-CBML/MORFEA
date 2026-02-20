@@ -99,17 +99,17 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
     df = df[~mask]
  
  
-    dataset = StageDataset(df, "embryo_dataset_annotations")
+    dataset = StageDataset(df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature)
     dataset_te_val = StageDataset(val_df, "embryo_dataset_annotations")
     crit = torch.nn.CrossEntropyLoss()
     model = StageModel(input_size = len(dataset.lat_cols))
     model.to(DEVICE)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=3e-5)
  
  
     loader = DataLoader(
         dataset,
-        batch_size=32,
+        batch_size=128,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
@@ -124,7 +124,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
         drop_last=False
     )
     print(len(loader))
-    for epoch in range(20):
+    for epoch in range(8):
         model.train()
         for lats, labels in loader:
             lats = lats.to(DEVICE).float()
@@ -165,13 +165,13 @@ if __name__ == "__main__":
  
  
     parser.add_argument("--name", help="Model name. Must have already exported latents")
-    parser.add_argument("--curvature", action="store_true", help="Use to include curvature")
-    parser.add_argument("--latents", action="store_true", help="Use to include latents")
-    parser.add_argument("--path_signatures", action="store_true", help="Use to include path signatures")
-    parser.add_argument("--velocity", action="store_true", help="Use to include velocity")
-    parser.add_argument("--acceleration", action="store_true", help="Use to include acceleration")
+    parser.add_argument("--curvature", default=True,action="store_true", help="Use to include curvature")
+    parser.add_argument("--latents", default=True,action="store_true", help="Use to include latents")
+    parser.add_argument("--path-signatures", default=True,action="store_true", help="Use to include path signatures")
+    parser.add_argument("--velocity", default=True,action="store_true", help="Use to include velocity")
+    parser.add_argument("--acceleration", default=True, action="store_true", help="Use to include acceleration")
  
   
     args = parser.parse_args()
  
-    main(args.name)
+    main(args.name,curvature=args.curvature,latents=args.latents,velocity=args.velocity)
