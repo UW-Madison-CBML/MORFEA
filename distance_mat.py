@@ -16,7 +16,7 @@ def get_mat(traj, embryo_id, model_name):
     ax.set_ylabel("Time Index")
     plt.colorbar(im)
 
-    plt.savefig(output_dir+f'{embryo_id}_distance_matrix.png', dpi=300, bbox_inches='tight')
+    plt.savefig(output_dir+f'/{embryo_id}_distance_matrix.png', dpi=300, bbox_inches='tight')
 
     plt.close(fig) 
 

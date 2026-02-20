@@ -125,7 +125,7 @@ if [ $? -eq 0 ]; then
     # Rezip the plots
     echo "Compressing plots..."
     tar -czvf "$1"_plots.tar.gz "$OUTPUT_DIR"
-    echo "Plots saved to plots.tar.gz"
+    echo "Plots saved to {$1}_plots.tar.gz"
 else
     echo "Error: Visualization failed"
     exit 1
