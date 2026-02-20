@@ -497,7 +497,7 @@ ABLATION STUDY CONFIGURATION
         train_dataset,
         batch_size=64,
         shuffle=True,
-        num_workers=4,
+        num_workers=16,
         pin_memory=True,
         drop_last=True
     )
@@ -505,7 +505,7 @@ ABLATION STUDY CONFIGURATION
         val_dataset,
         batch_size=1,
         shuffle=False,  # No shuffle for validation
-        num_workers=4,
+        num_workers=16,
         pin_memory=True,
         drop_last=False  # Don't drop last for validation
     )
