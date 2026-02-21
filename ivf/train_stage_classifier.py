@@ -182,8 +182,8 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
                 len_seq = 0
                 for i, idx in enumerate(pred_indices):
                     if(i == 0 or pred_indices[i-1] != idx):
-                        print(f"{dataset_val.phases[current]} {len_seq} times")
-                        current = idx
+                        print(f"{current} {len_seq} times")
+                        current = dataset_val.phases[idx]
                         len_seq = 1
                     
                     else:
