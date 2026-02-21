@@ -164,9 +164,32 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
             "val_loss_std":loss_stats.std_dev,
             "val_acc":acc_stats.mean,
             "val_acc_std":acc_stats.std_dev})
-        for k, v in stats_dict.items():
-            run.log({k : v.mean})
-            run.log({k + "standard dev"  : v.std_dev})
+        highest_std = sorted(list(stats_dict.items()), key = lambda x: -1*(x[1].std_dev))[:5]
+        model.eval()
+        for embryo, _ in highest_std:
+            with open(os.path.join("embryo_dataset_annotations", f"{embryo}_phases.csv"), 'r') as file:
+                print("Ground Truth:\n", file.read())
+            with torch.no_grad():
+                data = dataset_val.df[dataset_val.df["embryo_id"] == embryo][dataset_val.lat_cols].to_numpy()
+                whole_seq = torch.tensor(data, dtype=torch.float32).unsqueeze(0).to(DEVICE)
+                
+                logits = model(whole_seq)
+                
+                pred_indices = logits.argmax(dim=-1).squeeze(0).cpu().numpy()
+
+                print("Predicted Phases:")
+                current = ""
+                len_seq = 0
+                for i, idx in enumerate(pred_indices):
+                    if(i == 0 or pred_indices[i-1] != idx):
+                        print(f"{dataset_val.phases[current]} {len_seq} times")
+                        current = idx
+                        len_seq = 1
+                    
+                    else:
+                        len_seq += 1
+                
+                 
 
 
  
