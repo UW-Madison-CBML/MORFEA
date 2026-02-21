@@ -15,61 +15,24 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(DEVICE)
 def main(model_name):
     login(os.getenv("HF_TOKEN"))
-    ds = IVFSequenceDataset(pd.read_csv(os.path.abspath("index.csv")), resize=128, norm="minmax01")
-    loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=4, pin_memory=True)
-    model = None
-    if(model_name == None):
-    # Search for model going back up to 30 days
-        api = HfApi()
-        model_loaded = False
-        
-        for days_back in range(31):
-            date_label = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
-            model_name = f"JensLundsgaard/IVF-ConvLSTM-Model-{date_label}"
-            try:
-                print(f"Attempting to load model: {model_name}")
-                model = ConvLSTMAutoencoder.from_pretrained(model_name)
-                print(f"Successfully loaded model from {date_label}")
-                model_loaded = True
-                break
-            except Exception as e:
-                if days_back < 30:
-                    continue
-                else:
-                    print(f"Failed to find model within 30 days. Last error: {e}")
-                    raise
-
-        if not model_loaded or model is None:
-            print("Could not find any model within the last 30 days, using local weights...")
-            model = ConvLSTMAutoencoder(
-                seq_len=50,
-                input_channels=1,
-                encoder_hidden_dim=256,
-                encoder_layers=2,
-                decoder_hidden_dim=128,
-                decoder_layers=2,
-                latent_size=4096,
-                use_classifier=False,
-                num_classes=2
-            )
-            if os.path.exists("convlstm_model_weights.pth"):
-                try:
-                    model.load_state_dict(torch.load("convlstm_model_weights.pth", weights_only=True))
-                    print("Loaded local convlstm_model_weights.pth")
-                except Exception as e:
-                    print(f"Failed to load local weights: {e}")
-                    print("Using untrained model - results will be poor!")
-
-    else:
-        model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/" + model_name)
+    os.makedirs(os.path.join(f"./{model_name}_imgs","A"))
+    os.makedirs(os.path.join(f"./{model_name}_imgs","B"))
+    os.makedirs(os.path.join(f"./{model_name}_imgs","C"))
+    grades_df = read_csv(os.path.abspath("embryo_dataset_grades.csv")).rename(columns={"video_name":"embryo_id"})
+    annotations_dir = "embryo_dataset_annotations"
+    df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})
+    df = df.merge(grades_df, left_on="embryo_id", right_on="embryo_id", how='left').dropna(subset=["TE"])
+    ds = IVFSequenceDataset(df, resize=128, norm="minmax01")
+    loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=16, pin_memory=True)
+    model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/" + model_name)
     model = model.to(DEVICE)
     for idx, (embryo_vol, _, _) in enumerate(loader):
         model.eval()
 
-        # Get cell_id from dataframe for filename
         row = ds.df.iloc[idx]
-        cell_id = row.get("cell_id", f"cell_{idx}")
-
+        cell_id = str(row["embryo_id"])
+        annotations_df = pd.read_csv(os.path.join(annotations_dir, f"{cell_id}_phases.csv"))
+        grade = str(row["TE"])
         # Pass full sequence to model
         embryo_vol = embryo_vol.to(DEVICE)
         with torch.no_grad():
@@ -77,21 +40,14 @@ def main(model_name):
 
         vol_img = embryo_vol[0, :, 0].cpu().detach().numpy()
         recon_img = recon[0, :, 0].cpu().detach().numpy()
-        
-        # Select subsequence indices
-        indices = [0, 10, 20, 30]
+         
+        for phase_row_idx,phase_row in annotations_df.iterrows():
+            vol = (vol_img[phase_row["stage_begin"]] * 255).astype(np.uint8)
+            recon = (recon_img[phase_row["stage_begin"]]*255).astype(np.uint8)
 
-        # Extract slices and concatenate horizontally along the width (axis=1)
-        img_strip = np.hstack([vol_img[i] for i in indices])
-        rec_strip = np.hstack([recon_img[i] for i in indices])
-
-        # Stack the two strips vertically to put them on top of each other
-        final_comparison = np.vstack([img_strip, rec_strip])
-
-        # Convert to uint8 (0-255) for standard image formats
-        final_img = (final_comparison * 255).astype(np.uint8)
-        plt.imsave(f"./{model_name}_imgs/"+str(cell_id)+str(idx)+".png", final_img, cmap='gray')
-        plt.close()
+            plt.imsave(os.path.join(f"/{model_name}_imgs",grade,str(cell_id)+str(phase_row["stage_id"])+".png", vol, cmap='gray'))
+            plt.imsave(os.path.join(f"/{model_name}_imgs",grade,str(cell_id)+str(phase_row["stage_id"]) + "_recon"+".png", recon, cmap='gray'))
+            plt.close()
 
 if __name__ == "__main__":
     import argparse

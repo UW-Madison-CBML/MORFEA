@@ -22,7 +22,7 @@ Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
 #transfer_output_remaps = "imgs.tar.gz =  file:///staging/groups/bhaskar_group/ivf/imgs.tar.gz;"
-transfer_input_files = get_imgs.sh, get_img.py, model.py, train_requirements.txt, dataset_ivf.py, Dockerfile, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz,file:///staging/groups/bhaskar_group/ivf/index.csv, api_keys.txt, raffael_model.py, raffael_conv_lstm.py
+transfer_input_files = get_imgs.sh, get_img.py, model.py, train_requirements.txt, dataset_ivf.py, Dockerfile, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, api_keys.txt, raffael_model.py, raffael_conv_lstm.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz
 +WantGPULab = true
 +GPUJobLength = "short"
 gpus_minimum_capability = 7.0
@@ -32,11 +32,11 @@ gpus_minimum_capability = 7.0
 transfer_output_files = $(model)_imgs.tar.gz
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
-request_cpus = 4
+request_cpus = 16
 request_memory = 64GB
 request_disk = 80GB
 request_gpus = 1
 
 
-queue model in (notemp-2026-02-16,noconv-2026-02-16,control-2026-02-16)
+queue model in (notemp-2026-02-20,noconv-2026-02-20,control-2026-02-20)
 
