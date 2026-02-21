@@ -22,10 +22,9 @@ IFS="_" read -ra ADDR <<< "$1"
 
 #for i in "${ADDR[@]}"; do
 #done
-python export_latents.py --name s512-2026-02-20
-python export_latents.py --name s256-2026-02-20
-python export_latents.py --name s128-2026-02-20
-python export_latents.py --name s64-2026-02-20
+python export_latents.py --name notemp-2026-02-20
+python export_latents.py --name control-2026-02-20
+python export_latents.py --name noconv-2026-02-20
 
 #cat get_latents.txt | xargs -I {} sh -c 'python export_latents.py --name "{}" --limit 50'
 mkdir -p latents
