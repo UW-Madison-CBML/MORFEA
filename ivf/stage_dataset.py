@@ -177,7 +177,7 @@ def addAnnotations(group_name, group, annotations_dir, max_points, curvature = T
         num_points = mat.shape[0]
         
         padded_features = np.zeros((num_points, max_points))
-        
+        for seq_len in range( 
         padded_features[:, :num_points] = mat
         for i in range(padded_features.shape[1]):
             group["z_dist_{i}"] = padded_features[:,i]
