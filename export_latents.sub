@@ -38,4 +38,5 @@ request_disk = 80GB
 request_gpus = 1
 
 
-queue models from get_latents.txt
+#queue models from get_latents.txt
+queue 1

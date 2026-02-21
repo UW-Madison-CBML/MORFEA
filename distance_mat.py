@@ -6,8 +6,6 @@ import os
 import matplotlib.patches as mpatches
 import matplotlib.ticker as ticker
 def get_mat(traj, embryo_id, model_name, annotations_dir):
-    if "AG78" not in embryo_id:
-        return
     output_dir = f"{model_name}_distances"
     if not os.path.exists(output_dir):
         raise ValueError("output folder DNE")
@@ -22,7 +20,11 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
     phase_matrix_lower = np.ma.masked_where(mask, phase_matrix)
     fig, ax = plt.subplots(figsize=(10, 8)) # Slightly wider for the legend
     im_dist = ax.imshow(dist_matrix, cmap='viridis', interpolation='none')
-    im_phase = ax.imshow(phase_matrix_lower, cmap='Set3', interpolation='none', alpha=1.0)
+    im_phase = ax.imshow(phase_matrix_lower, 
+                     cmap='Set3', 
+                     interpolation='none', 
+                     vmin=0, 
+                     vmax=len(df) - 1)
     num_phases = len(df)
     patches = [
         mpatches.Patch(color=plt.cm.Set3(i), label=row['stage_id'])
