@@ -71,6 +71,7 @@ def main(model_name):
     lat_columns = [f"z_{i}" for i in range(values.shape[1])]
     values_df = pd.DataFrame(values, columns=lat_columns)
     df = pd.concat([keys, values_df], axis = 1)
+    df = df.dropna(subset=["ICM"])
     # This returns a DataFrame where each row is a cell_id with its signature
     sizes = df.groupby("embryo_id")["time_step"].size()
     print(sizes.idxmax())

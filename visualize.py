@@ -623,7 +623,7 @@ Examples:
 
     # Load latents
     df, latent_cols = load_latents(args.latents_csv)
-
+    df = df.dropna(subset=["ICM"])
     index_df = pd.read_csv("index_embryo.csv").rename(columns={"embryo_id":"cell_id"})
     # Load grades if requested
     grades_df = None
