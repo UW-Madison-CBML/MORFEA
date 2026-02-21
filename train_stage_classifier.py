@@ -1,6 +1,6 @@
 import torch
-from signature_dataset import SignatureDataset
-from signature_model import SignatureClassifier
+from stage_dataset import StageDataset
+from stage_model import StageModel
 from torch.utils.data import DataLoader
 import wandb
 import os
@@ -12,7 +12,7 @@ class RunningStats:
         self.n = 0
         self.mean = 0.0
         self.m2 = 0.0
-
+ 
     def push(self, x):
         """Add a new value and update statistics."""
         self.n += 1
@@ -20,17 +20,17 @@ class RunningStats:
         self.mean += delta / self.n
         delta2 = x - self.mean
         self.m2 += delta * delta2
-
+ 
     @property
     def variance(self):
         """Returns sample variance (unbiased). Use self.m2 / self.n for population."""
         return self.m2 / (self.n - 1) if self.n > 1 else 0.0
-
+ 
     @property
     def std_dev(self):
         """Returns sample standard deviation."""
         return math.sqrt(self.variance)
-
+ 
 VAL_EMBRYOS =[
     "RG434-11",
     "RC1103-1",
@@ -75,95 +75,138 @@ VAL_EMBRYOS =[
     "AM918-2-5",
     "LNA592-9",
     ]
-def main(model_name):
+def main(model_name, curvature = True, velocity = True, acceleration = True, path_signatures = None, latents = True, distance_mat=True):
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+     
     wandb.login(key=os.getenv("WANDB_KEY"))
     run = wandb.init(
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
     )
-    
+ 
     learning_rate = 0.001
     lat_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv")).rename(columns={"cell_id":"embryo_id"})
-    lat_np = np.load(os.path.abspath(f"latents/{model_name}.csv"))
+    lat_np = np.load(os.path.abspath(f"latents/{model_name}.npy"))
     if(len(lat_df) != lat_np.shape[0]):
         raise ValueError("keys and values sizes do not match")
-    lat_columns = [f"z_{i}" for i in range(values.shape[1])]
+    lat_columns = [f"z_{i}" for i in range(lat_np.shape[1])]
     values_df = pd.DataFrame(lat_np, columns=lat_columns)
     df = pd.concat([lat_df, values_df], axis = 1)
     mask = df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = df[mask]
-    print(len(val_df)/len(df))
     df = df[~mask]
-
-
-    dataset = StageDataset(df, "embryo_grade_annotations") 
-    dataset_val = StageDataset(val_df, "embryo_grade_annotations") 
+ 
+ 
+    dataset = StageDataset(df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, distance_mat=distance_mat)
+    dataset_val = StageDataset(val_df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, return_embryo_id=True)
     crit = torch.nn.CrossEntropyLoss()
-    model = SignatureClassifier(len(lat_columns), keep_na=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
-
-
+    model = StageModel(input_size = len(dataset.lat_cols))
+    model.to(DEVICE)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=3e-5)
+ 
+ 
     loader = DataLoader(
         dataset,
-        batch_size=32,
+        batch_size=128,
         shuffle=True,
-        num_workers=4,
+        num_workers=16,
         pin_memory=True,
         drop_last=True
     )
-    loader_te_val = DataLoader(
-        dataset_te_val,
+    loader_val = DataLoader(
+        dataset_val,
         batch_size=1,
         shuffle=False,
         num_workers=4,
         pin_memory=True,
         drop_last=False
-
-    for epoch in range(20):
+    )
+    print(len(loader))
+    for epoch in range(8):
         model.train()
         for lats, labels in loader:
-            lats = lats.to(DEVICE)
+            lats = lats.to(DEVICE).float()
             labels = labels.to(DEVICE).long()
             logits = model(lats)
-            loss = crit(logits, labels)
-
-            optimizer.zero_grad() 
-            loss.backward() 
+            loss = crit(logits.view(-1, 18), labels.view(-1))
+ 
+            optimizer.zero_grad()
+            loss.backward()
             optimizer.step()
             run.log({"loss": loss.item()})
+        model.eval()
+        loss_stats = RunningStats()
+        acc_stats = RunningStats()
 
-    loss_stats = RunningStats()
-    acc_stats = RunningStats()
+        stats_dict = {} 
 
-    model.eval()
-    with torch.no_grad():
-        for lats, labels in loader_te_val:
-            lats = lats.to(DEVICE)
-            labels = labels.to(DEVICE).long()
-            logits = model(lats)
-            loss = crit(logits, labels)
-            loss_stats.push(loss.item())
-            
-            # Calculate accuracy
-            preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
-            acc_stats.push((preds == labels).sum().item()/labels.shape[0])
-    run.log({"val_loss":loss_stats.mean,
-        "val_loss_std":loss_stats.std_dev,
-        "val_acc":acc_stats.mean,
-        "val_acc_std":acc_stats.std_dev})
-    
+        with torch.no_grad():
+            for lats, labels, embryo_id in loader_val:
+                lats = lats.to(DEVICE).float()
+                labels = labels.to(DEVICE).long()
+                logits = model(lats)
+                loss = crit(logits.view(-1, 18), labels.view(-1))
+                loss_stats.push(loss.item())
 
+                embryo_id = embryo_id[0]
+
+                if (embryo_id in stats_dict.keys()):
+                    stats_dict[embryo_id].push(loss.item())
+                else:
+                    stats_dict[embryo_id] = RunningStats()
+ 
+                # Calculate accuracy
+                preds = logits.view(-1,18).argmax(dim=1)  # Get predicted class (0, 1, or 2)
+                acc_stats.push((preds == labels.view(-1)).sum().item()/labels.view(-1).shape[0])
+        run.log({"val_loss":loss_stats.mean,
+            "val_loss_std":loss_stats.std_dev,
+            "val_acc":acc_stats.mean,
+            "val_acc_std":acc_stats.std_dev})
+        highest_std = sorted(list(stats_dict.items()), key = lambda x: -1*(x[1].std_dev))[:5]
+        model.eval()
+        for embryo, _ in highest_std:
+            with open(os.path.join("embryo_dataset_annotations", f"{embryo}_phases.csv"), 'r') as file:
+                print("Ground Truth:\n", file.read())
+            with torch.no_grad():
+                data = dataset_val.df[dataset_val.df["embryo_id"] == embryo][dataset_val.lat_cols].to_numpy()
+                whole_seq = torch.tensor(data, dtype=torch.float32).unsqueeze(0).to(DEVICE)
+                
+                logits = model(whole_seq)
+                
+                pred_indices = logits.argmax(dim=-1).squeeze(0).cpu().numpy()
+
+                print("Predicted Phases:")
+                current = ""
+                len_seq = 0
+                for i, idx in enumerate(pred_indices):
+                    if(i == 0 or pred_indices[i-1] != idx):
+                        print(f"{current} {len_seq} times")
+                        current = dataset_val.phases[idx]
+                        len_seq = 1
+                    
+                    else:
+                        len_seq += 1
+                
+                 
+
+
+ 
+ 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="A simple script using argparse to greet a user.")
-
-
+ 
+ 
     parser.add_argument("--name", help="Model name. Must have already exported latents")
-
+    parser.add_argument("--curvature", default=True,action="store_true", help="Use to include curvature")
+    parser.add_argument("--latents", default=True,action="store_true", help="Use to include latents")
+    parser.add_argument("--path-signatures", default=True,action="store_true", help="Use to include path signatures")
+    parser.add_argument("--velocity", default=True,action="store_true", help="Use to include velocity")
+    parser.add_argument("--acceleration", default=True, action="store_true", help="Use to include acceleration")
+    parser.add_argument("--distance-mat", default=True, action="store_true", help="Use to include acceleration")
+  
     args = parser.parse_args()
-
-    main(args.name)
+ 
+    main(args.name,curvature=args.curvature,latents=args.latents,velocity=args.velocity, distance_mat=args.distance_mat)

@@ -18,7 +18,7 @@ def main(model_name):
     os.makedirs(os.path.join(f"./{model_name}_imgs","A"))
     os.makedirs(os.path.join(f"./{model_name}_imgs","B"))
     os.makedirs(os.path.join(f"./{model_name}_imgs","C"))
-    grades_df = read_csv(os.path.abspath("embryo_dataset_grades.csv")).rename(columns={"video_name":"embryo_id"})
+    grades_df = pd.read_csv(os.path.abspath("embryo_dataset_grades.csv")).rename(columns={"video_name":"embryo_id"})
     annotations_dir = "embryo_dataset_annotations"
     df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})
     df = df.merge(grades_df, left_on="embryo_id", right_on="embryo_id", how='left').dropna(subset=["TE"])
@@ -31,7 +31,7 @@ def main(model_name):
 
         row = ds.df.iloc[idx]
         cell_id = str(row["embryo_id"])
-        annotations_df = pd.read_csv(os.path.join(annotations_dir, f"{cell_id}_phases.csv"))
+        annotations_df = pd.read_csv(os.path.join(annotations_dir, f"{cell_id}_phases.csv"), header=None, names=['stage_id', 'stage_begin', 'stage_end'])
         grade = str(row["TE"])
         # Pass full sequence to model
         embryo_vol = embryo_vol.to(DEVICE)
@@ -41,7 +41,7 @@ def main(model_name):
         vol_img = embryo_vol[0, :, 0].cpu().detach().numpy()
         recon_img = recon[0, :, 0].cpu().detach().numpy()
          
-        for phase_row_idx,phase_row in annotations_df.iterrows():
+        for _,phase_row in annotations_df.iterrows():
             vol = (vol_img[phase_row["stage_begin"]] * 255).astype(np.uint8)
             recon = (recon_img[phase_row["stage_begin"]]*255).astype(np.uint8)
 
