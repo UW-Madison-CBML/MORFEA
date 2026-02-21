@@ -171,7 +171,7 @@ def addAnnotations(group_name, group, annotations_dir, max_points, curvature = T
 
     if (path_signatures != None):
         print(" ")
-    if(distance_mat):
+    """if(distance_mat):
         mat = distance_matrix(trajectory, trajectory)
         
         num_points = mat.shape[0]
@@ -180,8 +180,25 @@ def addAnnotations(group_name, group, annotations_dir, max_points, curvature = T
         for seq_len in range( 
         padded_features[:, :num_points] = mat
         for i in range(padded_features.shape[1]):
-            group["z_dist_{i}"] = padded_features[:,i]
+            group["z_dist_{i}"] = padded_features[:,i]"""
+    if(acceleration):
+        alpha_v = 0.3
+        alpha_a = 0.3
 
+        velocity_raw = group[lat_cols].diff().fillna(0)
+        for col in velocity_raw.columns:
+            group[f'z_v_ema_{col}'] = velocity_raw[col].ewm(alpha=alpha_v, adjust=False).mean()
+
+        v_cols = [c for c in group.columns if c.startswith('z_v_ema_')]
+        accel_raw = group[v_cols].diff().fillna(0)
+
+        for i, col in enumerate(v_cols):
+            group[f'z_a_ema_latent_{i}'] = accel_raw[col].ewm(alpha=alpha_a, adjust=False).mean()
+
+        a_cols = [c for c in group.columns if c.startswith('z_a_ema_')]
+
+        group['z_v_magnitude'] = np.linalg.norm(group[v_cols].values, axis=1)
+        group['z_a_magnitude'] = np.linalg.norm(group[a_cols].values, axis=1)
     if (not latents):
         group.drop(columns=lat_cols)
     
@@ -200,9 +217,9 @@ class StageDataset(Dataset):
         self.latents_df = latents_df
         self.annotations_dir = annotations_dir
         self.return_embryo_id = return_embryo_id
-        sizes = df.groupby("embryo_id")["time_step"].size()
+        sizes = self.latents_df.groupby("embryo_id")["time_step"].size()
         self.max_points = sizes.max()
-        self.df = self.latents_df.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,self.annotations_dir, max_points, curvature = curvature, velocity = velocity, latents = latents, acceleration = acceleration, path_signatures = None, distance_mat=distance_mat)).reset_index()
+        self.df = self.latents_df.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,self.annotations_dir, self.max_points, curvature = curvature, velocity = velocity, latents = latents, acceleration = acceleration, path_signatures = None, distance_mat=distance_mat)).reset_index()
         self.groups = self.df.groupby("embryo_id")
         self.seqlength = 64
         
