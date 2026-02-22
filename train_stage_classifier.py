@@ -75,6 +75,19 @@ VAL_EMBRYOS =[
     "AM918-2-5",
     "LNA592-9",
     ]
+def get_class_weights(annotations_dir, lat_group_sizes, phases):
+    stage_id_freq = {phase: 0 for phase in phases}
+    for i, row in lat_group_sizes.iterrows():
+        annotations_df = pd.read_csv(os.path.join(annotations_dir, f"{row['embryo_id']}_phases.csv"), header=None, names=["stage_id","stage_begin", "stage_end"])
+        stage_id_freq["pre_phase"] += max(0,annotations_df.iloc[0]["stage_begin"] - 1)
+        stage_id_freq["post_phase"] += max(0, row["counts"] - annotations_df.iloc[-1]["stage_end"])
+        for _, phase_row in annotations_df.iterrows():
+            stage_id_freq[phase_row["stage_id"]] += max(0,phase_row["stage_end"] - phase_row["stage_begin"])
+    out_tensor = torch.tensor([stage_id_freq[phase] for phase in phases])
+    return out_tensor / out_tensor.sum()
+
+        
+    
 def main(model_name, curvature = True, velocity = True, acceleration = True, path_signatures = None, latents = True, distance_mat=True):
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
@@ -98,10 +111,10 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
     val_df = df[mask]
     df = df[~mask]
  
- 
     dataset = StageDataset(df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, distance_mat=distance_mat)
     dataset_val = StageDataset(val_df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, distance_mat=distance_mat, return_embryo_id=True)
-    crit = torch.nn.CrossEntropyLoss()
+    weights = get_class_weights(os.path.abspath("embryo_dataset_annotations"), df.groupby("embryo_id").size().reset_index(name='counts'), dataset.phases).to(DEVICE)
+    crit = torch.nn.CrossEntropyLoss(weight=weights)
     model = StageModel(input_size = len(dataset.lat_cols))
     model.to(DEVICE)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=3e-5)

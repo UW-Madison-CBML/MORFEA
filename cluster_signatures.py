@@ -25,13 +25,16 @@ def main(model_name, grade):
         raise ValueError("no embryo_id column")
     
     sig_cols = [col for col in sig_df.columns if col.startswith("s_")]
-    
+     
     df = sig_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")
     df = df[["embryo_id", grade] + sig_cols].dropna(subset=[grade])
     feature_cols = [col for col in df.columns if col.startswith('s_')]
     X = df[feature_cols].values
-    print(np.isnan(X).any())
+    count_nans = np.isnan(X).sum(axis=1)
+    #X = X[:, ~nan_mask]
     grades = df[grade].values
+    print(count_nans[df[grade] == "C"]) 
+    print(count_nans[df[grade] != "C"]) 
 
     print(f"Starting with {X.shape[0]} samples, {X.shape[1]} features\n")
     selector = VarianceThreshold(threshold=0) 
