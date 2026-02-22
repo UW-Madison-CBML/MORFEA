@@ -40,7 +40,7 @@ def main(model_name, grade):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X_filtered)
     
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    """fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
     grade_colors = {'A': 'green', 'B': 'orange', 'C': 'red'}
     colors_grade = [grade_colors[g] for g in grades]
@@ -61,7 +61,7 @@ def main(model_name, grade):
     plt.colorbar(scatter, ax=axes[1], label='Cluster')
 
     plt.tight_layout()
-    plt.savefig('clusters/clustering_comparison.png', dpi=300, bbox_inches='tight')
+    plt.savefig('clusters/clustering_comparison.png', dpi=300, bbox_inches='tight')"""
     print("=== STRATEGY 1: Feature Selection ===")
     selector = SelectKBest(f_classif, k=50)  
     print(grades)

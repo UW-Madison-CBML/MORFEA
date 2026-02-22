@@ -110,7 +110,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
     run = wandb.init(
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
-        name=f"{model_name}-phase-{'c' if curvature else ''}{'v' if velocity else ''}{'p' if path_signatures else ''}{'l' if latents else ''}{'d' if distance_mat else ''}",
+        name=f"{model_name}-phase-{'c' if curvature else ''}{'v' if velocity else ''}{'p' if path_signatures else ''}{'l' if latents else ''}{'d' if distance_mat else ''}{'a' if acceleration else ''}",
     )
  
     learning_rate = 0.001
@@ -152,6 +152,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
     )
     print(len(loader))
     for epoch in range(8):
+        print(epoch)
         model.train()
         for lats, labels in loader:
             lats = lats.to(DEVICE).float()
