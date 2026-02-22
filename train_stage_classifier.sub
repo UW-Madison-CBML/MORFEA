@@ -36,4 +36,4 @@ request_disk = 80GB
 request_gpus = 1
  
  
-queue model from (control-2026-02-20)
+queue model from train_stage_classifier.txt

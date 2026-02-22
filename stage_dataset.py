@@ -206,7 +206,7 @@ class StageDataset(Dataset):
         self.seqlength = 64
         
 
-        self.phases = ['t2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tB', 'tEB', 'tHB', 'tM', 'tPB2', 'tPNa', 'tPNf', 'tSB', 'pre_phase', 'post_phase']
+        self.phases = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
         self.lat_cols = [column for column in self.df.columns if column.startswith("z_")]
         # 1. dim reduce latents_df
         # dir/EMBRYO_ID_annotions.csv

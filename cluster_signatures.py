@@ -11,6 +11,7 @@ import seaborn as sns
 from itertools import product
 import umap
 
+from matplotlib.patches import Patch
 def main(model_name, grade):
     sig_df = pd.read_csv(os.path.abspath(f"signatures/{model_name}_sigs.csv"))
     grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"))
@@ -30,19 +31,37 @@ def main(model_name, grade):
     df = df[["embryo_id", grade] + sig_cols].dropna(subset=[grade])
     feature_cols = [col for col in df.columns if col.startswith('s_')]
     X = df[feature_cols].values
-    count_nans = np.isnan(X).sum(axis=1)
-    #X = X[:, ~nan_mask]
     grades = df[grade].values
-    print(count_nans[df[grade] == "C"]) 
-    print(count_nans[df[grade] != "C"]) 
-
+     
     print(f"Starting with {X.shape[0]} samples, {X.shape[1]} features\n")
     selector = VarianceThreshold(threshold=0) 
     X_filtered = selector.fit_transform(X)
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X_filtered)
+    
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
+    grade_colors = {'A': 'green', 'B': 'orange', 'C': 'red'}
+    colors_grade = [grade_colors[g] for g in grades]
+    axes[0].scatter(X_viz[:, 0], X_viz[:, 1], c=colors_grade, s=100, alpha=0.6, edgecolors='black', linewidth=0.5)
+    axes[0].set_xlabel(f'PC1 ({pca_viz.explained_variance_ratio_[0]:.1%})')
+    axes[0].set_ylabel(f'PC2 ({pca_viz.explained_variance_ratio_[1]:.1%})')
+    axes[0].set_title('Actual Grades (A=green, B=orange, C=red)')
+    legend_elements = [Patch(facecolor='green', edgecolor='black', label='A'),
+                       Patch(facecolor='orange', edgecolor='black', label='B'),
+                       Patch(facecolor='red', edgecolor='black', label='C')]
+    axes[0].legend(handles=legend_elements)
+
+    scatter = axes[1].scatter(X_viz[:, 0], X_viz[:, 1], c=clusters_combo, cmap='viridis', 
+                              s=100, alpha=0.6, edgecolors='black', linewidth=0.5)
+    axes[1].set_xlabel(f'PC1 ({pca_viz.explained_variance_ratio_[0]:.1%})')
+    axes[1].set_ylabel(f'PC2 ({pca_viz.explained_variance_ratio_[1]:.1%})')
+    axes[1].set_title('KMeans Clusters (Feature Selection + PCA)')
+    plt.colorbar(scatter, ax=axes[1], label='Cluster')
+
+    plt.tight_layout()
+    plt.savefig('clusters/clustering_comparison.png', dpi=300, bbox_inches='tight')
     print("=== STRATEGY 1: Feature Selection ===")
     selector = SelectKBest(f_classif, k=50)  
     print(grades)
@@ -87,7 +106,6 @@ def main(model_name, grade):
     axes[0].set_xlabel(f'PC1 ({pca_viz.explained_variance_ratio_[0]:.1%})')
     axes[0].set_ylabel(f'PC2 ({pca_viz.explained_variance_ratio_[1]:.1%})')
     axes[0].set_title('Actual Grades (A=green, B=orange, C=red)')
-    from matplotlib.patches import Patch
     legend_elements = [Patch(facecolor='green', edgecolor='black', label='A'),
                        Patch(facecolor='orange', edgecolor='black', label='B'),
                        Patch(facecolor='red', edgecolor='black', label='C')]

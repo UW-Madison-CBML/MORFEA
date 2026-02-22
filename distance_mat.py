@@ -5,6 +5,7 @@ from scipy.spatial import distance_matrix
 import os
 import matplotlib.patches as mpatches
 import matplotlib.ticker as ticker
+from matplotlib.colors import ListedColormap
 def get_mat(traj, embryo_id, model_name, annotations_dir):
     output_dir = f"{model_name}_distances"
     if not os.path.exists(output_dir):
@@ -20,14 +21,16 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
     phase_matrix_lower = np.ma.masked_where(mask, phase_matrix)
     fig, ax = plt.subplots(figsize=(10, 8)) # Slightly wider for the legend
     im_dist = ax.imshow(dist_matrix, cmap='viridis', interpolation='none')
+    colors = list(plt.cm.Set3(range(12))) + list(plt.cm.Set2(range(8)))
+    custom_cmap = ListedColormap(colors)
     im_phase = ax.imshow(phase_matrix_lower, 
-                     cmap='Set3', 
+                     cmap=custom_cmap, 
                      interpolation='none', 
                      vmin=0, 
                      vmax=len(df) - 1)
     num_phases = len(df)
     patches = [
-        mpatches.Patch(color=plt.cm.Set3(i), label=row['stage_id'])
+        mpatches.Patch(color=custom_cmap(i), label=row['stage_id'])
         for i, row in df.iterrows()
     ]
     ax.legend(handles=patches, bbox_to_anchor=(1.25, 1), loc='upper left', title="Phases")

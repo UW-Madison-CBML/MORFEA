@@ -15,4 +15,4 @@ fi
 ls -lh
 
  
-python train_stage_classifier.py --name "$1"
+python "$@"
