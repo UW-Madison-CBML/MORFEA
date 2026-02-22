@@ -1,4 +1,4 @@
-train_stage_classifier.py --name control-2026-02-20 --latents --acceleration --distance-mat --velocity --curvature
-train_stage_classifier.py --name control-2026-02-20 --latents --acceleration --velocity
-train_stage_classifier.py --name control-2026-02-20 --latents --curvature
+train_stage_classifier.py --name control-2026-02-20 --acceleration --distance-mat --velocity --curvature
+train_stage_classifier.py --name control-2026-02-20 --acceleration --velocity
+train_stage_classifier.py --name control-2026-02-20 --curvature
 train_stage_classifier.py --name control-2026-02-20 --acceleration --distance-mat --velocity --curvature
