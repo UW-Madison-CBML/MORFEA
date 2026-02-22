@@ -10,6 +10,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import umap
 
+from scipy.stats import skew, kurtosis
 from scipy.optimize import least_squares
 from scipy.stats import kurtosis
 def fit_circle_curvature(points, how=""):
@@ -135,18 +136,27 @@ def get_quad_tphate_interp(latents, how="PCA", n_components=2):
     interps = [make_interp_spline(timesteps, X_out[:,i], k=3) for i in range(X_out.shape[1])]
 
     return interps
+def get_accel_features(velocity):
+    features['velocity_mean'] = np.mean(velocity)
+    features['velocity_std'] = np.std(velocity)
+    features['velocity_median'] = np.median(velocity)
+    features['velocity_min'] = np.min(velocity)
+    features['velocity_max'] = np.max(velocity)
+    features['velocity_range'] = np.max(velocity) - np.min(velocity)
 
+    features['velocity_p10'] = np.percentile(velocity, 10)
+    features['velocity_p25'] = np.percentile(velocity, 25)
+    features['velocity_p75'] = np.percentile(velocity, 75)
+    features['velocity_p90'] = np.percentile(velocity, 90)
+    features['velocity_iqr'] = np.percentile(velocity, 75) - np.percentile(velocity, 25)
+
+    features['velocity_skewness'] = skew(velocity)
+    features['velocity_kurtosis'] = kurtosis(velocity)
+    return features
+     
 
 def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
-    """
-    Compute path signature.
 
-    Args:
-        n_points: Number of discretization points (default: 1000)
-                  Original was 10000 which is very slow!
-                  1000 gives ~10x speedup with minimal accuracy loss
-    """
-    
     N = len(X)
     level_threshold=N
     t = np.linspace(a, b, n_points)
@@ -175,7 +185,6 @@ def get_new_row(group, cell_id, max_len=0):
     #signature = group[:-50,:].flatten()
 
 
-    # Kurtosis: fourth central moment (fisher=True means Normal = 0)
     #new_rows = []
     #for i in range(50):
     #interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T if max_len == 0 else group
@@ -184,164 +193,9 @@ def get_new_row(group, cell_id, max_len=0):
     curvature = np.array(calculate_curvatures(group))
     trajectory = group
     # Basic velocity
-    velocity = np.linalg.norm(np.diff(trajectory, axis=0), axis=1)
-    features = {}
-    # === DISTRIBUTION STATISTICS ===
-    features['velocity_mean'] = np.mean(velocity)
-    features['velocity_std'] = np.std(velocity)
-    features['velocity_median'] = np.median(velocity)
-    features['velocity_min'] = np.min(velocity)
-    features['velocity_max'] = np.max(velocity)
-    features['velocity_range'] = np.max(velocity) - np.min(velocity)
-
-    # Percentiles (capture outliers)
-    features['velocity_p10'] = np.percentile(velocity, 10)
-    features['velocity_p25'] = np.percentile(velocity, 25)
-    features['velocity_p75'] = np.percentile(velocity, 75)
-    features['velocity_p90'] = np.percentile(velocity, 90)
-    features['velocity_iqr'] = np.percentile(velocity, 75) - np.percentile(velocity, 25)
-
-    # Shape of distribution
-    from scipy.stats import skew, kurtosis
-    features['velocity_skewness'] = skew(velocity)
-    features['velocity_kurtosis'] = kurtosis(velocity)
-
-    # === CONSISTENCY MEASURES ===
-    # Coefficient of variation (normalized std)
-    features['velocity_cv'] = np.std(velocity) / (np.mean(velocity) + 1e-10)
-
-    # What % of time is velocity "normal" (within 1 std of mean)?
-    mean_v, std_v = np.mean(velocity), np.std(velocity)
-    features['velocity_stability'] = np.sum((velocity > mean_v - std_v) & (velocity < mean_v + std_v)) / len(velocity)
-
-    # How often does velocity change drastically?
-    velocity_changes = np.abs(np.diff(velocity))
-    features['velocity_change_mean'] = np.mean(velocity_changes)
-    features['velocity_change_max'] = np.max(velocity_changes)
-
-    # === TEMPORAL PATTERNS ===
-    # Early vs late development speed
-    third = len(velocity) // 3
-    features['velocity_early'] = np.mean(velocity[:third])
-    features['velocity_mid'] = np.mean(velocity[third:2*third])
-    features['velocity_late'] = np.mean(velocity[2*third:])
-
-    # Ratio of late to early (speeding up or slowing down?)
-    features['velocity_late_early_ratio'] = features['velocity_late'] / (features['velocity_early'] + 1e-10)
-
-    # Trend: is velocity increasing or decreasing over time?
-    time_indices = np.arange(len(velocity))
-    features['velocity_trend'] = np.polyfit(time_indices, velocity, 1)[0]  # slope of linear fit
-
-    # === EXTREMES & OUTLIERS ===
-    # Count of extremely fast/slow periods
-    v_median = np.median(velocity)
-    features['slow_periods'] = np.sum(velocity < 0.5 * v_median) / len(velocity)
-    features['fast_periods'] = np.sum(velocity > 2.0 * v_median) / len(velocity)
-
-    # Longest sustained high/low velocity
-    high_velocity = velocity > features['velocity_p75']
-    features['max_consecutive_high_vel'] = np.max(np.diff(np.where(np.concatenate(([high_velocity[0]], high_velocity[:-1] != high_velocity[1:], [True])))[0])[::2])
-
-    low_velocity = velocity < features['velocity_p25']
-    features['max_consecutive_low_vel'] = np.max(np.diff(np.where(np.concatenate(([low_velocity[0]], low_velocity[:-1] != low_velocity[1:], [True])))[0])[::2])
-
-    # === MONOTONICITY ===
-    # Is velocity mostly increasing/decreasing or all over the place?
-    velocity_diffs = np.diff(velocity)
-    features['velocity_increases'] = np.sum(velocity_diffs > 0) / len(velocity_diffs)
-    features['velocity_decreases'] = np.sum(velocity_diffs < 0) / len(velocity_diffs)
-
-    # === SMOOTHNESS ===
-    # How smooth is the velocity curve? (2nd derivative of position)
-    velocity_smoothness = np.std(np.diff(velocity))
-    features['velocity_smoothness'] = velocity_smoothness
-
-    # === PHASE TRANSITIONS (big jumps) ===
-    # Detect developmental phase shifts
-    velocity_jumps = np.abs(np.diff(velocity))
-    features['n_phase_transitions'] = np.sum(velocity_jumps > 2 * np.std(velocity))
-    features['biggest_phase_transition'] = np.max(velocity_jumps)
-    # Basic acceleration
-    acceleration = np.diff(velocity)
-
-    # === DISTRIBUTION STATISTICS ===
-    features['accel_mean'] = np.mean(acceleration)
-    features['accel_std'] = np.std(acceleration)
-    features['accel_median'] = np.median(acceleration)
-    features['accel_mean_abs'] = np.mean(np.abs(acceleration))  # Magnitude regardless of direction
-    features['accel_max_positive'] = np.max(acceleration)
-    features['accel_max_negative'] = np.min(acceleration)
-    features['accel_range'] = np.max(acceleration) - np.min(acceleration)
-
-    # Percentiles
-    features['accel_p10'] = np.percentile(acceleration, 10)
-    features['accel_p90'] = np.percentile(acceleration, 90)
-
-    # Distribution shape
-    features['accel_skewness'] = skew(acceleration)
-    features['accel_kurtosis'] = kurtosis(acceleration)
-
-    # === DIRECTION CHANGES ===
-    # How often does acceleration switch from positive to negative?
-    accel_sign_changes = np.sum(np.diff(np.sign(acceleration)) != 0)
-    features['accel_sign_changes'] = accel_sign_changes
-    features['accel_sign_change_rate'] = accel_sign_changes / len(acceleration)
-
-    # Ratio of acceleration vs deceleration
-    features['accel_positive_ratio'] = np.sum(acceleration > 0) / len(acceleration)
-    features['accel_negative_ratio'] = np.sum(acceleration < 0) / len(acceleration)
-
-    # === TEMPORAL PATTERNS ===
-    # Early vs late acceleration patterns
-    third = len(acceleration) // 3
-    features['accel_early'] = np.mean(acceleration[:third])
-    features['accel_mid'] = np.mean(acceleration[third:2*third])
-    features['accel_late'] = np.mean(acceleration[2*third:])
-
-    # Is the embryo accelerating or decelerating overall?
-    features['accel_trend'] = np.polyfit(np.arange(len(acceleration)), acceleration, 1)[0]
-
-    # === SUSTAINED PERIODS ===
-    # Longest period of sustained acceleration
-    sustained_accel = acceleration > 0
-    if np.any(sustained_accel):
-        features['max_sustained_accel'] = np.max(np.diff(np.where(np.concatenate(([sustained_accel[0]], sustained_accel[:-1] != sustained_accel[1:], [True])))[0])[::2])
-    else:
-        features['max_sustained_accel'] = 0
-
-    # Longest period of sustained deceleration
-    sustained_decel = acceleration < 0
-    if np.any(sustained_decel):
-        features['max_sustained_decel'] = np.max(np.diff(np.where(np.concatenate(([sustained_decel[0]], sustained_decel[:-1] != sustained_decel[1:], [True])))[0])[::2])
-    else:
-        features['max_sustained_decel'] = 0
-
-    # === EXTREMES ===
-    # Strong acceleration/deceleration events
-    accel_threshold = 2 * np.std(acceleration)
-    features['strong_accel_events'] = np.sum(acceleration > accel_threshold)
-    features['strong_decel_events'] = np.sum(acceleration < -accel_threshold)
-
-    # === VARIABILITY ===
-    # Coefficient of variation
-    features['accel_cv'] = np.std(acceleration) / (np.mean(np.abs(acceleration)) + 1e-10)
-
-    # === CUMULATIVE MEASURES ===
-    # Total acceleration applied over trajectory
-    features['total_accel'] = np.sum(np.abs(acceleration))
-    features['net_accel'] = np.sum(acceleration)  # Can be negative
-
-    # === CONSISTENCY ===
-    # How "jerky" is development? (variance of acceleration changes)
-    features['accel_jerkiness'] = np.std(np.diff(acceleration))
-
-    # Rolling window variability (local instability)
-    window_size = max(3, len(acceleration) // 10)
-    rolling_std = []
-    for i in range(len(acceleration) - window_size):
-        rolling_std.append(np.std(acceleration[i:i+window_size]))
-    features['accel_local_variability'] = np.mean(rolling_std) if rolling_std else 0 
+    #velocity = np.linalg.norm(np.diff(trajectory, axis=0), axis=1)
+    #features = get_accel_features(velocity)
+    
     if max_len > 0:
         if(len(signature) > max_len):
             raise ValueError(f"{cell_id} exceeds max len for padding")
@@ -349,7 +203,8 @@ def get_new_row(group, cell_id, max_len=0):
             pad_width = max(0, max_len - len(signature))
             #signature = np.pad(signature, ((0, pad_width), (0, 0)), mode='constant') 
             signature = np.pad(signature, (0, pad_width), mode='constant') 
-    signature = np.concatenate((np.array([val for val in features.values()]), np.array(curvature)))
+    #signature = np.concatenate((np.array([val for val in features.values()]), np.array(curvature)))
+    signature = np.array(curvature)
     #    #new_rows.append(signature)
     #    new_rows.append( 
     #new_rows = np.array(new_rows).T 

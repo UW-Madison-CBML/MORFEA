@@ -113,29 +113,17 @@ def calculate_curvatures(group, offset):
  
     for i in range(len(trajectory)):
 
-        if i < offset:
-
-            points = trajectory[i:i+(2*offset)]
-
-            curvatures.append(fit_circle_curvature(points))
-
-        elif i >= len(trajectory) - offset:
-
-            points = trajectory[i-(2*offset):i]
-
-            curvatures.append(fit_circle_curvature(points))
-
+        points = trajectory[max(0,i-offset):i]
+        if len(points) < 3:
+            curvatures.append(0) 
         else:
-
-            points = trajectory[i-offset:i+offset]
-
             curvatures.append(fit_circle_curvature(points))
  
     return np.array(curvatures)
  
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 from scipy.spatial import distance_matrix
-def addAnnotations(group_name, group, annotations_dir, max_points, curvature = True, velocity = True, latents = True, acceleration = True, path_signatures = None, distance_mat=True):
+def addAnnotations(group_name, group, annotations_dir, curvature = True, velocity = True, latents = True, acceleration = True, path_signatures = None, distance_mat=True):
     annotation_file = os.path.join(annotations_dir, f"{group_name}_phases.csv")
     df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
 
@@ -165,22 +153,16 @@ def addAnnotations(group_name, group, annotations_dir, max_points, curvature = T
         group["z_speed"] = speed
 
     if (curvature):
-        group["z_curvature_6"] = calculate_curvatures(group, 6)
-        group["z_curvature_10"] = calculate_curvatures(group, 10)
-        group["z_curvature_2"] = calculate_curvatures(group, 2)
+        group["z_curvature_6"] = calculate_curvatures(group, 12)
+        group["z_curvature_10"] = calculate_curvatures(group, 20)
+        group["z_curvature_2"] = calculate_curvatures(group, 4)
 
     if (path_signatures != None):
         print(" ")
-    """if(distance_mat):
-        mat = distance_matrix(trajectory, trajectory)
+    if(distance_mat):
+        mat = distance_matrix(np.array([trajectory[0]]), trajectory).flatten()
         
-        num_points = mat.shape[0]
-        
-        padded_features = np.zeros((num_points, max_points))
-        for seq_len in range( 
-        padded_features[:, :num_points] = mat
-        for i in range(padded_features.shape[1]):
-            group["z_dist_{i}"] = padded_features[:,i]"""
+        group["z_dist"] = mat
     if(acceleration):
         alpha_v = 0.3
         alpha_a = 0.3
@@ -200,7 +182,7 @@ def addAnnotations(group_name, group, annotations_dir, max_points, curvature = T
         group['z_v_magnitude'] = np.linalg.norm(group[v_cols].values, axis=1)
         group['z_a_magnitude'] = np.linalg.norm(group[a_cols].values, axis=1)
     if (not latents):
-        group.drop(columns=lat_cols)
+        group = group.drop(columns=lat_cols)
     
     
     return group
@@ -219,7 +201,7 @@ class StageDataset(Dataset):
         self.return_embryo_id = return_embryo_id
         sizes = self.latents_df.groupby("embryo_id")["time_step"].size()
         self.max_points = sizes.max()
-        self.df = self.latents_df.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,self.annotations_dir, self.max_points, curvature = curvature, velocity = velocity, latents = latents, acceleration = acceleration, path_signatures = None, distance_mat=distance_mat)).reset_index()
+        self.df = self.latents_df.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,self.annotations_dir, curvature = curvature, velocity = velocity, latents = latents, acceleration = acceleration, path_signatures = None, distance_mat=distance_mat)).reset_index()
         self.groups = self.df.groupby("embryo_id")
         self.seqlength = 64
         

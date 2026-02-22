@@ -148,7 +148,7 @@ def plot_cell_trajectory_circle(cell_id, tphate_data, time_steps, output_dir="pl
 
     # Calculate curvature using the compute_curvature function
     n_points = len(tphate_data)
-    nbd = 2  # Neighborhood size for curvature calculation
+    nbd = 12  # Neighborhood size for curvature calculation
     curvature = compute_curvature(nbd, tphate_data, n_points)
 
     # Normalize curvature for color mapping
@@ -308,7 +308,6 @@ def plot_cell_trajectory_timestamp(cell_id, tphate_data, time_steps, output_dir=
             time_to_phase[t] = phase_name
             time_to_color[t] = color
 
-    # Assign phase colors to each point in trajectory
     point_colors = []
     point_phases = []
     for t in time_steps:
@@ -319,16 +318,13 @@ def plot_cell_trajectory_timestamp(cell_id, tphate_data, time_steps, output_dir=
             point_colors.append([0.5, 0.5, 0.5, 1.0])  # Gray for undefined
             point_phases.append('Unknown')
 
-    # Plot the trajectory line
     ax.plot(tphate_data[:, 0], tphate_data[:, 1], tphate_data[:, 2],
             'k-', alpha=0.2, linewidth=1.5)
 
-    # Create scatter plot colored by phase
     ax.scatter(tphate_data[:, 0], tphate_data[:, 1], tphate_data[:, 2],
                c=point_colors, alpha=0.8, s=50,
                edgecolors='black', linewidth=0.5, zorder=5)
 
-    # Mark start and end points
     ax.scatter(tphate_data[0, 0], tphate_data[0, 1], tphate_data[0, 2],
                c='green', marker='o', s=120, label='Start', zorder=6, edgecolors='black', linewidth=1)
     ax.scatter(tphate_data[-1, 0], tphate_data[-1, 1], tphate_data[-1, 2],

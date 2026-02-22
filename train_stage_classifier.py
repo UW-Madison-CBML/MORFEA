@@ -100,7 +100,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
  
  
     dataset = StageDataset(df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, distance_mat=distance_mat)
-    dataset_val = StageDataset(val_df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, return_embryo_id=True)
+    dataset_val = StageDataset(val_df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, distance_mat=distance_mat, return_embryo_id=True)
     crit = torch.nn.CrossEntropyLoss()
     model = StageModel(input_size = len(dataset.lat_cols))
     model.to(DEVICE)
@@ -171,6 +171,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
                 print("Ground Truth:\n", file.read())
             with torch.no_grad():
                 data = dataset_val.df[dataset_val.df["embryo_id"] == embryo][dataset_val.lat_cols].to_numpy()
+                print(data.shape)
                 whole_seq = torch.tensor(data, dtype=torch.float32).unsqueeze(0).to(DEVICE)
                 
                 logits = model(whole_seq)

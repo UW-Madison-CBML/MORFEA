@@ -13,7 +13,7 @@ class IVFEmbryoDataset(Dataset):
     Dataset that loads complete embryo sequences.
     Each sample is one full embryo with all its frames.
     """
-    def __init__(self, index_csv, resize=128, norm="minmax01", max_frames=None):
+    def __init__(self, df, resize=128, norm="minmax01", max_frames=None):
         """
         Args:
             index_csv: Path to index CSV with columns: embryo_id, embryo_paths
@@ -21,10 +21,10 @@ class IVFEmbryoDataset(Dataset):
             norm: Normalization method ("zscore" or "minmax01")
             max_frames: Maximum number of frames to load per embryo (None = load all)
         """
-        self.df = pd.read_csv(index_csv)
+        self.df = df
         self.resize = resize
         self.norm = norm
-        self.max_frames = max_frames
+        self.max_frames = None
 
     def _read_gray(self, path):
         """Read and resize a grayscale image."""

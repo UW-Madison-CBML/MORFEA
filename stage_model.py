@@ -19,6 +19,6 @@ class StageModel(Module):
         x = F.relu(self.lin1(x))
         x = F.relu(self.lin2(x))
         x,_  = self.lstm(x)
-        x = F.relu(self.lin3(x))
+        x = self.lin3(x)
 
         return x
