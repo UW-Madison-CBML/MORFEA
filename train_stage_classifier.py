@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from stage_dataset import StageDataset
 from stage_model import StageModel
 from torch.utils.data import DataLoader
@@ -86,7 +87,19 @@ def get_class_weights(annotations_dir, lat_group_sizes, phases):
     out_tensor = torch.tensor([stage_id_freq[phase] for phase in phases])
     return out_tensor / out_tensor.sum()
 
-        
+def monotonicity_loss(batched_logits_seq, temp=8.0):
+    B, T, C = batched_logits_seq.shape
+    device = batched_logits_seq.device
+    probs = F.softmax(batched_logits_seq * temp, dim=-1) # (B, T, C)
+    indices = torch.arange(C, device=device, dtype=torch.float32) # (C) 
+    soft_indices = (probs * indices).sum(dim=-1) # (B, T) 
+    diffs = soft_indices.diff(dim=-1) # (B, T-1) 
+    monotone_violations = F.leaky_relu(-diffs, negative_slope=0.1) 
+    return monotone_violations.mean()
+ 
+    
+    
+    
     
 def main(model_name, curvature = True, velocity = True, acceleration = True, path_signatures = None, latents = True, distance_mat=True):
     torch.cuda.empty_cache()
@@ -97,6 +110,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
     run = wandb.init(
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
+        name=f"{model_name}-phase-{'c' if curvature else ''}{'v' if velocity else ''}{'p' if path_signatures else ''}{'l' if latents else ''}{'d' if distance_mat else ''}",
     )
  
     learning_rate = 0.001
@@ -117,7 +131,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
     crit = torch.nn.CrossEntropyLoss(weight=weights)
     model = StageModel(input_size = len(dataset.lat_cols))
     model.to(DEVICE)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=3e-5)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
  
  
     loader = DataLoader(
@@ -143,8 +157,8 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
             lats = lats.to(DEVICE).float()
             labels = labels.to(DEVICE).long()
             logits = model(lats)
-            loss = crit(logits.view(-1, 18), labels.view(-1))
- 
+            loss = crit(logits.view(-1, 18), labels.view(-1)) + 0.1 * monotonicity_loss(logits)
+             
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -177,7 +191,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
             "val_loss_std":loss_stats.std_dev,
             "val_acc":acc_stats.mean,
             "val_acc_std":acc_stats.std_dev})
-        highest_std = sorted(list(stats_dict.items()), key = lambda x: -1*(x[1].std_dev))[:5]
+        highest_std = sorted(list(stats_dict.items()), key = lambda x: (x[1].std_dev))[:5]
         model.eval()
         for embryo, _ in highest_std:
             with open(os.path.join("embryo_dataset_annotations", f"{embryo}_phases.csv"), 'r') as file:
@@ -214,13 +228,13 @@ if __name__ == "__main__":
  
  
     parser.add_argument("--name", help="Model name. Must have already exported latents")
-    parser.add_argument("--curvature", default=True,action="store_true", help="Use to include curvature")
-    parser.add_argument("--latents", default=True,action="store_true", help="Use to include latents")
-    parser.add_argument("--path-signatures", default=True,action="store_true", help="Use to include path signatures")
-    parser.add_argument("--velocity", default=True,action="store_true", help="Use to include velocity")
-    parser.add_argument("--acceleration", default=True, action="store_true", help="Use to include acceleration")
-    parser.add_argument("--distance-mat", default=True, action="store_true", help="Use to include acceleration")
+    parser.add_argument("--curvature",action="store_true", help="Use to include curvature")
+    parser.add_argument("--latents",action="store_true", help="Use to include latents")
+    parser.add_argument("--path-signatures",action="store_true", help="Use to include path signatures")
+    parser.add_argument("--velocity",action="store_true", help="Use to include velocity")
+    parser.add_argument("--acceleration", action="store_true", help="Use to include acceleration")
+    parser.add_argument("--distance-mat", action="store_true", help="Use to include distance to first frame")
   
     args = parser.parse_args()
  
-    main(args.name,curvature=args.curvature,latents=args.latents,velocity=args.velocity, distance_mat=args.distance_mat)
+    main(args.name,curvature=args.curvature,latents=args.latents,velocity=args.velocity, acceleration=args.acceleration, distance_mat=args.distance_mat)

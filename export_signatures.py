@@ -187,10 +187,10 @@ def get_new_row(group, cell_id, max_len=0):
 
     #new_rows = []
     #for i in range(50):
-    #interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T if max_len == 0 else group
+    interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T if max_len == 0 else group
     #if(np.isnan(interped_latents).any()):
     #    print(f"{cell_id} has nan!!!")
-    curvature = np.array(calculate_curvatures(group))
+    curvature = np.array(calculate_curvatures(interped_latents))
     trajectory = group
     # Basic velocity
     #velocity = np.linalg.norm(np.diff(trajectory, axis=0), axis=1)
