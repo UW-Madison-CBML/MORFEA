@@ -123,14 +123,10 @@ def compute_curvature(offset, trajectory, num_pts):
     curvatures = []
     
     for i in range(len(trajectory)):
-        if i < offset:
-            points = trajectory[i:i+(2*offset)]
-            curvatures.append(fit_circle_curvature(points))
-        elif i >= len(trajectory) - offset:
-            points = trajectory[i-(2*offset):i]
-            curvatures.append(fit_circle_curvature(points))
+        points = trajectory[max(0,i-offset):min(len(trajectory),i+offset)]
+        if(len(points) < 3):
+            curvatures.append(0)
         else:
-            points = trajectory[i-offset:i+offset]
             curvatures.append(fit_circle_curvature(points))
     
     return np.array(curvatures)
@@ -158,10 +154,9 @@ def plot_cell_trajectory_circle(cell_id, tphate_data, time_steps, output_dir="pl
     else:
         norm_curvature = np.zeros_like(curvature)
 
-    colors = plt.cm.jet(norm_curvature)
     scatter = ax.scatter(tphate_data[:, 0], tphate_data[:, 1], tphate_data[:, 2],
-                         c=colors, alpha=0.8, s=50,
-                         edgecolors='black', linewidth=0.5, zorder=5)
+                         c=norm_curvature, alpha=0.8, s=50,
+                         edgecolors='black', linewidth=0.5, zorder=5, cmap='jet')
 
     # Mark start and end
     ax.scatter(tphate_data[0, 0], tphate_data[0, 1], tphate_data[0, 2],

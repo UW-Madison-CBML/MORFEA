@@ -2,7 +2,8 @@
 echo "Installing dependencies..."
 pip install safetensors wandb
 pip install scikit-learn 
-pip install scikit-learn-extra
+pip install "numpy<2.0.0" scikit-learn-extra --upgrade
+pip install umap-learn
 # Extract dataset
 mkdir stage_clusters
 echo "Extracting dataset..."

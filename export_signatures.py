@@ -240,7 +240,7 @@ def main(model_name):
     max_points = sizes.max()
     print("max points", max_points)
     signatures_df = df.groupby('embryo_id').apply(
-        lambda group: get_new_row(group[lat_columns].to_numpy().astype(np.float32), group.name)#, max_len=max_points)
+        lambda group: get_new_row(group[lat_columns].to_numpy().astype(np.float32), group.name, max_len=max_points)
     ).reset_index(drop=True)
 
     # Save to CSV
