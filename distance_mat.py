@@ -6,6 +6,7 @@ import os
 import matplotlib.patches as mpatches
 import matplotlib.ticker as ticker
 from matplotlib.colors import ListedColormap
+import matplotlib.colors as mcolors
 def get_mat(traj, embryo_id, model_name, annotations_dir):
     output_dir = f"{model_name}_distances"
     if not os.path.exists(output_dir):
@@ -23,11 +24,16 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
     im_dist = ax.imshow(dist_matrix, cmap='viridis', interpolation='none')
     colors = list(plt.cm.Set3(range(12))) + list(plt.cm.Set2(range(8)))
     custom_cmap = ListedColormap(colors)
+    colors = colors[:len(df)] 
+
+    custom_cmap = mcolors.ListedColormap(colors)
+
+    bounds = np.arange(len(df) + 1)
+    norm = mcolors.BoundaryNorm(bounds, custom_cmap.N)
     im_phase = ax.imshow(phase_matrix_lower, 
                      cmap=custom_cmap, 
                      interpolation='none', 
-                     vmin=0, 
-                     vmax=len(df) - 1)
+                     norm=norm)
     num_phases = len(df)
     patches = [
         mpatches.Patch(color=custom_cmap(i), label=row['stage_id'])
@@ -37,11 +43,11 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
     ax.set_title(f"{embryo_id} Distance Matrix", fontsize=14, fontweight='bold')
     ax.set_xlabel("Time Index")
     ax.set_ylabel("Time Index")
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(32))
+    """ax.xaxis.set_major_locator(ticker.MultipleLocator(32))
     ax.yaxis.set_major_locator(ticker.MultipleLocator(32))
     ax.xaxis.set_minor_locator(ticker.MultipleLocator(32, offset=-0.5))
     ax.yaxis.set_minor_locator(ticker.MultipleLocator(32, offset=-0.5))
-    ax.grid(True, which='minor', color='white', linestyle='-', linewidth=0.8, alpha=0.6, zorder=1)
+    ax.grid(True, which='minor', color='white', linestyle='-', linewidth=0.8, alpha=0.6, zorder=1)"""
     plt.colorbar(im_dist, ax=ax, label='Distance', shrink=0.8)
     plt.savefig(os.path.join(output_dir, f'{embryo_id}_matrix.png'), dpi=300, bbox_inches='tight')
     plt.close(fig)

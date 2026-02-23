@@ -10,8 +10,10 @@ from sklearn.metrics import silhouette_score, adjusted_rand_score, davies_bouldi
 import seaborn as sns
 from itertools import product
 import umap
+import matplotlib
 
-from matplotlib.patches import Patch
+
+import matplotlib.patches as patches
 def main(model_name, grade):
     sig_df = pd.read_csv(os.path.abspath(f"signatures/{model_name}_sigs.csv"))
     grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"))
@@ -31,103 +33,32 @@ def main(model_name, grade):
     df = df[["embryo_id", grade] + sig_cols].dropna(subset=[grade])
     feature_cols = [col for col in df.columns if col.startswith('s_')]
     X = df[feature_cols].values
-    grades = df[grade].values
-     
+    grade_classes = ["A", "B", "C"]
+    grades = np.array([grade_classes.index(val) for val in df[grade].values])
+    X[np.isnan(X)] = 0
     print(f"Starting with {X.shape[0]} samples, {X.shape[1]} features\n")
     selector = VarianceThreshold(threshold=0) 
     X_filtered = selector.fit_transform(X)
-
+    
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X_filtered)
     
-    """fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    reducer = umap.UMAP(n_neighbors=25, min_dist=0.1, n_components=2, random_state=42)
+    embedding = reducer.fit_transform(X_scaled)
+    cmap = matplotlib.colors.ListedColormap(['green', 'yellow', 'red'])
+    scatter = plt.scatter(embedding[:, 0], embedding[:,1], c=grades, cmap=cmap)
 
-    grade_colors = {'A': 'green', 'B': 'orange', 'C': 'red'}
-    colors_grade = [grade_colors[g] for g in grades]
-    axes[0].scatter(X_viz[:, 0], X_viz[:, 1], c=colors_grade, s=100, alpha=0.6, edgecolors='black', linewidth=0.5)
-    axes[0].set_xlabel(f'PC1 ({pca_viz.explained_variance_ratio_[0]:.1%})')
-    axes[0].set_ylabel(f'PC2 ({pca_viz.explained_variance_ratio_[1]:.1%})')
-    axes[0].set_title('Actual Grades (A=green, B=orange, C=red)')
-    legend_elements = [Patch(facecolor='green', edgecolor='black', label='A'),
-                       Patch(facecolor='orange', edgecolor='black', label='B'),
-                       Patch(facecolor='red', edgecolor='black', label='C')]
-    axes[0].legend(handles=legend_elements)
+    handles, _ = scatter.legend_elements()
 
-    scatter = axes[1].scatter(X_viz[:, 0], X_viz[:, 1], c=clusters_combo, cmap='viridis', 
-                              s=100, alpha=0.6, edgecolors='black', linewidth=0.5)
-    axes[1].set_xlabel(f'PC1 ({pca_viz.explained_variance_ratio_[0]:.1%})')
-    axes[1].set_ylabel(f'PC2 ({pca_viz.explained_variance_ratio_[1]:.1%})')
-    axes[1].set_title('KMeans Clusters (Feature Selection + PCA)')
-    plt.colorbar(scatter, ax=axes[1], label='Cluster')
+    plt.legend(handles, grade_classes, title="Grades", bbox_to_anchor=(1.05, 1), loc='upper left')
 
-    plt.tight_layout()
-    plt.savefig('clusters/clustering_comparison.png', dpi=300, bbox_inches='tight')"""
-    print("=== STRATEGY 1: Feature Selection ===")
-    selector = SelectKBest(f_classif, k=50)  
-    print(grades)
-    print(X_scaled)
-    X_selected = selector.fit_transform(X_scaled, grades)
-
-    kmeans = KMeans(n_clusters=3, random_state=42, n_init=20)
-    clusters_selected = kmeans.fit_predict(X_selected)
-    print(f"KMeans on selected features: Silhouette = {silhouette_score(X_selected, clusters_selected):.3f}")
-    print(f"Cluster distribution: {np.bincount(clusters_selected)}")
-    print(f"Grade vs Cluster agreement: {adjusted_rand_score(grades == 'C', clusters_selected):.3f}")
-
-    print("\n=== STRATEGY 2: PCA Reduction ===")
-    pca = PCA(n_components=0.80)
-    X_pca = pca.fit_transform(X_scaled)
-    print(f"PCA reduced to {X_pca.shape[1]} components (explaining {pca.explained_variance_ratio_.sum():.1%} variance)")
-
-    kmeans_pca = KMeans(n_clusters=3, random_state=42, n_init=20)
-    clusters_pca = kmeans_pca.fit_predict(X_pca)
-    print(f"KMeans on PCA: Silhouette = {silhouette_score(X_pca, clusters_pca):.3f}")
-    print(f"Cluster distribution: {np.bincount(clusters_pca)}")
-
-    print("\n=== STRATEGY 3: Feature Selection + PCA ===")
-    X_selected_pca = pca.fit_transform(X_selected)
-    print(f"Selected + PCA: {X_selected_pca.shape[1]} components")
-
-    kmeans_combo = KMeans(n_clusters=3, random_state=42, n_init=20)
-    clusters_combo = kmeans_combo.fit_predict(X_selected_pca)
-    print(f"KMeans on selected+PCA: Silhouette = {silhouette_score(X_selected_pca, clusters_combo):.3f}")
-    print(f"Cluster distribution: {np.bincount(clusters_combo)}")
-
-    print("\n=== VISUALIZATION ===")
-
-    pca_viz = PCA(n_components=2)
-    X_viz = pca_viz.fit_transform(X_selected_pca)
-
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-
-    grade_colors = {'A': 'green', 'B': 'orange', 'C': 'red'}
-    colors_grade = [grade_colors[g] for g in grades]
-    axes[0].scatter(X_viz[:, 0], X_viz[:, 1], c=colors_grade, s=100, alpha=0.6, edgecolors='black', linewidth=0.5)
-    axes[0].set_xlabel(f'PC1 ({pca_viz.explained_variance_ratio_[0]:.1%})')
-    axes[0].set_ylabel(f'PC2 ({pca_viz.explained_variance_ratio_[1]:.1%})')
-    axes[0].set_title('Actual Grades (A=green, B=orange, C=red)')
-    legend_elements = [Patch(facecolor='green', edgecolor='black', label='A'),
-                       Patch(facecolor='orange', edgecolor='black', label='B'),
-                       Patch(facecolor='red', edgecolor='black', label='C')]
-    axes[0].legend(handles=legend_elements)
-
-    scatter = axes[1].scatter(X_viz[:, 0], X_viz[:, 1], c=clusters_combo, cmap='viridis', 
-                              s=100, alpha=0.6, edgecolors='black', linewidth=0.5)
-    axes[1].set_xlabel(f'PC1 ({pca_viz.explained_variance_ratio_[0]:.1%})')
-    axes[1].set_ylabel(f'PC2 ({pca_viz.explained_variance_ratio_[1]:.1%})')
-    axes[1].set_title('KMeans Clusters (Feature Selection + PCA)')
-    plt.colorbar(scatter, ax=axes[1], label='Cluster')
-
-    plt.tight_layout()
-    plt.savefig('clusters/clustering_comparison.png', dpi=300, bbox_inches='tight')
-    print("Plot saved as 'clustering_comparison.png'")
-
-    print("\n=== Cluster vs Grade Distribution ===")
-    print(pd.crosstab(clusters_combo, grades, margins=True))    
-    sig_df = pd.read_csv(os.path.abspath(f"signatures/{model_name}_sigs.csv"))
-    grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"), keep_default_na=False)
+    plt.xlabel("UMAP 1")
+    plt.ylabel("UMAP 2")
+    plt.title("Embryo Curvature Timestep Feature UMAP Embedding")
+   
+    plt.savefig(os.path.join("clusters", "umap.png"), dpi=300, bbox_inches='tight')
+    plt.close() 
     
-
 if __name__ == "__main__":
     import sys
     if len(sys.argv) != 3:
