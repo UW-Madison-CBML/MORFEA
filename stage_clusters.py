@@ -76,7 +76,7 @@ VAL_EMBRYOS =[
     "AM918-2-5",
     "LNA592-9",
     ]
-phases = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
+PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
 from scipy.spatial import distance_matrix
 from sklearn.preprocessing import StandardScaler
 import matplotlib
@@ -96,63 +96,61 @@ def addAnnotations(group_name, group, annotations_dir):
     new_column += ["post_phase"] * (len(group) - len(new_column))
     new_column = new_column[:len(group)]
      
-    group["phase"] = np.array([phases.index(i) for i in new_column])
+    group["phase"] = np.array([PHASES.index(i) for i in new_column])
     trajectory = group[lat_cols].to_numpy().astype(np.float32)
      
     distance_mat = distance_matrix(trajectory, trajectory)
     scaled_mat = StandardScaler().fit_transform(distance_mat)
-    scaled_traj = StandardScaler().fit_transform(trajectory)
 
 
-    reducer = umap.UMAP(n_neighbors=25, min_dist=0.1, n_components=8, random_state=42)
-    mat_embedding = reducer.fit_transform(scaled_mat)
-    reducer = umap.UMAP(n_neighbors=25, min_dist=0.1, n_components=8, random_state=42)
-    traj_embedding = reducer.fit_transform(scaled_traj)
-    #cmap = matplotlib.colormaps["tab20"].resampled(18)
-    #plt.scatter(embedding[:, 0], embedding[:,1], c=group["phase"].to_numpy() / 18, cmap=cmap)
-    #legend_handles = []
-    #for i, phase_name in enumerate(phases):
-    #    color = cmap(i)
-    #    patch = patches.Patch(color=color, label=phase_name)
-    #    legend_handles.append(patch)
+    reducer = umap.UMAP(n_neighbors=25, min_dist=0.1, n_components=2, random_state=42)
+    mat_embedding = scaled_mat # just use plain matrix for clustering, we get umap embedding for visuals 
+    embedding = reducer.fit_transform(scaled_mat)
+    cmap = matplotlib.colormaps["tab20"].resampled(18)
+    plt.scatter(embedding[:, 0], embedding[:,1], c=group["phase"].to_numpy() / 18, cmap=cmap)
+    legend_handles = []
+    for i, phase_name in enumerate(PHASES):
+        color = cmap(i)
+        patch = patches.Patch(color=color, label=phase_name)
+        legend_handles.append(patch)
 
-    #plt.legend(handles=legend_handles, title="Phases", bbox_to_anchor=(1.05, 1), loc='upper left')
-    #plt.xlabel("UMAP 1")
-    #plt.ylabel("UMAP 2")
-    #plt.title("Distance Matrix Feature UMAP Phases")
+    plt.legend(handles=legend_handles, title="Phases", bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.xlabel("UMAP 1")
+    plt.ylabel("UMAP 2")
+    plt.title("Distance Matrix Feature UMAP Phases")
    
-    #plt.savefig(os.path.join("stage_clusters", f"{group_name}_umap.png"), dpi=300, bbox_inches='tight')
-
+    plt.savefig(os.path.join("stage_clusters", f"{group_name}_umap.png"), dpi=300, bbox_inches='tight')
+    plt.close()
     kmedoids = KMedoids(n_clusters=18, random_state=0, method="pam")
 
     kmedoids.fit(mat_embedding)
 
     mat_labels = kmedoids.labels_ 
 
-    kmedoids = KMedoids(n_clusters=18, random_state=0, method="pam")
-
-    kmedoids.fit(traj_embedding)
-
-    traj_labels = kmedoids.labels_  
-
-    #plt.scatter(embedding[:, 0], embedding[:,1], c=traj_labels / 18 , cmap=cmap)
-    #plt.xlabel("UMAP 1")
-    #plt.ylabel("UMAP 2")
-    #plt.title("Distance Matric Feature UMAP Cluster")
+    plt.scatter(embedding[:, 0], embedding[:,1], c=mat_labels / 18 , cmap=cmap)
+    plt.xlabel("UMAP 1")
+    plt.ylabel("UMAP 2")
+    plt.title("Distance Matric Feature UMAP Cluster")
    
-    #plt.savefig(os.path.join("stage_clusters", f"{group_name}_clusters.png"), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join("stage_clusters", f"{group_name}_clusters.png"), dpi=300, bbox_inches='tight')
 
-    #plt.close()
+    plt.close()
     print(group_name)
-    phase = group['phase'].to_numpy()
+    phase = [PHASES[i] for i in group['phase'].to_numpy()]
     
     mat_ari = adjusted_rand_score(phase, mat_labels)
     mat_nmi = normalized_mutual_info_score(phase, mat_labels)
-    traj_ari = adjusted_rand_score(phase, traj_labels)
-    traj_nmi = normalized_mutual_info_score(phase, traj_labels)
+    #traj_ari = adjusted_rand_score(phase, traj_labels)
+    #traj_nmi = normalized_mutual_info_score(phase, traj_labels)
+    out_df = pd.DataFrame({"embryo_id":group_name, "nmi":mat_nmi, "ari":mat_ari}, index=[0])
+    confusion_df = pd.crosstab(mat_labels, pd.Categorical(phase, categories=PHASES), dropna=False)
+    print(confusion_df.columns)
+    for col in confusion_df:  
+        prominence = confusion_df.loc[confusion_df[col].idxmax()][col] /( 0.000001 + confusion_df[col].sum())
+        out_df[col] = [prominence]
+        
 
-    print(pd.crosstab(phase, traj_labels))
-    return pd.DataFrame({"embryo_id":group_name, "mat_nmi":mat_nmi, "mat_ari":mat_ari, "traj_nmi":traj_nmi, "traj_ari":traj_ari}, index=[0])
+    return out_df #"traj_nmi":traj_nmi, "traj_ari":traj_ari
 
 def main(model_name):
     annotations_dir = "embryo_dataset_annotations" 
@@ -163,17 +161,20 @@ def main(model_name):
     lat_columns = [f"z_{i}" for i in range(lat_np.shape[1])]
     values_df = pd.DataFrame(lat_np, columns=lat_columns)
     df = pd.concat([lat_df, values_df], axis = 1)
-    #df[df['embryo_id'].isin(df['embryo_id'].unique()[:10])]
+    #df = df[df['embryo_id'].isin(df['embryo_id'].unique()[:10])]
     cluster_stats = df.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,annotations_dir)).reset_index()
     print(model_name)
-    print("mat nmi: ", cluster_stats["mat_nmi"].mean(), " +- ", cluster_stats["mat_nmi"].std())
-    print("mat ari: ", cluster_stats["mat_ari"].mean(), " +- ", cluster_stats["mat_ari"].std())
-    print("best mat nmi:", cluster_stats.loc[cluster_stats["mat_nmi"].idxmax()]["embryo_id"])
-    print("best mat ari:", cluster_stats.loc[cluster_stats["mat_ari"].idxmax()]["embryo_id"])
-    print("traj nmi: ", cluster_stats["traj_nmi"].mean(), " +- ", cluster_stats["traj_nmi"].std())
-    print("traj ari: ", cluster_stats["traj_ari"].mean(), " +- ", cluster_stats["traj_ari"].std())
-    print("best traj nmi:", cluster_stats.loc[cluster_stats["traj_nmi"].idxmax()]["embryo_id"])
-    print("best traj ari:", cluster_stats.loc[cluster_stats["traj_ari"].idxmax()]["embryo_id"])    
+    print("mat nmi: ", cluster_stats["nmi"].mean(), " +- ", cluster_stats["nmi"].std())
+    print("mat ari: ", cluster_stats["ari"].mean(), " +- ", cluster_stats["ari"].std())
+    print("best mat nmi:", cluster_stats.loc[cluster_stats["nmi"].idxmax()]["embryo_id"])
+    print("best mat ari:", cluster_stats.loc[cluster_stats["ari"].idxmax()]["embryo_id"])
+    for i in  PHASES:
+        print("$\\num{", cluster_stats[i].mean() ,"} \\pm \\num{", cluster_stats[i].std()  , "}$&")
+    print("\\\\")
+    #print("traj nmi: ", cluster_stats["traj_nmi"].mean(), " +- ", cluster_stats["traj_nmi"].std())
+    #print("traj ari: ", cluster_stats["traj_ari"].mean(), " +- ", cluster_stats["traj_ari"].std())
+    #print("best traj nmi:", cluster_stats.loc[cluster_stats["traj_nmi"].idxmax()]["embryo_id"])
+    #print("best traj ari:", cluster_stats.loc[cluster_stats["traj_ari"].idxmax()]["embryo_id"])    
     
 if __name__ == "__main__":
     import argparse

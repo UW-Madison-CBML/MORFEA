@@ -19,4 +19,4 @@ ls -lh
 
  
 python stage_clusters.py --name "$1"
-tar -czvf stage_clusters.tar.gz stage_clusters/
+tar -czvf "$1"_stage_clusters.tar.gz stage_clusters/
