@@ -191,14 +191,17 @@ class Decoder(nn.Module):
         self.latent_expand = nn.Linear(latent_size, latent_dim * 16 * 16)
 
         # ConvLSTM decodes temporal dimension
-        self.convlstm = ConvLSTM(
-            input_dim=latent_dim,
-            hidden_dim=hidden_dim,
-            kernel_size=(3, 3),
-            num_layers=num_layers,
-            batch_first=True,
-            return_all_layers=False
-        )
+        if self.no_conv:
+            self.convlstm = None 
+        else:
+            self.convlstm = ConvLSTM(
+                input_dim=latent_dim,
+                hidden_dim=hidden_dim,
+                kernel_size=(3, 3),
+                num_layers=num_layers,
+                batch_first=True,
+                return_all_layers=False
+            )
 
         # Spatial decoding with residual connections: 16x16 -> 32x32 -> 64x64 -> 128x128
         self.spatial_decoder = nn.Sequential(
