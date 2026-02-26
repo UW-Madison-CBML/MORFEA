@@ -107,18 +107,19 @@ def addAnnotations(group_name, group, annotations_dir):
     mat_embedding = scaled_mat # just use plain matrix for clustering, we get umap embedding for visuals 
     embedding = reducer.fit_transform(scaled_mat)
     cmap = matplotlib.colormaps["tab20"].resampled(18)
-    plt.scatter(embedding[:, 0], embedding[:,1], c=group["phase"].to_numpy() / 18, cmap=cmap)
+    fig, ax = plt.subplots(figsize=(8,6))
+    ax.scatter(embedding[:, 0], embedding[:,1], c=group["phase"].to_numpy() / 18, cmap=cmap)
     legend_handles = []
     for i, phase_name in enumerate(PHASES):
         color = cmap(i)
         patch = patches.Patch(color=color, label=phase_name)
         legend_handles.append(patch)
 
-    plt.legend(handles=legend_handles, title="Phases", bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.xlabel("UMAP 1")
-    plt.ylabel("UMAP 2")
-    plt.title("Distance Matrix Feature UMAP Phases")
-   
+    ax.legend(handles=legend_handles, title="Phases", bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax.set_xlabel("UMAP 1")
+    ax.set_ylabel("UMAP 2")
+    ax.set_title("Distance Matrix Feature UMAP Phases")
+    ax.set_position([0.1, 0.1, 0.65, 0.8]) 
     plt.savefig(os.path.join("stage_clusters", f"{group_name}_umap.png"), dpi=300, bbox_inches='tight')
     plt.close()
     kmedoids = KMedoids(n_clusters=18, random_state=0, method="pam")
@@ -126,12 +127,13 @@ def addAnnotations(group_name, group, annotations_dir):
     kmedoids.fit(mat_embedding)
 
     mat_labels = kmedoids.labels_ 
-
-    plt.scatter(embedding[:, 0], embedding[:,1], c=mat_labels / 18 , cmap=cmap)
-    plt.xlabel("UMAP 1")
-    plt.ylabel("UMAP 2")
-    plt.title("Distance Matric Feature UMAP Cluster")
+    ax.set_position([0.1, 0.1, 0.65, 0.8])
+    ax.scatter(embedding[:, 0], embedding[:,1], c=mat_labels / 18 , cmap=cmap)
+    ax.set_xlabel("UMAP 1")
+    ax.set_ylabel("UMAP 2")
+    ax.set_title("Distance Matric Feature UMAP Cluster")
    
+    ax.set_position([0.1, 0.1, 0.65, 0.8]) 
     plt.savefig(os.path.join("stage_clusters", f"{group_name}_clusters.png"), dpi=300, bbox_inches='tight')
 
     plt.close()
