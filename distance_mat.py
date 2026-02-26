@@ -24,10 +24,11 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
     phase_matrix_lower = np.ma.masked_where(mask, phase_matrix)
     fig, ax = plt.subplots(figsize=(10, 8)) # Slightly wider for the legend
     im_dist = ax.imshow(dist_matrix, cmap='viridis', interpolation='none')
-    colors = list(plt.cm.Set3(range(12))) + list(plt.cm.Set2(range(8)))
-    custom_cmap = ListedColormap(colors)
-    colors = colors[:len(PHASES)] 
 
+    tab20_colors = plt.cm.tab20.colors 
+    custom_cmap = ListedColormap(tab20_colors)
+
+    colors = tab20_colors[:len(PHASES)]
     custom_cmap = mcolors.ListedColormap(colors)
 
     bounds = np.arange(len(PHASES))
