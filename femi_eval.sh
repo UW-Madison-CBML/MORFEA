@@ -1,7 +1,9 @@
 #!/bin/bash
 pip install safetensors huggingface_hub wandb
-
+pip install transformers torch
+pip install --upgrade transformers
 # Extract dataset
+python -c "import transformers; print(transformers.__version__)"
 tar -zxf embryo_dataset.tar.gz
 tar -zxf latents.tar.gz
 tar -zxf embryo_dataset_annotations.tar.gz
