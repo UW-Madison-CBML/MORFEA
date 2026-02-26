@@ -110,7 +110,8 @@ class Encoder(nn.Module):
             ResidualBlock(128, 256, downsample=True),
         )
 
-        if self.no_conv:
+        self.use_convlstm = use_convlstm
+        if not self.use_convlstm:
             self.convlstm = None 
         else:
             self.convlstm = ConvLSTM(
@@ -129,7 +130,6 @@ class Encoder(nn.Module):
         # Input: (B*T, hidden_dim * 16 * 16)
         # Output: (B*T, latent_size)
         self.latent_compress = nn.Linear(hidden_dim * 16 * 16, latent_size)
-        self.use_convlstm = use_convlstm
 
     def forward(self, x):
         """
@@ -190,8 +190,9 @@ class Decoder(nn.Module):
         # Output: (B*T, latent_dim * 16 * 16)
         self.latent_expand = nn.Linear(latent_size, latent_dim * 16 * 16)
 
+        self.use_convlstm = use_convlstm
         # ConvLSTM decodes temporal dimension
-        if self.no_conv:
+        if not self.use_convlstm:
             self.convlstm = None 
         else:
             self.convlstm = ConvLSTM(
@@ -218,7 +219,6 @@ class Decoder(nn.Module):
             nn.Conv2d(32, 1, kernel_size=3, padding=1),
             nn.Sigmoid()  # Assume pixels normalized to [0,1]
         )
-        self.use_convlstm = use_convlstm
 
     def forward(self, z_seq):
         """

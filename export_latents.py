@@ -132,7 +132,7 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
     if not os.path.exists(index_csv):
         raise FileNotFoundError(f"{index_csv} not found. Run build_index_embryo.py first.")
 
-    ds = IVFEmbryoDataset(index_csv, resize=128, norm="minmax01")
+    ds = IVFEmbryoDataset(pd.read_csv(index_csv), resize=128, norm="minmax01")
 
     # Limit number of embryos if specified
     if limit is not None and limit > 0:
