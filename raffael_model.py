@@ -67,7 +67,6 @@ class ResidualUpBlock(nn.Module):
         self.conv = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm2d(out_channels)
 
-        # Shortcut with upsampling
         self.shortcut = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1)
 
     def forward(self, x):
@@ -111,17 +110,17 @@ class Encoder(nn.Module):
             ResidualBlock(128, 256, downsample=True),
         )
 
-        # ConvLSTM: process temporal sequence
-        # Input: (B, T, 256, 16, 16)
-        # Output: (B, T, hidden_dim, 16, 16)
-        self.convlstm = ConvLSTM(
-            input_dim=256,
-            hidden_dim=hidden_dim,
-            kernel_size=(3, 3),
-            num_layers=num_layers,
-            batch_first=True,
-            return_all_layers=False
-        )
+        if self.no_conv:
+            self.convlstm = None 
+        else:
+            self.convlstm = ConvLSTM(
+                input_dim=256,
+                hidden_dim=hidden_dim,
+                kernel_size=(3, 3),
+                num_layers=num_layers,
+                batch_first=True,
+                return_all_layers=False
+            )
 
         # Dropout before latent compression
         self.dropout = nn.Dropout(0.1)
