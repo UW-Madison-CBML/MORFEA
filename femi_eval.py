@@ -1,4 +1,3 @@
-# export_latents.py - Export latent embeddings to CSV
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -9,7 +8,7 @@ from dataset_ivf_embryo import IVFEmbryoDataset
 from raffael_model import ConvLSTMAutoencoder
 from huggingface_hub import login, HfApi
 from datetime import datetime, timedelta
-from transformers import ViTMAEForPreTraining, AutoImageProcessor
+from transformers import VideoMAEModel, AutoImageProcessor
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {DEVICE}")
 
@@ -35,18 +34,6 @@ def addAnnotations(group_name, group, annotations_dir):
     
     return group
 
-def load_model(model_name=None, days_back=30):
-    """
-    Load ConvLSTM model from HuggingFace or local weights.
-
-    Args:
-        model_name: Specific model name to load (e.g., "JensLundsgaard/IVF-ConvLSTM-Model-2025-12-15")
-                   If None, will search for most recent models
-        days_back: Number of days to search back for models
-
-    Returns:
-        Loaded model
-    """
     
 def export_femi_latents_to_csv(index_csv="index_embryo.csv",
                           output_csv="latents.csv",
@@ -58,7 +45,7 @@ def export_femi_latents_to_csv(index_csv="index_embryo.csv",
 
 
     processor = AutoImageProcessor.from_pretrained("ihlab/FEMI")
-    model = ViTMAEForPreTraining.from_pretrained("ihlab/FEMI")
+    model = VideoMAEModel.from_pretrained("ihlab/FEMI")
 
         
     if not os.path.exists(index_csv):
@@ -75,7 +62,6 @@ def export_femi_latents_to_csv(index_csv="index_embryo.csv",
 
     model = model.to(DEVICE)
     model.eval()
-    model = model.to(DEVICE)
 
     all_latents = []
     embryo_ids = []
@@ -90,7 +76,8 @@ def export_femi_latents_to_csv(index_csv="index_embryo.csv",
         row = ds.df.iloc[idx] 
         embryo_imgs = [Image.open(img) for img in row["embryo_paths"].split("|")]
         inputs = processor(images=embryo_imgs, return_tensors="pt")
-        encoder_outputs = model.vit(**inputs)
+        with torch.no_grad():
+            encoder_outputs = model.vit(**inputs)
         latents = encoder_outputs.last_hidden_state
         print(latents.shape)
 
