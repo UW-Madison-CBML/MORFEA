@@ -1,3 +1,1 @@
-convlstm l1 --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.05 --size 512 --name control
-convlstm l1 --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.00 --size 512 --name notemp
 convlstm l1 --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.05 --size 512 --no-convlstm --name noconv
