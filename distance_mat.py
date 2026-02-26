@@ -7,6 +7,8 @@ import matplotlib.patches as mpatches
 import matplotlib.ticker as ticker
 from matplotlib.colors import ListedColormap
 import matplotlib.colors as mcolors
+
+PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
 def get_mat(traj, embryo_id, model_name, annotations_dir):
     output_dir = f"{model_name}_distances"
     if not os.path.exists(output_dir):
@@ -17,7 +19,7 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
     df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
     for i, row in df.iterrows():
         start, end = int(row["stage_begin"]), int(row["stage_end"])
-        phase_matrix[start:end+1, :] = i  
+        phase_matrix[start:end+1, :] = PHASES.index(row["stage_begin"])
     mask = np.triu(np.ones_like(phase_matrix, dtype=bool), k=1)
     phase_matrix_lower = np.ma.masked_where(mask, phase_matrix)
     fig, ax = plt.subplots(figsize=(10, 8)) # Slightly wider for the legend
@@ -51,24 +53,22 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
     plt.colorbar(im_dist, ax=ax, label='Distance', shrink=0.8)
     plt.savefig(os.path.join(output_dir, f'{embryo_id}_matrix.png'), dpi=300, bbox_inches='tight')
     plt.close(fig)
-    """fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(8, 6))
     im_dist = ax.imshow(dist_matrix, cmap='viridis', interpolation='none')
     im_phase = ax.imshow(phase_matrix_lower, cmap='Set3', interpolation='none', alpha=0.6)
 
-    patches = [mpatches.Patch(color=plt.cm.Set3(i/len(phases)), label=p[0]) for i, p in enumerate(phases)]
+    patches = [mpatches.Patch(color=plt.cm.Set3(i/len(PHASES)), label=p[0]) for i, p in enumerate(PHASES)]
     ax.legend(handles=patches, bbox_to_anchor=(1.15, 1), loc='upper left', title="Phases")
     ax.set_title(f"{embryo_id} Distance Matrix", fontsize=14, fontweight='bold')
 
     ax.set_xlabel("Time Index")
     ax.set_ylabel("Time Index")
     # Set major ticks (with labels) every 32 values
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(32, offset=-0.5))
-    ax.yaxis.set_major_locator(ticker.MultipleLocator(32, offset=-0.5))
     ax.grid(True, which='major', color='white', linestyle='-', linewidth=0.8, alpha=0.6, zorder=1)
     plt.colorbar(im)
     plt.savefig(os.path.join(output_dir, f'{embryo_id}_matrix.png'), dpi=300, bbox_inches='tight')
 
-    plt.close(fig) """
+    plt.close(fig)
 
 def main(model_name):
     file_name = "latents/"+ model_name

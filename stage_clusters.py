@@ -127,7 +127,7 @@ def addAnnotations(group_name, group, annotations_dir):
     kmedoids.fit(mat_embedding)
 
     mat_labels = kmedoids.labels_ 
-    ax.set_position([0.1, 0.1, 0.65, 0.8])
+    fig, ax = plt.subplots(figsize=(8,6))
     ax.scatter(embedding[:, 0], embedding[:,1], c=mat_labels / 18 , cmap=cmap)
     ax.set_xlabel("UMAP 1")
     ax.set_ylabel("UMAP 2")
