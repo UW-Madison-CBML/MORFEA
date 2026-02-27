@@ -130,9 +130,9 @@ class Encoder(nn.Module):
         # Input: (B*T, hidden_dim * 16 * 16)
         # Output: (B*T, latent_size)
         self.latent_compress = nn.Linear(hidden_dim * 16 * 16, latent_size)
-        self.lin1 = nn.Linear(latent_size)
-        self.lin2 = nn.Linear(latent_size)
-        self.lin3 = nn.Linear(latent_size)
+        self.lin1 = nn.Linear(latent_size,latent_size)
+        self.lin2 = nn.Linear(latent_size,latent_size)
+        self.lin3 = nn.Linear(latent_size,latent_size)
 
 
 
@@ -225,9 +225,9 @@ class Decoder(nn.Module):
             nn.Conv2d(32, 1, kernel_size=3, padding=1),
             nn.Sigmoid()  # Assume pixels normalized to [0,1]
         )
-        self.lin1 = nn.Linear(latent_size)
-        self.lin2 = nn.Linear(latent_size)
-        self.lin3 = nn.Linear(latent_size)
+        self.lin1 = nn.Linear(latent_size,latent_size)
+        self.lin2 = nn.Linear(latent_size,latent_size)
+        self.lin3 = nn.Linear(latent_size,latent_size)
 
     def forward(self, z_seq):
         """
