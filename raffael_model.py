@@ -130,6 +130,11 @@ class Encoder(nn.Module):
         # Input: (B*T, hidden_dim * 16 * 16)
         # Output: (B*T, latent_size)
         self.latent_compress = nn.Linear(hidden_dim * 16 * 16, latent_size)
+        self.lin1 = nn.Linear(latent_size)
+        self.lin2 = nn.Linear(latent_size)
+        self.lin3 = nn.Linear(latent_size)
+
+
 
     def forward(self, x):
         """
@@ -164,12 +169,13 @@ class Encoder(nn.Module):
         h_flat = h_seq.view(B * T, C * H * W)  # (B*T, hidden_dim * 16 * 16)
         h_flat = self.dropout(h_flat)  # Apply dropout
         z_compressed = self.latent_compress(h_flat)  # (B*T, latent_size)
+        z_compressed = F.relu(self.lin1(z_compressed))
+        z_compressed = F.relu(self.lin2(z_compressed))
+        z_compressed = F.relu(self.lin3(z_compressed))
         z_seq = z_compressed.view(B, T, self.latent_size)  # (B, T, latent_size)
 
-        # Take last timestep
-        z_last = z_seq[:, -1]  # (B, latent_size)
 
-        return z_seq, z_last
+        return z_seq
 
 
 class Decoder(nn.Module):
@@ -219,6 +225,9 @@ class Decoder(nn.Module):
             nn.Conv2d(32, 1, kernel_size=3, padding=1),
             nn.Sigmoid()  # Assume pixels normalized to [0,1]
         )
+        self.lin1 = nn.Linear(latent_size)
+        self.lin2 = nn.Linear(latent_size)
+        self.lin3 = nn.Linear(latent_size)
 
     def forward(self, z_seq):
         """
@@ -232,6 +241,9 @@ class Decoder(nn.Module):
 
         # Expand compressed latent to spatial dimensions
         z_flat = z_seq.view(B * T, L)  # (B*T, latent_size)
+        z_flat = F.relu(self.lin1(z_flat))
+        z_flat = F.relu(self.lin2(z_flat))
+        z_flat = F.relu(self.lin3(z_flat))
         z_expanded = self.latent_expand(z_flat)  # (B*T, latent_dim * 16 * 16)
         z_spatial = z_expanded.view(B, T, self.latent_dim, 16, 16)  # (B, T, latent_dim, 16, 16)
 
@@ -250,40 +262,6 @@ class Decoder(nn.Module):
 
         return x_rec
 
-
-class LatentClassifier(nn.Module):
-    """
-    Empty / Non-empty Well Classifier
-    Classifies based on last timestep latent
-    """
-
-    def __init__(self, latent_size=4096, num_classes=2, dropout=0.3):
-        super(LatentClassifier, self).__init__()
-
-        self.head = nn.Sequential(
-            # Classification head - input is already flattened (B, latent_size)
-            nn.Linear(latent_size, 512),
-            nn.BatchNorm1d(512),
-            nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
-
-            nn.Linear(512, 256),
-            nn.BatchNorm1d(256),
-            nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
-
-            nn.Linear(256, num_classes)
-        )
-
-    def forward(self, z_last):
-        """
-        Args:
-            z_last: (B, latent_size) - last timestep compressed latent
-
-        Returns:
-            logits: (B, num_classes) - classification logits
-        """
-        return self.head(z_last)
 
 
 class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
@@ -358,12 +336,6 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
             use_convlstm=self.use_convlstm
         )
 
-        # Optional classifier
-        if use_classifier:
-            self.classifier = LatentClassifier(
-                latent_size=latent_size,
-                num_classes=num_classes
-            )
 
     def forward(self, x, return_all=False, hidden=None):
         """
@@ -384,12 +356,11 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         """
         B, T, C, orig_H, orig_W = x.shape
 
-        # Encode (will resize to 128x128 internally)
         if return_all:
             z_seq, z_last, h_last_enc, c_last_enc = self.encoder(x, return_all=return_all)#, hidden_state=hidden_state['enc'] if hidden_state != None else None)
 
         else:
-            z_seq, z_last = self.encoder(x)#, hidden_state=hidden_state['enc'] if hidden_state != None else None)
+            z_seq = self.encoder(x)#, hidden_state=hidden_state['enc'] if hidden_state != None else None)
 
 
         # Decode (outputs 128x128)

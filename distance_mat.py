@@ -28,17 +28,15 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
     tab20_colors = plt.cm.tab20.colors 
     custom_cmap = ListedColormap(tab20_colors)
 
-    colors = tab20_colors[:len(PHASES)]
-    custom_cmap = mcolors.ListedColormap(colors)
 
-    bounds = np.arange(len(PHASES))
+    bounds = np.arange(len(PHASES) + 1) - 0.5
     norm = mcolors.BoundaryNorm(bounds, custom_cmap.N)
     im_phase = ax.imshow(phase_matrix_lower, 
                      cmap=custom_cmap, 
                      interpolation='none', 
                      norm=norm)
     patches = [
-        mpatches.Patch(color=custom_cmap(i), label=row['stage_id'])
+        mpatches.Patch(color=custom_cmap(PHASES.index(row['stage_id'])/18), label=row['stage_id'])
         for i, row in df.iterrows()
     ]
     ax.legend(handles=patches, bbox_to_anchor=(1.25, 1), loc='upper left', title="Phases")
@@ -57,7 +55,7 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
     im_dist = ax.imshow(dist_matrix, cmap='viridis', interpolation='none')
     im_phase = ax.imshow(phase_matrix_lower, cmap='Set3', interpolation='none', alpha=1)
 
-    patches = [mpatches.Patch(color=plt.cm.Set3(i/len(PHASES)), label=p) for i, p in enumerate(PHASES)]
+    patches = [mpatches.Patch(color=custom_cmap(i/18), label=p) for i, p in enumerate(PHASES)]
     ax.legend(handles=patches, bbox_to_anchor=(1.15, 1), loc='upper left', title="Phases")
     ax.set_title(f"{embryo_id} Distance Matrix", fontsize=14, fontweight='bold')
 
