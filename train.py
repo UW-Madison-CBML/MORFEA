@@ -69,8 +69,13 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
         return torch.tensor(0.0, device=z_seq.device)
     
     # Compute difference between adjacent timesteps
-    diff = z_seq[:, 1:] - z_seq[:, :-1]  # (B, T-1, C, H, W)
+    diff1 = z_seq[:, 1:] - z_seq[:, :-1]  # (B, T-1, L)
+    diff2 = z_seq[:, 2:] - z_seq[:, :-2]  # (B, T-2, L)
+    diff4 = z_seq[:, 4:] - z_seq[:, :-4]  # (B, T-4, L)
+    diff8 = z_seq[:, 8:] - z_seq[:, :-8]  # (B, T-8, L)
+    diff = torch.cat((diff1, diff2, diff4, diff8), axis=1) # (B, 4T-15, L)
     smooth_loss = (diff ** 2).mean()
+    
     
     return weight * smooth_loss
 
@@ -696,17 +701,17 @@ ABLATION STUDY CONFIGURATION
             for i, embryo_vol in enumerate(full_seq_loader):
                 if i != rand_img:
                     continue
-                embryo_vol.to(DEVICE) 
+                embryo_vol = embryo_vol.to(DEVICE) 
                 _, z_seq = model(embryo_vol)
                 traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
                 distance_mat = distance_matrix(traj,traj)
                 fig, ax = plt.subplots(figsize=(8, 6))
-                im = ax.imshow(dist_matrix, cmap='viridis')
+                im = ax.imshow(distance_mat, cmap='viridis')
 
                 ax.set_xlabel("Time Index")
                 ax.set_ylabel("Time Index")
                 plt.colorbar(im, ax=ax)
-                wandb.log({"temp_smoothness": wandb.Image(fig)})
+                wandb.log({"temp_smoothness_val": wandb.Image(fig)})
 
                 plt.close(fig)                
             
