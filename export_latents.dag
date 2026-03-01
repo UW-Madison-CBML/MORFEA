@@ -1,0 +1,6 @@
+JOB A export_latents.sub
+VARS A model="control-2026-03-01"
+#JOB B export_latents.sub
+#VARS B model="model1"
+
+#PARENT A CHILD B

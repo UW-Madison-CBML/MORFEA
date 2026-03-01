@@ -6,7 +6,7 @@ universe = docker
 #  commands) and arguments to be passed to jobs. 
 #  $(Process) will be a integer number for each job, starting with "0"
 #  and increasing for the relevant number of jobs.
-shell = ./export_latents.sh $(models)
+shell = ./export_latents.sh $(model)
    		
 # Specify the name of the log, standard error, and standard output (or
 # "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
