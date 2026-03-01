@@ -17,7 +17,6 @@ def fit_circle_curvature(points, how="triangle"):
     If points are collinear or too close, return 0.
 
     """
-
     if(how == "triangle"):
  
         # Get three points
@@ -123,7 +122,7 @@ def calculate_curvatures(group, offset):
  
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 from scipy.spatial import distance_matrix
-def addAnnotations(group_name, group, annotations_dir, curvature = True, velocity = True, latents = True, acceleration = True, path_signatures = None, distance_mat=True):
+def addAnnotations(group_name, group, annotations_dir, curvature = True, velocity = True, latents = True, acceleration = True, path_signatures = True, distance_mat=True):
     annotation_file = os.path.join(annotations_dir, f"{group_name}_phases.csv")
     df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
 
@@ -146,41 +145,21 @@ def addAnnotations(group_name, group, annotations_dir, curvature = True, velocit
 
     trajectory = group[lat_cols].values
 
-    if (velocity): 
-        vel = np.diff(trajectory, axis = 0)
-        vel = np.sqrt((vel**2).sum(axis = 1))
-        speed = np.concatenate((vel, np.zeros(1)))
-        group["z_speed"] = speed
-
     if (curvature):
         group["z_curvature_6"] = calculate_curvatures(group, 12)
         group["z_curvature_10"] = calculate_curvatures(group, 20)
         group["z_curvature_2"] = calculate_curvatures(group, 4)
 
     if (path_signatures != None):
-        print(" ")
+        
     if(distance_mat):
         mat = distance_matrix(np.array([trajectory[0]]), trajectory).flatten()
         
         group["z_dist"] = mat
     if(acceleration):
-        alpha_v = 0.3
-        alpha_a = 0.3
+        
 
-        velocity_raw = group[lat_cols].diff().fillna(0)
-        for col in velocity_raw.columns:
-            group[f'z_v_ema_{col}'] = velocity_raw[col].ewm(alpha=alpha_v, adjust=False).mean()
 
-        v_cols = [c for c in group.columns if c.startswith('z_v_ema_')]
-        accel_raw = group[v_cols].diff().fillna(0)
-
-        for i, col in enumerate(v_cols):
-            group[f'z_a_ema_latent_{i}'] = accel_raw[col].ewm(alpha=alpha_a, adjust=False).mean()
-
-        a_cols = [c for c in group.columns if c.startswith('z_a_ema_')]
-
-        group['z_v_magnitude'] = np.linalg.norm(group[v_cols].values, axis=1)
-        group['z_a_magnitude'] = np.linalg.norm(group[a_cols].values, axis=1)
     if (not latents):
         group = group.drop(columns=lat_cols)
     
@@ -201,6 +180,7 @@ class StageDataset(Dataset):
         self.return_embryo_id = return_embryo_id
         sizes = self.latents_df.groupby("embryo_id")["time_step"].size()
         self.max_points = sizes.max()
+        
         self.df = self.latents_df.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,self.annotations_dir, curvature = curvature, velocity = velocity, latents = latents, acceleration = acceleration, path_signatures = None, distance_mat=distance_mat)).reset_index()
         self.groups = self.df.groupby("embryo_id")
         self.seqlength = 64
