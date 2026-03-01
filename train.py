@@ -449,10 +449,10 @@ ABLATION STUDY CONFIGURATION
         pin_memory=True,
         drop_last=False 
     )
+    epochs = 30
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
 
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * 10)
-
-    for epoch in range(10):
+    for epoch in range(epochs):
         model.train()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
@@ -512,7 +512,7 @@ ABLATION STUDY CONFIGURATION
                 raise ValueError(f"Invalid loss_type: {loss_type}. Must be 'l1' or 'mse'")
 
             if temporal_weight > 0:
-                smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
+                smooth_loss = temporal_smoothness_loss(embryo_lat, weight=(epoch/epochs)*temporal_weight) # try to anneal in the smoothness loss, let it learn reconstruction first
                 loss = rec_loss + smooth_loss
             else:
                 smooth_loss = torch.tensor(0.0, device=DEVICE)
