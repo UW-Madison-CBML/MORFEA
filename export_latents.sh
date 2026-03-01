@@ -1,6 +1,5 @@
 #!/bin/bash
 echo "Starting export_latents job..."
-# Install dependencies
 
 # Extract dataset
 echo "Extracting dataset..."
