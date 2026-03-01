@@ -135,7 +135,6 @@ class Encoder(nn.Module):
         # Output: (B*T, latent_size)
         self.latent_compress = nn.Linear(hidden_dim * 16 * 16, latent_size)
         self.lin1 = nn.Linear(latent_size,latent_size)
-        self.lin2 = nn.Linear(latent_size,latent_size)
 
 
 
@@ -171,12 +170,11 @@ class Encoder(nn.Module):
         # Flatten and compress spatial dimensions with linear layer
         B, T, C, H, W = h_seq.shape
         h_flat = h_seq.view(B, T, C * H * W)  # Linear just works on bottom most dim
-        z_compressed = self.latent_compress(h_flat)  
-        z_compressed = self.dropout(z_compressed)
-        z_compressed = F.relu(self.lin1(z_compressed))
+        z_compressed = self.dropout(h_flat)
+        z_compressed = F.relu(self.latent_compress(z_compressed))
         if self.use_convlstm:
             z_compressed, _ = self.lstm(z_compressed)
-        z_compressed = F.relu(self.lin2(z_compressed))
+        z_compressed = F.relu(self.lin1(z_compressed))
         z_seq = z_compressed.view(B, T, self.latent_size)  
 
 
@@ -235,7 +233,6 @@ class Decoder(nn.Module):
             nn.Sigmoid()  # Assume pixels normalized to [0,1]
         )
         self.lin1 = nn.Linear(latent_size,latent_size)
-        self.lin2 = nn.Linear(latent_size,latent_size)
 
     def forward(self, z_seq):
         """
@@ -252,8 +249,7 @@ class Decoder(nn.Module):
         z_flat = F.relu(self.lin1(z_flat))
         if self.use_convlstm:
             z_flat, _ = self.lstm(z_flat)
-        z_flat = F.relu(self.lin2(z_flat))
-        z_expanded = self.latent_expand(z_flat)  # (B*T, latent_dim * 16 * 16)
+        z_expanded = F.relu(self.latent_expand(z_flat))  # (B*T, latent_dim * 16 * 16)
         z_spatial = z_expanded.view(B, T, self.latent_dim, 16, 16)  # (B, T, latent_dim, 16, 16)
 
         """# ConvLSTM decodes temporal dimension
