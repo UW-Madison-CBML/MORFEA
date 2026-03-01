@@ -111,7 +111,7 @@ class Encoder(nn.Module):
         )
 
         self.use_convlstm = use_convlstm
-        if not self.use_convlstm:
+        """if not self.use_convlstm:
             self.convlstm = None 
         else:
             self.convlstm = ConvLSTM(
@@ -121,7 +121,11 @@ class Encoder(nn.Module):
                 num_layers=num_layers,
                 batch_first=True,
                 return_all_layers=False
-            )
+                )"""
+        if self.use_convlstm:
+            self.lstm = nn.LSTM(latent_size, latent_size, batch_first=True)
+        else:
+            self.lstm = None
 
         # Dropout before latent compression
         self.dropout = nn.Dropout(0.1)
@@ -132,7 +136,6 @@ class Encoder(nn.Module):
         self.latent_compress = nn.Linear(hidden_dim * 16 * 16, latent_size)
         self.lin1 = nn.Linear(latent_size,latent_size)
         self.lin2 = nn.Linear(latent_size,latent_size)
-        self.lin3 = nn.Linear(latent_size,latent_size)
 
 
 
@@ -157,22 +160,24 @@ class Encoder(nn.Module):
         _, C2, H2, W2 = x.shape
         x = x.view(B, T, C2, H2, W2)  # (B, T, 256, 16, 16)
 
-        # ConvLSTM processes temporal sequence
+        """# ConvLSTM processes temporal sequence
         if(self.use_convlstm):
             lstm_out, _ = self.convlstm(x)  # list of (B, T, hidden_dim, 16, 16)
             h_seq = lstm_out[0]             # (B, T, hidden_dim, 16, 16)
         else:
-            h_seq = x # just pass it forward if not
+            h_seq = x # just pass it forward if not"""
+        h_seq = x
 
         # Flatten and compress spatial dimensions with linear layer
         B, T, C, H, W = h_seq.shape
-        h_flat = h_seq.view(B * T, C * H * W)  # (B*T, hidden_dim * 16 * 16)
-        h_flat = self.dropout(h_flat)  # Apply dropout
-        z_compressed = self.latent_compress(h_flat)  # (B*T, latent_size)
+        h_flat = h_seq.view(B, T, C * H * W)  # Linear just works on bottom most dim
+        z_compressed = self.latent_compress(h_flat)  
+        z_compressed = self.dropout(z_compressed)
         z_compressed = F.relu(self.lin1(z_compressed))
+        if self.use_convlstm:
+            z_compressed, _ = self.lstm(z_compressed)
         z_compressed = F.relu(self.lin2(z_compressed))
-        z_compressed = F.relu(self.lin3(z_compressed))
-        z_seq = z_compressed.view(B, T, self.latent_size)  # (B, T, latent_size)
+        z_seq = z_compressed.view(B, T, self.latent_size)  
 
 
         return z_seq
@@ -198,7 +203,7 @@ class Decoder(nn.Module):
 
         self.use_convlstm = use_convlstm
         # ConvLSTM decodes temporal dimension
-        if not self.use_convlstm:
+        """if not self.use_convlstm:
             self.convlstm = None 
         else:
             self.convlstm = ConvLSTM(
@@ -208,7 +213,11 @@ class Decoder(nn.Module):
                 num_layers=num_layers,
                 batch_first=True,
                 return_all_layers=False
-            )
+            )"""
+        if self.use_convlstm:
+            self.lstm = nn.LSTM(latent_size, latent_size, batch_first=True)
+        else:
+            self.lstm = None
 
         # Spatial decoding with residual connections: 16x16 -> 32x32 -> 64x64 -> 128x128
         self.spatial_decoder = nn.Sequential(
@@ -227,7 +236,6 @@ class Decoder(nn.Module):
         )
         self.lin1 = nn.Linear(latent_size,latent_size)
         self.lin2 = nn.Linear(latent_size,latent_size)
-        self.lin3 = nn.Linear(latent_size,latent_size)
 
     def forward(self, z_seq):
         """
@@ -240,20 +248,21 @@ class Decoder(nn.Module):
         B, T, L = z_seq.shape
 
         # Expand compressed latent to spatial dimensions
-        z_flat = z_seq.view(B * T, L)  # (B*T, latent_size)
+        z_flat = z_seq # linear works on bottom most dim
         z_flat = F.relu(self.lin1(z_flat))
+        if self.use_convlstm:
+            z_flat, _ = self.lstm(z_flat)
         z_flat = F.relu(self.lin2(z_flat))
-        z_flat = F.relu(self.lin3(z_flat))
         z_expanded = self.latent_expand(z_flat)  # (B*T, latent_dim * 16 * 16)
         z_spatial = z_expanded.view(B, T, self.latent_dim, 16, 16)  # (B, T, latent_dim, 16, 16)
 
-        # ConvLSTM decodes temporal dimension
+        """# ConvLSTM decodes temporal dimension
         if(self.use_convlstm):
             lstm_out, _ = self.convlstm(z_spatial)  # list of (B, T, hidden_dim, 16, 16)
             h_seq = lstm_out[0]                 # (B, T, hidden_dim, 16, 16)
         else:
-            h_seq = z_spatial # just pass it forward
-
+            h_seq = z_spatial # just pass it forward"""
+        h_seq = z_spatial
         # Spatial decoding: process each timestep separately
         B, T, C, H, W = h_seq.shape
         h_seq = h_seq.view(B * T, C, H, W)  # (B*T, hidden_dim, 16, 16)
