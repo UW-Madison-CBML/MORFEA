@@ -64,20 +64,25 @@ class RunningStats:
 
 VAL_EMBRYOS = []#"RS363-7", "CZ594-5","CJ261-10","RL747-8","TM272-9","LFA766-1","GT353-3","LGA881-2-5","LBE649-3","TH481-5","LTA908-2","BS648-7","GS955-7","HA1040-4","CM892-5","FC048-6","GC702-6","DI358-3","MM912-4","RK787-3","GSS052-2","OJ319-5","DML373-2","PS292-4","TM294-2","KT573-4","DJC641-4","FE14-020","LD400-1","MV930-2","MDCH869-4","AS662-2","LH1169-8","GA664-1","PMDPI029-1-3","DV116-3","FV709-11","GM456-3","RA361-4","LM844-1","DL020-3","VM570-4","MC833-6","LV613-2","ZS435-5","RM126-7","BK428-2","LS93-8","GS490-7","GF976-4","PMDPI029-1-11","DRL1048-1","BS294-7","CA658-12","RO793-2","GJ191-1","CC007-2","SL313-11","RC545-2-8","OJ319-9","PA289-8","TK319-10","SM686-7","KJ1077-3","BE645-10","BC167-4","VC581-1","FM162-6","PC758-2","HC459-6","DE069-10","GC340-3","BS596-5","PE256-2","LBE857-1","PH783-3","LS1045-4","CC455-3","DL617-6","BS1086-1","CK601-4","DA309-5","LTE064-1","KF460-4","LP181-1","GS349-4","LC47-8","GS205-6","EH309-8","BS1033-2","LL854-1","DHDPI042-6","BN356-6","PA145-2","GC340-1","MM334-5","AG274-2","BA518-7","BC973-4","BA1195-9","AM33-2","AB91-1","AB028-6","BC167-4","AL884-2","AM685-3"]
 # TODO: add tcl or stricter smoothing loss
+from info_nce import InfoNCE, info_nce
 def temporal_smoothness_loss(z_seq, weight=0.1):
     if z_seq.size(1) < 2:
         return torch.tensor(0.0, device=z_seq.device)
-    
+    B,T,L = z_seq.shape
+    """ 
     # Compute difference between adjacent timesteps
     diff1 = z_seq[:, 1:] - z_seq[:, :-1]  # (B, T-1, L)
     diff2 = z_seq[:, 2:] - z_seq[:, :-2]  # (B, T-2, L)
     diff4 = z_seq[:, 4:] - z_seq[:, :-4]  # (B, T-4, L)
     diff8 = z_seq[:, 8:] - z_seq[:, :-8]  # (B, T-8, L)
     diff = torch.cat((diff1, diff2, diff4, diff8), axis=1) # (B, 4T-15, L)
-    smooth_loss = (diff ** 2).mean()
-    
-    
-    return weight * smooth_loss
+    smooth_loss = (diff ** 2).mean()"""
+    loss = InfoNCE(negative_mode='unpaired') 
+    query = z_seq[:, :-1, :].reshape(-1, L)
+    positive_key = z_seq[:, 1:, :].reshape(-1,L)
+    negative_keys = z_seq.roll(shifts=T//2, dims=1)[:, :-1, :].reshape(-1, L)
+    output = loss(query, positive_key, negative_keys) 
+    return weight * output
 
 
 def save_and_push_model(model, repo_name, required_files, model_config=None):
@@ -91,8 +96,12 @@ def save_and_push_model(model, repo_name, required_files, model_config=None):
         model_config: Optional dictionary with model configuration to save as config.json
     """
     os.makedirs(repo_name, exist_ok=True)
-    model.encoder.lstm.flatten_parameters()
-    model.decoder.lstm.flatten_parameters()
+    device = model.device
+    clean_state_dict = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+
+    model = model.load_state_dict(clean_state_dict).to(device)
+    model.encoder.lstm_enc.flatten_parameters()
+    model.decoder.lstm_dec.flatten_parameters()
     try:
         model.save_pretrained(repo_name)
         print(f"Saved model using save_pretrained")
@@ -118,7 +127,7 @@ def save_and_push_model(model, repo_name, required_files, model_config=None):
 
     # Push model to hub (this uploads model weights and config)
     try:
-        model.push_to_hub(repo_name, safe_serialization=False)
+        model.push_to_hub(repo_name)
         print(f"Pushed model weights to {repo_name}")
     except Exception as e:
         print(f"Warning: push_to_hub failed ({e}), will upload manually")
