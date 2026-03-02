@@ -90,10 +90,9 @@ def save_and_push_model(model, repo_name, required_files, model_config=None):
         required_files: List of file paths to include in the repo
         model_config: Optional dictionary with model configuration to save as config.json
     """
-    # Create temporary directory for the repo
     os.makedirs(repo_name, exist_ok=True)
-
-    # Save the model weights
+    model.encoder.lstm.flatten_parameters()
+    model.decoder.lstm.flatten_parameters()
     try:
         model.save_pretrained(repo_name)
         print(f"Saved model using save_pretrained")
