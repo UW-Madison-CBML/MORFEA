@@ -118,7 +118,7 @@ def save_and_push_model(model, repo_name, required_files, model_config=None):
 
     # Push model to hub (this uploads model weights and config)
     try:
-        model.push_to_hub(repo_name)
+        model.push_to_hub(repo_name, safe_serialization=False)
         print(f"Pushed model weights to {repo_name}")
     except Exception as e:
         print(f"Warning: push_to_hub failed ({e}), will upload manually")
