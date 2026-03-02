@@ -56,7 +56,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-pip install huggingface_hub wandb safetensors
 HF_KEY=$(head -n 1 api_keys.txt)
 export HF_TOKEN=$HF_KEY
 WANDB_KEY=$(tail -n 1 api_keys.txt)
