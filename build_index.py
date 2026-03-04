@@ -7,7 +7,7 @@ from tqdm import tqdm
 DATASET_ROOT = "./embryo_dataset"
 OUT_CSV = "index.csv"
 T = 32                 # Sequence length (frames)
-WINDOW_STRIDE = 1   # 50% overlap
+WINDOW_STRIDE = T//4   # 50% overlap
 EMPTY_IMAGE_PATHS_FILE = "empty_images.txt"
 NUM_TEMPORAL_SAMPLES = 2   # Number of temporal contrastive pairs per sequence
 TEMPORAL_DISTANCES = [1, 5, 10, 20]  # Frame distances for temporal sampling
