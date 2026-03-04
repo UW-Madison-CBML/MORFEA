@@ -32,7 +32,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
 import os
 import time
-
+import umap
 from huggingface_hub import login
 import shutil
 import hashlib
@@ -96,42 +96,36 @@ def save_and_push_model(model, repo_name, required_files, model_config=None):
         model_config: Optional dictionary with model configuration to save as config.json
     """
     os.makedirs(repo_name, exist_ok=True)
-    device = model.device
+    device = next(model.parameters()).device
     clean_state_dict = {k: v.cpu().clone() for k, v in model.state_dict().items()}
-
-    model = model.load_state_dict(clean_state_dict).to(device)
-    model.encoder.lstm_enc.flatten_parameters()
-    model.decoder.lstm_dec.flatten_parameters()
+    model.cpu()
+    model.load_state_dict(clean_state_dict)
     try:
         model.save_pretrained(repo_name)
         print(f"Saved model using save_pretrained")
     except Exception as e:
-        # If save_pretrained fails, just save the state dict
         print(f"save_pretrained failed ({e}), saving state dict only")
         torch.save(model.state_dict(), os.path.join(repo_name, "pytorch_model.bin"))
-
-    # Save custom config.json with all ablation parameters
     if model_config is not None:
         config_path = os.path.join(repo_name, "config.json")
         with open(config_path, 'w') as f:
             json.dump(model_config, f, indent=2)
         print(f"Saved config.json with ablation parameters")
-
-    # Copy all required files
     for file_path in required_files:
         if os.path.exists(file_path):
             shutil.copy2(file_path, repo_name)
             print(f"Added {file_path} to repository")
         else:
             print(f"Warning: {file_path} not found, skipping")
-
-    # Push model to hub (this uploads model weights and config)
     try:
         model.push_to_hub(repo_name)
         print(f"Pushed model weights to {repo_name}")
     except Exception as e:
         print(f"Warning: push_to_hub failed ({e}), will upload manually")
 
+    model.to(device)
+    model.encoder.lstm_enc.flatten_parameters()
+    model.decoder.lstm_dec.flatten_parameters()
     # Upload all files using HfApi (including config.json)
     api = HfApi()
 
@@ -707,7 +701,7 @@ ABLATION STUDY CONFIGURATION
         rand_img = np.random.randint(len(full_seq_loader)) 
         with torch.no_grad():
             for i, embryo_vol in enumerate(full_seq_loader):
-                if i != rand_img:
+                if i % 200 != 0:
                     continue
                 embryo_vol = embryo_vol.to(DEVICE) 
                 _, z_seq = model(embryo_vol)
@@ -722,6 +716,18 @@ ABLATION STUDY CONFIGURATION
                 wandb.log({"temp_smoothness_val": wandb.Image(fig)})
 
                 plt.close(fig)                
+                
+                embedding = umap.UMAP(n_neighbors=5, random_state=42).fit(traj).embedding
+                fig, ax = plt.subplots(figsize=(8, 6))
+                im = ax.scatter(embedding[:,0], embedding[:,1],c=np.linspace(0,1,embedding.shape[0]), cmap='viridis')
+
+                ax.set_xlabel("UMAP 1")
+                ax.set_ylabel("UMAP 2")
+                plt.colorbar(im, ax=ax)
+                wandb.log({"temp_smoothness_val": wandb.Image(fig)})
+
+                plt.close(fig)                
+
             
 
     run.finish()
