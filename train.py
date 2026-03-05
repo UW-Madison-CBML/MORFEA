@@ -728,6 +728,7 @@ ABLATION STUDY CONFIGURATION
         run.log(val_log_dict)
         run.log(val_log_std_dict)
         cebra_latents = []
+        cebra_labels = []
         model.eval()
         with torch.no_grad():
             for embryo_vol in full_seq_loader_train:
@@ -735,7 +736,8 @@ ABLATION STUDY CONFIGURATION
                 _, z_seq = model(embryo_vol)
                 traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
                 cebra_latents.append(traj)
-        cebra_time_model.fit(cebra_latents)
+                cebra_labels.append(np.arange(len(traj)))
+        cebra_time_model.fit(cebra_latents, cebra_labels)
         #cebra_time_model.save("cebra_time_model.pt")
 
 
