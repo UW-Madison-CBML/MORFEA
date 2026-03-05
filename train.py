@@ -33,6 +33,7 @@ from torch.utils.data.distributed import DistributedSampler
 import os
 import time
 import umap
+import sklearn
 from huggingface_hub import login
 import shutil
 import hashlib
@@ -698,10 +699,10 @@ ABLATION STUDY CONFIGURATION
         }
         run.log(val_log_dict)
         run.log(val_log_std_dict)
-        rand_img = np.random.randint(len(full_seq_loader)) 
+        rand_img = np.random.randint(150, 250) 
         with torch.no_grad():
             for i, embryo_vol in enumerate(full_seq_loader):
-                if i % 200 != 0:
+                if i % rand_img != 0:
                     continue
                 embryo_vol = embryo_vol.to(DEVICE) 
                 _, z_seq = model(embryo_vol)
@@ -717,14 +718,14 @@ ABLATION STUDY CONFIGURATION
 
                 plt.close(fig)                
                 
-                embedding = umap.UMAP(n_neighbors=5, random_state=42).fit(traj).embedding
+                embedding = sklearn.decomposition.PCA(n_components=2).fit_transform(traj)
                 fig, ax = plt.subplots(figsize=(8, 6))
                 im = ax.scatter(embedding[:,0], embedding[:,1],c=np.linspace(0,1,embedding.shape[0]), cmap='viridis')
 
-                ax.set_xlabel("UMAP 1")
-                ax.set_ylabel("UMAP 2")
+                ax.set_xlabel("PCA 1")
+                ax.set_ylabel("PCA 2")
                 plt.colorbar(im, ax=ax)
-                wandb.log({"temp_smoothness_val": wandb.Image(fig)})
+                wandb.log({"pca": wandb.Image(fig)})
 
                 plt.close(fig)                
 
