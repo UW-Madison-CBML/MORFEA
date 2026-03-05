@@ -49,3 +49,5 @@ transformers
 umap-learn
 scikit-learn-extra
 seaborn
+cebra
+info-nce-pytorch
