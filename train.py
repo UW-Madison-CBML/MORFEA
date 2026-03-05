@@ -81,9 +81,11 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
     diff = torch.cat((diff1, diff2, diff4, diff8), axis=1) # (B, 4T-15, L)
     smooth_loss = (diff ** 2).mean()"""
     loss = InfoNCE(negative_mode='paired') 
-    query = z_seq[:, :-1, :].reshape(-1, L)
+    query = z_seq[:, :-1, :].reshape(-1,L)
     positive_key = z_seq[:, 1:, :].reshape(-1,L)
-    negative_keys = z_seq.roll(shifts=T//2, dims=1)[:, :-1, :].reshape(-1, L)
+
+    negative_keys = z_seq.roll(shifts=T//2, dims=1)[:, :-1, :].reshape(-1,1,L)
+
     output = loss(query, positive_key, negative_keys) 
     return weight * output
 
@@ -427,9 +429,9 @@ ABLATION STUDY CONFIGURATION
     print("val size: ", str(len(val_df) / len(df)))
     full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})
     full_seq_val_mask = full_seq_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
-    full_seq_df_val = full_seq_df[full_sq_df_val_mask] # just look at validation ICM embryos
+    full_seq_df_val = full_seq_df[full_seq_val_mask] # just look at validation ICM embryos
     
-    full_seq_df_train = full_seq_df[~full_sq_df_val_mask] # just look at validation ICM embryos
+    full_seq_df_train = full_seq_df[~full_seq_val_mask] # just look at validation ICM embryos
     full_seq_dataset_val = IVFEmbryoDataset(full_seq_df_val, resize=128, norm="minmax01")
     full_seq_dataset_train = IVFEmbryoDataset(full_seq_df_train, resize=128, norm="minmax01")
 
@@ -472,7 +474,7 @@ ABLATION STUDY CONFIGURATION
                         temperature=1,
                         output_dimension=3,
                         num_hidden_units=128,
-                        max_iterations=max_iterations,
+                        max_iterations=3000,
                         distance="euclidean",
                         conditional="time",
                         device="cuda_if_available",
@@ -728,7 +730,7 @@ ABLATION STUDY CONFIGURATION
         cebra_latents = []
         model.eval()
         with torch.no_grad():
-            for embryo_vol in enumerate(full_seq_loader_train):
+            for embryo_vol in full_seq_loader_train:
                 embryo_vol = embryo_vol.to(DEVICE)
                 _, z_seq = model(embryo_vol)
                 traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
@@ -766,7 +768,7 @@ ABLATION STUDY CONFIGURATION
                 wandb.log({"pca_val": wandb.Image(fig)})
 
                 plt.close(fig)                
-                cebra_embedding = cebra_time_model.transform(traj)
+                cebra_embedding = cebra_time_model.transform(np.array([traj])) # i guess batch it?
                 fig, ax = plt.subplots(figsize=(8, 6))
                 im = ax.scatter(cebra_embedding[0,:,0], cebra_embedding[0,:,1], cebra_embedding[0,:,2], c=np.linspace(0,1,embedding.shape[0]), cmap='viridis')
 
