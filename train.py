@@ -26,6 +26,8 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 from huggingface_hub import HfApi
 import wandb
 import gc
+import cebra
+from cebra import CEBRA
 gc.collect()
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -78,7 +80,7 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
     diff8 = z_seq[:, 8:] - z_seq[:, :-8]  # (B, T-8, L)
     diff = torch.cat((diff1, diff2, diff4, diff8), axis=1) # (B, 4T-15, L)
     smooth_loss = (diff ** 2).mean()"""
-    loss = InfoNCE(negative_mode='unpaired') 
+    loss = InfoNCE(negative_mode='paired') 
     query = z_seq[:, :-1, :].reshape(-1, L)
     positive_key = z_seq[:, 1:, :].reshape(-1,L)
     negative_keys = z_seq.roll(shifts=T//2, dims=1)[:, :-1, :].reshape(-1, L)
@@ -424,8 +426,12 @@ ABLATION STUDY CONFIGURATION
     val_dataset = IVFSequenceDataset(val_df, resize=128, norm="minmax01")
     print("val size: ", str(len(val_df) / len(df)))
     full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})
-    full_seq_df = full_seq_df[full_seq_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)] # just look at validation ICM embryos
-    full_seq_dataset = IVFEmbryoDataset(full_seq_df, resize=128, norm="minmax01")
+    full_seq_val_mask = full_seq_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
+    full_seq_df_val = full_seq_df[full_sq_df_val_mask] # just look at validation ICM embryos
+    
+    full_seq_df_train = full_seq_df[~full_sq_df_val_mask] # just look at validation ICM embryos
+    full_seq_dataset_val = IVFEmbryoDataset(full_seq_df_val, resize=128, norm="minmax01")
+    full_seq_dataset_train = IVFEmbryoDataset(full_seq_df_train, resize=128, norm="minmax01")
 
     # Create DataLoaders
     loader = DataLoader(
@@ -444,14 +450,34 @@ ABLATION STUDY CONFIGURATION
         pin_memory=True,
         drop_last=False  # Don't drop last for validation
     )
-    full_seq_loader = DataLoader(
-        full_seq_dataset,
+    full_seq_loader_val = DataLoader(
+        full_seq_dataset_val,
         batch_size=1,
         shuffle=False,
         num_workers=16,
         pin_memory=True,
         drop_last=False 
     )
+    full_seq_loader_train = DataLoader(
+        full_seq_dataset_train,
+        batch_size=1,
+        shuffle=False,
+        num_workers=16,
+        pin_memory=True,
+        drop_last=False 
+    )
+    cebra_time_model = CEBRA(model_architecture="offset10-model",
+                        batch_size=512,
+                        learning_rate=1e-2,
+                        temperature=1,
+                        output_dimension=3,
+                        num_hidden_units=128,
+                        max_iterations=max_iterations,
+                        distance="euclidean",
+                        conditional="time",
+                        device="cuda_if_available",
+                        verbose=True,
+                        time_offsets=10)
     epochs = 30
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
 
@@ -515,7 +541,7 @@ ABLATION STUDY CONFIGURATION
                 raise ValueError(f"Invalid loss_type: {loss_type}. Must be 'l1' or 'mse'")
 
             if temporal_weight > 0:
-                smooth_loss = temporal_smoothness_loss(embryo_lat, weight=(epoch/epochs)*temporal_weight) # try to anneal in the smoothness loss, let it learn reconstruction first
+                smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
                 loss = rec_loss + smooth_loss
             else:
                 smooth_loss = torch.tensor(0.0, device=DEVICE)
@@ -699,9 +725,21 @@ ABLATION STUDY CONFIGURATION
         }
         run.log(val_log_dict)
         run.log(val_log_std_dict)
-        rand_img = np.random.randint(150, 250) 
+        cebra_latents = []
+        model.eval()
         with torch.no_grad():
-            for i, embryo_vol in enumerate(full_seq_loader):
+            for embryo_vol in enumerate(full_seq_loader_train):
+                embryo_vol = embryo_vol.to(DEVICE)
+                _, z_seq = model(embryo_vol)
+                traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
+                cebra_latents.append(traj)
+        cebra_time_model.fit(cebra_latents)
+        #cebra_time_model.save("cebra_time_model.pt")
+
+
+        rand_img = np.random.randint(40, 64) 
+        with torch.no_grad():
+            for i, embryo_vol in enumerate(full_seq_loader_val):
                 if i % rand_img != 0:
                     continue
                 embryo_vol = embryo_vol.to(DEVICE) 
@@ -725,9 +763,21 @@ ABLATION STUDY CONFIGURATION
                 ax.set_xlabel("PCA 1")
                 ax.set_ylabel("PCA 2")
                 plt.colorbar(im, ax=ax)
-                wandb.log({"pca": wandb.Image(fig)})
+                wandb.log({"pca_val": wandb.Image(fig)})
 
                 plt.close(fig)                
+                cebra_embedding = cebra_time_model.transform(traj)
+                fig, ax = plt.subplots(figsize=(8, 6))
+                im = ax.scatter(cebra_embedding[0,:,0], cebra_embedding[0,:,1], cebra_embedding[0,:,2], c=np.linspace(0,1,embedding.shape[0]), cmap='viridis')
+
+                ax.set_xlabel("Cebra 1")
+                ax.set_ylabel("Cebra 2")
+                ax.set_ylabel("Cebra 3")
+                plt.colorbar(im, ax=ax)
+                wandb.log({"cebra_val": wandb.Image(fig)})
+
+                plt.close(fig) 
+
 
             
 

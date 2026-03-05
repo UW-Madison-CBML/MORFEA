@@ -63,6 +63,7 @@ export WANDB_KEY=$WANDB_KEY
 export TORCH_DISTRIBUTED_DEBUG=DETAIL
 export NCCL_DEBUG=INFO
 pip install info-nce-pytorch
+pip install cebra
 tar -zxf embryo_dataset.tar.gz
 
 # Create training configuration file for reproducibility
