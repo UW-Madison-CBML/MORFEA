@@ -469,12 +469,12 @@ ABLATION STUDY CONFIGURATION
         drop_last=False 
     )
     cebra_time_model = CEBRA(model_architecture="offset10-model",
-                        batch_size=512,
+                        batch_size=256,
                         learning_rate=1e-2,
                         temperature=1,
                         output_dimension=3,
                         num_hidden_units=128,
-                        max_iterations=3000,
+                        max_iterations=200,
                         distance="euclidean",
                         conditional="time",
                         device="cuda_if_available",
@@ -736,7 +736,7 @@ ABLATION STUDY CONFIGURATION
                 _, z_seq = model(embryo_vol)
                 traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
                 cebra_latents.append(traj)
-                cebra_labels.append(np.arange(len(traj)))
+                cebra_labels.append(np.arange(len(traj)).reshape(-1, 1).astype(np.float32))
         cebra_time_model.fit(cebra_latents, cebra_labels)
         #cebra_time_model.save("cebra_time_model.pt")
 

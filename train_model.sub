@@ -22,8 +22,6 @@ Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
 transfer_input_files = train_model.sh, train.py, model.py, api_keys.txt, dataset_ivf.py, embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, build_index.py, raffael_model.py, raffael_conv_lstm.py, raffael_losses.py, ablation.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, dataset_ivf_embryo.py ,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv
-+WantGPULab = true
-+GPUJobLength = "long"
 gpus_minimum_capability = 7.0
 requirements= Machine=="bhaskargpu4000.chtc.wisc.edu"
  
