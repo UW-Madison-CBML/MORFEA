@@ -154,7 +154,7 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
     model = model.to(DEVICE)
 
     # Get outputs from both models
-    print("testing cosine similariy on half precision model") 
+    """print("testing cosine similariy on half precision model") 
     for idx, embryo_vol in enumerate(loader):
         if idx % 10 != 0:
             continue
@@ -172,7 +172,7 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
 
         print(f"Average Cosine Similarity of model outputs: {similarity_outputs.mean().item()}")
         if(similarity_outputs.mean().item() < 0.98):
-            raise ValueError("bad cosine similarity")
+            raise ValueError("bad cosine similarity")"""
     # Collect all latent vectors
     all_latents = []
     embryo_ids = []
@@ -190,11 +190,11 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
         embryo_id = row.get("embryo_id", f"embryo_{idx}")
 
         # embryo_vol is already (B=1, T, 1, 128, 128) from dataloader
-        embryo_vol = embryo_vol.to(DEVICE).half()
+        embryo_vol = embryo_vol.to(DEVICE) #.half()
 
         with torch.no_grad():
-            with torch.amp.autocast(device_type='cuda', dtype=torch.float16):    
-                _, z_seq = model(embryo_vol)  # z_seq: (B=1, T, 4096)
+            #with torch.amp.autocast(device_type='cuda', dtype=torch.float16):    
+            _, z_seq = model(embryo_vol)  # z_seq: (B=1, T, 4096)
         if(num_latents != z_seq.shape[2]):
             num_latents = z_seq.shape[2] 
         if torch.isinf(z_seq).any():

@@ -1,5 +1,5 @@
 JOB A export_latents.sub
-VARS A model="control-2026-03-01"
+VARS A model="control-2026-03-07"
 #JOB B export_latents.sub
 #VARS B model="model1"
 

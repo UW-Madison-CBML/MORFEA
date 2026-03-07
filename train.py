@@ -469,7 +469,7 @@ ABLATION STUDY CONFIGURATION
         drop_last=False 
     )
     cebra_time_model = CEBRA(model_architecture="offset10-model",
-                        batch_size=256,
+                        batch_size=128,
                         learning_rate=1e-2,
                         temperature=1,
                         output_dimension=3,
@@ -770,13 +770,14 @@ ABLATION STUDY CONFIGURATION
                 wandb.log({"pca_val": wandb.Image(fig)})
 
                 plt.close(fig)                
-                cebra_embedding = cebra_time_model.transform(np.array([traj])) # i guess batch it?
+                cebra_embedding = cebra_time_model.transform(traj, session_id=0) # i guess dont batch it?
                 fig, ax = plt.subplots(figsize=(8, 6))
-                im = ax.scatter(cebra_embedding[0,:,0], cebra_embedding[0,:,1], cebra_embedding[0,:,2], c=np.linspace(0,1,embedding.shape[0]), cmap='viridis')
+                ax = fig.add_subplot(111, projection='3d')
+                im = ax.scatter(cebra_embedding[:,0], cebra_embedding[:,1], cebra_embedding[:,2], c=np.linspace(0,1,cebra_embedding.shape[0]), cmap='viridis')
 
                 ax.set_xlabel("Cebra 1")
                 ax.set_ylabel("Cebra 2")
-                ax.set_ylabel("Cebra 3")
+                ax.set_zlabel("Cebra 3")
                 plt.colorbar(im, ax=ax)
                 wandb.log({"cebra_val": wandb.Image(fig)})
 
