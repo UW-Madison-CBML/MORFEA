@@ -129,8 +129,9 @@ def save_and_push_model(model, repo_name, required_files, model_config=None):
         print(f"Warning: push_to_hub failed ({e}), will upload manually")
 
     model.to(device)
-    model.encoder.lstm_enc.flatten_parameters()
-    model.decoder.lstm_dec.flatten_parameters()
+    if model.decoder.lstm_dec is not None and model.encoder.lstm_enc is not None:
+        model.encoder.lstm_enc.flatten_parameters()
+        model.decoder.lstm_dec.flatten_parameters()
     # Upload all files using HfApi (including config.json)
     api = HfApi()
 
@@ -783,7 +784,24 @@ ABLATION STUDY CONFIGURATION
 
                 plt.close(fig) 
 
+        rand_img = np.random.randint(40, 64) 
+        with torch.no_grad():
+            for i, embryo_vol in enumerate(full_seq_loader_train):
+                if i % rand_img != 0:
+                    continue
+                embryo_vol = embryo_vol.to(DEVICE) 
+                _, z_seq = model(embryo_vol)
+                traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
+                distance_mat = distance_matrix(traj,traj)
+                fig, ax = plt.subplots(figsize=(8, 6))
+                im = ax.imshow(distance_mat, cmap='viridis')
 
+                ax.set_xlabel("Time Index")
+                ax.set_ylabel("Time Index")
+                plt.colorbar(im, ax=ax)
+                wandb.log({"temp_smoothness_train": wandb.Image(fig)})
+
+                plt.close(fig)   
             
 
     run.finish()
