@@ -201,7 +201,7 @@ def export_latents_to_csv(model_name="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-
             raise ValueError("WARNING: Infinite values detected in FP16 latents! (Overflow)")
 
         # Extract the batch dimension
-        z = z_seq[0].cpu().half().numpy()
+        z = z_seq[0].cpu().float().numpy()
         # After you are done with the large tensors in the loop:
         del embryo_vol
         del z_seq
