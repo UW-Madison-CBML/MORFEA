@@ -1,6 +1,6 @@
 # detect_empty_wells.sub
 
-docker_image = jenslundsgaard/ivf-training:latest
+docker_image = jenslundsgaard/ivf-training:v1.2
 universe = docker
 
 shell = ./build_index.sh
