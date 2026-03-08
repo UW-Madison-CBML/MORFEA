@@ -4,15 +4,16 @@ from cebra import CEBRA
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
+import os
 from huggingface_hub import login
 from torch.utils.data import DataLoader
 from dataset_ivf_embryo import IVFEmbryoDataset
 from raffael_model import ConvLSTMAutoencoder
 def main(model_name):
-    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     login(os.getenv("HF_KEY"))
     model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/" + model_name)     
+    model.to(device)
     VAL_EMBRYOS = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"}).dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
     full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})
     full_seq_val_mask = full_seq_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
@@ -57,7 +58,7 @@ def main(model_name):
     model.eval()
     with torch.no_grad():
         for embryo_vol in full_seq_loader_train:
-            embryo_vol = embryo_vol.to(DEVICE)
+            embryo_vol = embryo_vol.to(device)
             _, z_seq = model(embryo_vol)
             traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
             cebra_latents.append(traj)
@@ -70,7 +71,7 @@ def main(model_name):
     with torch.no_grad():
         for i, embryo_vol in enumerate(full_seq_loader_val):
             row = full_seq_df_val.iloc[i] 
-            embryo_vol = embryo_vol.to(DEVICE) 
+            embryo_vol = embryo_vol.to(device) 
             _, z_seq = model(embryo_vol)
             traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
                             
