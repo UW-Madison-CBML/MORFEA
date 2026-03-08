@@ -80,7 +80,7 @@ def fit_circle_curvature(points, how=""):
 
 def calculate_curvatures(trajectory):
     """Calculate curvature for each point in trajectory using sliding window."""
-    offset = 6
+    offset = 20
     curvatures = []
     
     for i in range(len(trajectory)):

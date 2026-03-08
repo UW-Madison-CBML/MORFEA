@@ -1,6 +1,6 @@
 # upload_drive.sub
    
-docker_image = jenslundsgaard/ivf-training:latest
+docker_image = jenslundsgaard/ivf-training:v1.2
 #docker_image = python:3.15.0a6-slim-trixie
 universe = docker
 # Specify your executable (single binary or a script that runs several
@@ -26,7 +26,7 @@ transfer_input_files = upload_drive.py, upload_drive.sh, file:///staging/groups/
  
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
-request_cpus = 4
+request_cpus = 1
 request_memory = 100GB
 request_disk = 100GB
 
