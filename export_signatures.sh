@@ -4,6 +4,6 @@ tar -zxf signatures.tar.gz
 tar -zxf latents.tar.gz
 mkdir -p signatures
 ls -lh
-python export_signatures.py --name control-2026-03-07
+python export_signatures.py --name control-2026-03-08
 
 tar -czvf signatures.tar.gz signatures
