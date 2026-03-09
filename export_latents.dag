@@ -1,6 +1,10 @@
 JOB A export_latents.sub
-VARS A model="control-2026-03-07"
-#JOB B export_latents.sub
-#VARS B model="model1"
+VARS A model="control-2026-03-08"
+JOB B export_latents.sub
+VARS B model="notemp-2026-03-08"
+JOB C export_latents.sub
+VARS C model="nolstm-2026-03-08"
 
-#PARENT A CHILD B
+
+PARENT A CHILD B
+PARENT B CHILD C

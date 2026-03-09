@@ -1,4 +1,3 @@
-import tphate
 import pandas as pd
 import numpy as np
 import scipy
@@ -112,11 +111,7 @@ def flatten_list(nested_list):
 # ig assume embryo timesteps are equally spaced
 def get_quad_tphate_interp(latents, how="PCA", n_components=2):
     X_out = np.zeros((latents.shape[0], n_components))
-    if(how == "TPHATE"):
-        tphate_op = tphate.TPHATE(n_jobs=8, n_components=n_components)
-        X_out = tphate_op.fit_transform(latents) 
-
-    elif(how == "PCA"):
+    if(how == "PCA"):
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(latents)
 
@@ -190,8 +185,7 @@ def get_new_row(group, cell_id, max_len=0):
     interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T if max_len == 0 else group
     #if(np.isnan(interped_latents).any()):
     #    print(f"{cell_id} has nan!!!")
-    curvature = np.array(calculate_curvatures(interped_latents))
-    trajectory = group
+    signature = np.array(calculate_curvatures(interped_latents))
     # Basic velocity
     #velocity = np.linalg.norm(np.diff(trajectory, axis=0), axis=1)
     #features = get_accel_features(velocity)
@@ -204,7 +198,7 @@ def get_new_row(group, cell_id, max_len=0):
             #signature = np.pad(signature, ((0, pad_width), (0, 0)), mode='constant') 
             signature = np.pad(signature, (0, pad_width), mode='constant') 
     #signature = np.concatenate((np.array([val for val in features.values()]), np.array(curvature)))
-    signature = np.array(curvature)
+    #signature = np.array(curvature)
     #    #new_rows.append(signature)
     #    new_rows.append( 
     #new_rows = np.array(new_rows).T 
