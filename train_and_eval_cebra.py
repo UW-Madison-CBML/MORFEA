@@ -15,26 +15,20 @@ def main(model_name):
     model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/" + model_name)     
     model.to(device)
     VAL_EMBRYOS = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"}).dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
-    full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})
+    grades_df = pd.read_csv(os.path.abspath("embryo_dataset_grades.csv")).rename(colunms={"video_name":"embryo_id"}).drop_na(subset=["TE"])[["embryo_id","TE"]]
+
+    full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})    full_seq_df = full_seq_df.merge(grades_df, how="left", left_on="embryo_id", right_on"embryo_id")
     full_seq_val_mask = full_seq_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     full_seq_df_val = full_seq_df[full_seq_val_mask] # just look at validation ICM embryos
     
-    full_seq_df_train = full_seq_df[~full_seq_val_mask] # just look at validation ICM embryos
-    full_seq_dataset_val = IVFEmbryoDataset(full_seq_df_val, resize=128, norm="minmax01")
+    full_seq_df_train = full_seq_df #[~full_seq_val_mask] train on whole dataset # just look at validation ICM embryos
     full_seq_dataset_train = IVFEmbryoDataset(full_seq_df_train, resize=128, norm="minmax01")
 
-    full_seq_loader_val = DataLoader(
-        full_seq_dataset_val,
-        batch_size=1,
-        shuffle=False,
-        num_workers=8,
-        pin_memory=True,
-        drop_last=False 
-    )
+    
     full_seq_loader_train = DataLoader(
         full_seq_dataset_train,
         batch_size=1,
-        shuffle=False,
+        shuffle=True,
         num_workers=8,
         pin_memory=True,
         drop_last=False 
@@ -66,27 +60,44 @@ def main(model_name):
     cebra_time_model.fit(cebra_latents, cebra_labels)
     #cebra_time_model.save("cebra_time_model.pt")
 
-
-    rand_img = np.random.randint(40, 64) 
+    
+    max_imgs = 16
     with torch.no_grad():
-        for i, embryo_vol in enumerate(full_seq_loader_val):
-            row = full_seq_df_val.iloc[i] 
-            embryo_vol = embryo_vol.to(device) 
-            _, z_seq = model(embryo_vol)
-            traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
-                            
-            cebra_embedding = cebra_time_model.transform(traj, session_id=0) # i guess dont batch it?
-            fig, ax = plt.subplots(figsize=(8, 6))
-            ax = fig.add_subplot(111, projection='3d')
-            im = ax.scatter(cebra_embedding[:,0], cebra_embedding[:,1], cebra_embedding[:,2], c=np.linspace(0,1,cebra_embedding.shape[0]), cmap='viridis')
+        for grade in ["A", "B", "C"]:
+            grade_ds = IVFEmbryoDataset(full_seq_df[full_seq_df["embryo_id"] == grade], resize=128, norm="minmax01")
+            grade_loader = DataLoader(
+                grade_ds,
+                batch_size=1,
+                shuffle=False,
+                num_workers=8,
+                pin_memory=True,
+                drop_last=False 
+            )
+            fig, axes = plt.subplots(4, 4, figsize=(20, 20),subplot_kw={'projection': '3d'})
 
-            ax.set_xlabel("Cebra 1")
-            ax.set_ylabel("Cebra 2")
-            ax.set_zlabel("Cebra 3")
-            
-            plt.colorbar(im, ax=ax)
-            
-            fig.savefig(os.path.join("cebra_plots",f"{row['embryo_id']}.png"))
+            axes = axes.ravel()
+
+            for i, embryo_vol in enumerate(grade_loader):
+                if(i >= len(axes)):
+                    break
+                embryo_vol = embryo_vol.to(device) 
+                _, z_seq = model(embryo_vol)
+                traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
+                                
+                cebra_embedding = cebra_time_model.transform(traj, session_id=0) # i guess dont batch it?
+                ax = axes[i]
+                im = ax.scatter(cebra_embedding[:,0], cebra_embedding[:,1], cebra_embedding[:,2], c=np.linspace(0,1,cebra_embedding.shape[0]), cmap='viridis')
+
+                ax.set_xlabel("Cebra 1")
+                ax.set_ylabel("Cebra 2")
+                ax.set_zlabel("Cebra 3")
+                
+            plt.tight_layout(rect=[0, 0, 0.85, 1])
+            fig.subplots_adjust(right=0.85) 
+            cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
+            fig.colorbar(im, cax=cbar_ax, label='Normalized Time')
+ 
+            fig.savefig(os.path.join("cebra_plots",f"{grade}.png"))
             plt.close()
 if __name__ == "__main__":
     import sys

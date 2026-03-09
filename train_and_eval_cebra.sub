@@ -8,7 +8,7 @@ universe = docker
 #  commands) and arguments to be passed to jobs. 
 #  $(Process) will be a integer number for each job, starting with "0"
 #  and increasing for the relevant number of jobs.
-shell = ./train_and_eval_cebra.sh 
+shell = ./train_and_eval_cebra.sh $(model)
    		
 # Specify the name of the log, standard error, and standard output (or
 # "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
@@ -35,4 +35,7 @@ request_disk = 80GB
 request_gpus = 1
 
 
-queue 1
+queue model from (
+
+
+)
