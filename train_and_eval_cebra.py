@@ -15,9 +15,10 @@ def main(model_name):
     model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/" + model_name)     
     model.to(device)
     VAL_EMBRYOS = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"}).dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
-    grades_df = pd.read_csv(os.path.abspath("embryo_dataset_grades.csv")).rename(colunms={"video_name":"embryo_id"}).drop_na(subset=["TE"])[["embryo_id","TE"]]
+    grades_df = pd.read_csv(os.path.abspath("embryo_dataset_grades.csv")).rename(columns={"video_name":"embryo_id"}).dropna(subset=["TE"])[["embryo_id","TE"]]
 
-    full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})    full_seq_df = full_seq_df.merge(grades_df, how="left", left_on="embryo_id", right_on"embryo_id")
+    full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})    
+    full_seq_df = full_seq_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")
     full_seq_val_mask = full_seq_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     full_seq_df_val = full_seq_df[full_seq_val_mask] # just look at validation ICM embryos
     
