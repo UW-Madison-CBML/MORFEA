@@ -32,10 +32,8 @@ request_disk = 80GB
  
  
 queue model from (
-control-2026-02-20
-noconv-2026-02-20
-notemp-2026-02-20
-s64-2026-02-20
-s128-2026-02-20
-s256-2026-02-20
+notemp-2026-03-08
+nolstm-2026-03-08
+control-2026-03-08
 )
+
