@@ -80,6 +80,7 @@ PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7
 from scipy.spatial import distance_matrix
 from sklearn.preprocessing import StandardScaler
 import matplotlib
+from sklearn.cluster import AgglomerativeClustering
 def addAnnotations(group_name, group, annotations_dir):
     annotation_file = os.path.join(annotations_dir, f"{group_name}_phases.csv")
     df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
@@ -122,7 +123,15 @@ def addAnnotations(group_name, group, annotations_dir):
     ax.set_position([0.1, 0.1, 0.65, 0.8]) 
     plt.savefig(os.path.join("stage_clusters", f"{group_name}_umap.png"), dpi=300, bbox_inches='tight')
     plt.close()
-    kmedoids = KMedoids(n_clusters=18, random_state=0, method="pam")
+    #kmedoids = KMedoids(n_clusters=18, random_state=0, method="pam")
+    num_samples = len(mat_embedding)
+    connectivity_mat = np.zeros((num_samples,num_samples)) 
+    for i in range(num_samples):
+        if i > 0:
+            connectivity_mat[i, i-1] = 1
+        if i < num_samples - 1:
+            connectivity_mat[i, i+1] = 1
+    kmedoids = AgglomerativeClustering(n_clusters=18, metric='euclidean', connectivity=connectivity_mat, linkage="ward") # enforce temporal continuity
 
     kmedoids.fit(mat_embedding)
 
@@ -137,7 +146,6 @@ def addAnnotations(group_name, group, annotations_dir):
     plt.savefig(os.path.join("stage_clusters", f"{group_name}_clusters.png"), dpi=300, bbox_inches='tight')
 
     plt.close()
-    print(group_name)
     phase = [PHASES[i] for i in group['phase'].to_numpy()]
     
     mat_ari = adjusted_rand_score(phase, mat_labels)
@@ -146,7 +154,6 @@ def addAnnotations(group_name, group, annotations_dir):
     #traj_nmi = normalized_mutual_info_score(phase, traj_labels)
     out_df = pd.DataFrame({"embryo_id":group_name, "nmi":mat_nmi, "ari":mat_ari}, index=[0])
     confusion_df = pd.crosstab(mat_labels, pd.Categorical(phase, categories=PHASES), dropna=False)
-    print(confusion_df.columns)
     for col in confusion_df:  
         prominence = confusion_df.loc[confusion_df[col].idxmax()][col] /( 0.000001 + confusion_df[col].sum())
         out_df[col] = [prominence]
