@@ -146,18 +146,25 @@ def addAnnotations(group_name, group, annotations_dir, curvature = True, velocit
     trajectory = group[lat_cols].values
 
     if (curvature):
-        group["z_curvature_6"] = calculate_curvatures(group, 12)
-        group["z_curvature_10"] = calculate_curvatures(group, 20)
-        group["z_curvature_2"] = calculate_curvatures(group, 4)
+        group["z_curvature_12"] = calculate_curvatures(group, 12)
+        group["z_curvature_12"] = group["z_curvature_12"] * (1 / (group["z_curvature_12"].std() + 0.0001))
+        group["z_curvature_20"] = calculate_curvatures(group, 20)
+        group["z_curvature_20"] = group["z_curvature_20"] * (1 / (group["z_curvature_20"].std() + 0.0001))
+        group["z_curvature_4"] = calculate_curvatures(group, 4)
+        group["z_curvature_4"] = group["z_curvature_4"] * (1 / (group["z_curvature_4"].std() + 0.0001))
+
 
     if (path_signatures != None):
-        
+        print("")
     if(distance_mat):
         mat = distance_matrix(np.array([trajectory[0]]), trajectory).flatten()
         
         group["z_dist"] = mat
+    
     if(acceleration):
-        
+        group["z_speed"] = group[lat_cols].diff(axis=0).fillna(0).mean(axis=1)
+        group["z_acc"] = group[lat_cols].diff(axis=0).fillna(0)
+         
 
 
     if (not latents):
