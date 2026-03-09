@@ -25,6 +25,7 @@ transfer_input_files = train_and_eval_cebra.sh, train_and_eval_cebra.py, api_key
 gpus_minimum_capability = 7.0
 requirements= Machine=="bhaskargpu4000.chtc.wisc.edu"
 transfer_output_files = cebra_plots.tar.gz 
+transfer_output_remaps = "cebra_plots.tar.gz = $(model)_cebra_plots.tar.gz;"
 +GPUModel = "NVIDIA H200"
 #transfer_output_files = model_weights.pth 
 # Requirements (e.g., operating system) your job needs, what amount of
