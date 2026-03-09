@@ -47,7 +47,7 @@ def main(model_name):
                         device="cuda_if_available",
                         verbose=True,
                         time_offsets=10)
- 
+    print(model_name) 
     cebra_latents = []
     cebra_labels = []
     model.eval()
