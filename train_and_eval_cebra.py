@@ -85,20 +85,32 @@ def main(model_name):
             )
             print(len(grade_loader))
             fig, axes = plt.subplots(4, 4, figsize=(20, 20),subplot_kw={'projection': '3d'})
-
-            axes = axes.ravel()
-            im = None
-            for i, embryo_vol in enumerate(grade_loader):
-                if(i >= len(axes)):
+            d3_trajs = []
+            for j, embryo_vol in enumerate(grade_loader):
+                if(j >= len(axes)):
                     break
                 embryo_vol = embryo_vol.to(device) 
                 _, z_seq = model(embryo_vol)
                 traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
-                print(f"running cebra {i}")                
                 cebra_embedding = cebra_time_model.transform(traj) # i guess dont batch it?
-                ax = axes[i]
-                im = ax.scatter(cebra_embedding[:,0], cebra_embedding[:,1], cebra_embedding[:,2], c=np.linspace(0,1,cebra_embedding.shape[0]), cmap='viridis')
+                d3_trajs.append(cebra_embedding)
+            del embryo_vol, z_seq
+            x_list = [x for t in d3_trajs for x in t[:, 0]]
+            y_list = [y for t in d3_trajs for y in t[:, 1]]
+            z_list = [z for t in d3_trajs for z in t[:, 2]]
+            x_lim = (min(x_list),max(x_list))
+            y_lim = (min(y_list),max(y_list))
+            z_lim = (min(z_list),max(z_list))
 
+            axes = axes.ravel()
+            im = None
+            for i, d3_traj in enumerate(d3_trajs):
+                ax = axes[i]
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1,cebra_embedding.shape[0]), cmap='viridis')
+                
+                ax.set_xlim(x_lim)
+                ax.set_ylim(y_lim)
+                ax.set_zlim(z_lim) 
                 ax.set_xlabel("Cebra 1")
                 ax.set_ylabel("Cebra 2")
                 ax.set_zlabel("Cebra 3")
@@ -110,7 +122,26 @@ def main(model_name):
                 fig.colorbar(im, cax=cbar_ax, label='Normalized Time')
  
             fig.savefig(os.path.join("cebra_plots",f"{grade}.png"))
+            fig, ax = plt.subplots(figsize=(20, 20))
+            im = None
+            for i, d3_traj in enumerate(d3_trajs):
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1,cebra_embedding.shape[0]), cmap='viridis')
+                
+            ax.set_xlim(x_lim)
+            ax.set_ylim(y_lim)
+            ax.set_zlim(z_lim) 
+            ax.set_xlabel("Cebra 1")
+            ax.set_ylabel("Cebra 2")
+            ax.set_zlabel("Cebra 3")
+                
+            plt.tight_layout(rect=[0, 0, 0.85, 1])
+            fig.subplots_adjust(right=0.85) 
+            cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
+            if im is not None:
+                fig.colorbar(im, cax=cbar_ax, label='Normalized Time')
+            fig.savefig(os.path.join("cebra_plots",f"grouped_{grade}.png"))
             plt.close()
+
 if __name__ == "__main__":
     import sys
     main(sys.argv[1])
