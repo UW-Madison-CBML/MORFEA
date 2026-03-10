@@ -52,6 +52,7 @@ def main(model_name):
     print(model_name) 
     cebra_latents = []
     cebra_labels = []
+    offset = 0
     model.eval()
     with torch.no_grad():
         for embryo_vol in full_seq_loader_train:
@@ -59,12 +60,13 @@ def main(model_name):
             _, z_seq = model(embryo_vol)
             traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
             cebra_latents.append(traj)
-            cebra_labels.append(np.arange(len(traj)).reshape(-1, 1).astype(np.float32))
+            cebra_labels.append((np.arange(len(traj)) + offset).reshape(-1, 1).astype(np.float32))
+            offset += len(traj) + 10000
     import gc
     del embryo_vol, z_seq 
     gc.collect()
     torch.cuda.empty_cache()
-    cebra_time_model.fit(cebra_latents, session_id =np.zeros(sum([len(seq) for seq in cebra_latents]), dtype=int))
+    cebra_time_model.fit(np.concatenate(cebra_latents, axis=0), np.concatenate(cebra_labels, axis=0))
     cebra_time_model.save(f"{model_name}_cebra_time_model.pt")
 
     torch.cuda.empty_cache()
@@ -93,7 +95,7 @@ def main(model_name):
                 _, z_seq = model(embryo_vol)
                 traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
                 print(f"running cebra {i}")                
-                cebra_embedding = cebra_time_model.transform(traj,session_id=0) # i guess dont batch it?
+                cebra_embedding = cebra_time_model.transform(traj) # i guess dont batch it?
                 ax = axes[i]
                 im = ax.scatter(cebra_embedding[:,0], cebra_embedding[:,1], cebra_embedding[:,2], c=np.linspace(0,1,cebra_embedding.shape[0]), cmap='viridis')
 
