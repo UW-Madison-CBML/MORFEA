@@ -1,6 +1,7 @@
 import cebra
 import torch
 from cebra import CEBRA
+import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use('Agg') 
 import numpy as np
@@ -37,17 +38,17 @@ def main(model_name):
     )
  
     cebra_time_model = CEBRA(model_architecture="offset10-model",
-                        batch_size=128,
+                        batch_size=512,
                         learning_rate=1e-2,
-                        temperature=1,
+                        temperature=0.5,
                         output_dimension=3,
                         num_hidden_units=128,
-                        max_iterations=3000,
+                        max_iterations=5000,
                         distance="euclidean",
                         conditional="time",
                         device="cuda_if_available",
                         verbose=True,
-                        time_offsets=10)
+                        time_offsets=20)
     print(model_name) 
     cebra_latents = []
     cebra_labels = []
@@ -59,7 +60,11 @@ def main(model_name):
             traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
             cebra_latents.append(traj)
             cebra_labels.append(np.arange(len(traj)).reshape(-1, 1).astype(np.float32))
-    cebra_time_model.fit(cebra_latents, cebra_labels)
+    import gc
+    del embryo_vol, z_seq 
+    gc.collect()
+    torch.cuda.empty_cache()
+    cebra_time_model.fit(cebra_latents, session_id =np.zeros(sum([len(seq) for seq in cebra_latents]), dtype=int))
     cebra_time_model.save(f"{model_name}_cebra_time_model.pt")
 
     torch.cuda.empty_cache()
