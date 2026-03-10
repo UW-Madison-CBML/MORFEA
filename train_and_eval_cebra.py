@@ -40,7 +40,7 @@ def main(model_name):
     cebra_time_model = CEBRA(model_architecture="offset10-model",
                         batch_size=512,
                         learning_rate=1e-2,
-                        temperature=0.5,
+                        temperature=1.0,
                         output_dimension=3,
                         num_hidden_units=128,
                         max_iterations=5000,
@@ -48,7 +48,7 @@ def main(model_name):
                         conditional="time",
                         device="cuda_if_available",
                         verbose=True,
-                        time_offsets=20)
+                        time_offsets=10)
     print(model_name) 
     cebra_latents = []
     cebra_labels = []
@@ -85,6 +85,7 @@ def main(model_name):
             )
             print(len(grade_loader))
             fig, axes = plt.subplots(4, 4, figsize=(20, 20),subplot_kw={'projection': '3d'})
+            axes = axes.ravel()
             d3_trajs = []
             for j, embryo_vol in enumerate(grade_loader):
                 if(j >= len(axes)):
@@ -102,15 +103,14 @@ def main(model_name):
             y_lim = (min(y_list),max(y_list))
             z_lim = (min(z_list),max(z_list))
 
-            axes = axes.ravel()
             im = None
             for i, d3_traj in enumerate(d3_trajs):
                 ax = axes[i]
-                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1,cebra_embedding.shape[0]), cmap='viridis')
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1,d3_traj.shape[0]), cmap='viridis')
                 
                 ax.set_xlim(x_lim)
                 ax.set_ylim(y_lim)
-                ax.set_zlim(z_lim) 
+                ax.set_zlim3d(z_lim) 
                 ax.set_xlabel("Cebra 1")
                 ax.set_ylabel("Cebra 2")
                 ax.set_zlabel("Cebra 3")
@@ -122,14 +122,14 @@ def main(model_name):
                 fig.colorbar(im, cax=cbar_ax, label='Normalized Time')
  
             fig.savefig(os.path.join("cebra_plots",f"{grade}.png"))
-            fig, ax = plt.subplots(figsize=(20, 20))
+            fig, ax = plt.subplots(figsize=(20, 20), subplot_kw={'projection': '3d'})
             im = None
             for i, d3_traj in enumerate(d3_trajs):
-                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1,cebra_embedding.shape[0]), cmap='viridis')
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1,d3_traj.shape[0]), cmap='viridis')
                 
             ax.set_xlim(x_lim)
             ax.set_ylim(y_lim)
-            ax.set_zlim(z_lim) 
+            ax.set_zlim3d(z_lim) 
             ax.set_xlabel("Cebra 1")
             ax.set_ylabel("Cebra 2")
             ax.set_zlabel("Cebra 3")
