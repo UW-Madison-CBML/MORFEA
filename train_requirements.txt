@@ -51,3 +51,4 @@ scikit-learn-extra
 seaborn
 cebra
 info-nce-pytorch
+ruff
