@@ -11,10 +11,10 @@ from huggingface_hub import login
 from torch.utils.data import DataLoader
 from dataset_ivf_embryo import IVFEmbryoDataset
 from raffael_model import ConvLSTMAutoencoder
-
+from matplotlib.patches import Patch
 PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
 def get_phases(embryo_id, seq_len):
-    annotation_file = os.path.join(annotations_dir, f"{embryo_id}_phases.csv")
+    annotation_file = os.path.join("embryo_dataset_annotations", f"{embryo_id}_phases.csv")
     df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
 
     new_column = []
@@ -34,19 +34,21 @@ def get_phases(embryo_id, seq_len):
 
 
 def main(model_name):
+    HOLDOUT = True
+    GRADE = "ICM"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     login(os.getenv("HF_KEY"))
     model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/" + model_name)     
     model.to(device)
     VAL_EMBRYOS = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"}).dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
-    grades_df = pd.read_csv(os.path.abspath("embryo_dataset_grades.csv")).rename(columns={"video_name":"embryo_id"}).dropna(subset=["TE"])[["embryo_id","TE"]]
+    grades_df = pd.read_csv(os.path.abspath("embryo_dataset_grades.csv")).rename(columns={"video_name":"embryo_id"}).dropna(subset=[GRADE])[["embryo_id",GRADE]]
 
     full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})    
     full_seq_df = full_seq_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")
     full_seq_val_mask = full_seq_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
-    full_seq_df_val = full_seq_df[full_seq_val_mask] # just look at validation ICM embryos
+    full_seq_df_val = (full_seq_df[full_seq_val_mask] if HOLDOUT else full_seq_df) # just look at validation ICM embryos
     
-    full_seq_df_train = full_seq_df #[~full_seq_val_mask] train on whole dataset # just look at validation ICM embryos
+    full_seq_df_train = (full_seq_df[~full_seq_val_mask] if HOLDOUT else full_seq_df) # just look at validation ICM embryos
     full_seq_dataset_train = IVFEmbryoDataset(full_seq_df_train, resize=128, norm="minmax01")
 
     
@@ -95,8 +97,10 @@ def main(model_name):
     
     max_imgs = 16
     with torch.no_grad():
+        grade_fig, grade_ax = plt.subplots(figsize=(20,20), subplot_kw={'projection': '3d'})
+        im_grade = None
         for grade in ["A", "B", "C"]:
-            grade_ds = IVFEmbryoDataset(full_seq_df[full_seq_df["TE"] == grade], resize=128, norm="minmax01")
+            grade_ds = IVFEmbryoDataset(full_seq_df_val[full_seq_df_val[GRADE] == grade], resize=128, norm="minmax01")
             grade_loader = DataLoader(
                 grade_ds,
                 batch_size=1,
@@ -129,12 +133,13 @@ def main(model_name):
 
             im = None
             for i, d3_traj in enumerate(d3_trajs):
+                im_grade = grade_ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.ones((d3_traj.shape[0],)) * (["A","B","C"].index(grade) / 3), cmap='viridis')
                 ax = axes[i]
                 im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1,d3_traj.shape[0]), cmap='viridis')
                 
                 ax.set_xlim(x_lim)
                 ax.set_ylim(y_lim)
-                ax.set_zlim3d(z_lim) 
+                ax.set_zlim(z_lim) 
                 ax.set_xlabel("Cebra 1")
                 ax.set_ylabel("Cebra 2")
                 ax.set_zlabel("Cebra 3")
@@ -146,10 +151,12 @@ def main(model_name):
                 fig.colorbar(im, cax=cbar_ax, label='Normalized Time')
  
             fig.savefig(os.path.join("cebra_plots",f"{grade}.png"))
+            plt.close()
+                    
             fig, ax = plt.subplots(figsize=(20, 20), subplot_kw={'projection': '3d'})
             im = None
             for i, d3_traj in enumerate(d3_trajs):
-                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1,d3_traj.shape[0]), cmap='viridis')
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1, d3_traj.shape[0]), cmap='viridis')
                 
             ax.set_xlim(x_lim)
             ax.set_ylim(y_lim)
@@ -170,7 +177,7 @@ def main(model_name):
             axes = axes.ravel()
             im = None
             legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) 
-                   for i, phase in PHASES]
+                   for i, phase in enumerate(PHASES)]
 
             for i, d3_traj in enumerate(d3_trajs):
                 embryo_id = d3_traj_ids[i]
@@ -208,6 +215,67 @@ def main(model_name):
             fig.legend(handles=legend_elements, title="Phases") 
             fig.savefig(os.path.join("cebra_plots",f"phase_grouped_{grade}.png"))
             plt.close()
+            # now velocity
+            fig, axes = plt.subplots(4, 4, figsize=(20, 20),subplot_kw={'projection': '3d'})
+            axes = axes.ravel()
+            im = None
+            vels = []
+            for i, d3_traj in enumerate(d3_trajs):
+                vel = np.concatenate((d3_traj.diff(axis=0).mean(axis=1), np.array([0])))
+                vel = vel / val.max()
+                vels.append(vel)
+                ax = axes[i]
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=vel, cmap='viridis')
+                
+                ax.set_xlim(x_lim)
+                ax.set_ylim(y_lim)
+                ax.set_zlim(z_lim) 
+                ax.set_xlabel("Cebra 1")
+                ax.set_ylabel("Cebra 2")
+                ax.set_zlabel("Cebra 3")
+                
+            plt.tight_layout(rect=[0, 0, 0.85, 1])
+            fig.subplots_adjust(right=0.85) 
+            cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
+            if im is not None:
+                fig.colorbar(im, cax=cbar_ax, label='Normalized Velocity')
+ 
+            fig.savefig(os.path.join("cebra_plots",f"vel_{grade}.png"))
+            fig, ax = plt.subplots(figsize=(20, 20), subplot_kw={'projection': '3d'})
+            im = None
+            for i, d3_traj in enumerate(d3_trajs):
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=vels[i], cmap='viridis')
+                
+            ax.set_xlim(x_lim)
+            ax.set_ylim(y_lim)
+            ax.set_zlim(z_lim) 
+            ax.set_xlabel("Cebra 1")
+            ax.set_ylabel("Cebra 2")
+            ax.set_zlabel("Cebra 3")
+                
+            plt.tight_layout(rect=[0, 0, 0.85, 1])
+            fig.subplots_adjust(right=0.85) 
+            cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
+            if im is not None:
+                fig.colorbar(im, cax=cbar_ax, label='Normalized Vel')
+            fig.savefig(os.path.join("cebra_plots",f"vel_grouped_{grade}.png"))
+            plt.close()
+        # do all the grade stuff now
+        grade_ax.set_xlim(x_lim)
+        grade_ax.set_ylim(y_lim)
+        grade_ax.set_zlim(z_lim) 
+        grade_ax.set_xlabel("Cebra 1")
+        grade_ax.set_ylabel("Cebra 2")
+        grade_ax.set_zlabel("Cebra 3")
+        plt.tight_layout(rect=[0, 0, 0.85, 1])
+        grade_fig.subplots_adjust(right=0.85) 
+        cbar_ax = grade_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
+        if im_grade is not None:
+            fig.colorbar(im_grade, cax=cbar_ax, label='Normalized Time')
+
+        grade_fig.savefig(os.path.join("cebra_plots",f"{grade}.png"))
+        plt.close()
+
 
 
 if __name__ == "__main__":
