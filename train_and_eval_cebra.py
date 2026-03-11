@@ -37,10 +37,10 @@ def main(model_name):
         drop_last=False 
     )
  
-    cebra_time_model = CEBRA(model_architecture="offset10-model",
+    cebra_time_model = CEBRA(model_architecture="offset10-model-mse",
                         batch_size=512,
-                        learning_rate=1e-2,
-                        temperature=1.0,
+                        learning_rate=2e-5,
+                        temperature=10,
                         output_dimension=3,
                         num_hidden_units=128,
                         max_iterations=5000,
