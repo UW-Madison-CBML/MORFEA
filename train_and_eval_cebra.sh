@@ -1,5 +1,5 @@
 #!/bin/bash
-
+python -m ruff check .
 mkdir cebra_plots
 
 tar -xvf embryo_dataset.tar.gz
