@@ -11,6 +11,28 @@ from huggingface_hub import login
 from torch.utils.data import DataLoader
 from dataset_ivf_embryo import IVFEmbryoDataset
 from raffael_model import ConvLSTMAutoencoder
+
+PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
+def get_phases(embryo_id, seq_len):
+    annotation_file = os.path.join(annotations_dir, f"{embryo_id}_phases.csv")
+    df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
+
+    new_column = []
+    lat_cols = [column for column in group.columns if column.startswith("z_")]
+    
+    new_column += ["pre_phase"] * (df.iloc[0]["stage_begin"] - 1)
+    col_len_seq = []
+    for index, row in df.iterrows():
+        new_column += [row["stage_id"]] * (row["stage_end"] - row["stage_begin"]+1)
+        col_len_seq.append(len(new_column))
+
+    
+    new_column += ["post_phase"] * (seq_len - len(new_column))
+    new_column = new_column[:seq_len]
+    
+    return np.array([PHASES.index(phase) for phase in new_column]) 
+
+
 def main(model_name):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     login(os.getenv("HF_KEY"))
@@ -87,9 +109,11 @@ def main(model_name):
             fig, axes = plt.subplots(4, 4, figsize=(20, 20),subplot_kw={'projection': '3d'})
             axes = axes.ravel()
             d3_trajs = []
+            d3_traj_ids = []
             for j, embryo_vol in enumerate(grade_loader):
                 if(j >= len(axes)):
                     break
+                d3_traj_ids.append(grade_ds.df.iloc[j]["embryo_id"])
                 embryo_vol = embryo_vol.to(device) 
                 _, z_seq = model(embryo_vol)
                 traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
@@ -141,6 +165,50 @@ def main(model_name):
                 fig.colorbar(im, cax=cbar_ax, label='Normalized Time')
             fig.savefig(os.path.join("cebra_plots",f"grouped_{grade}.png"))
             plt.close()
+            # color by phases now
+            fig, axes = plt.subplots(4, 4, figsize=(20, 20),subplot_kw={'projection': '3d'})
+            axes = axes.ravel()
+            im = None
+            legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) 
+                   for i, phase in PHASES]
+
+            for i, d3_traj in enumerate(d3_trajs):
+                embryo_id = d3_traj_ids[i]
+                c_phase = get_phases(embryo_id, len(d3_traj))
+                ax = axes[i]
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=c_phase, cmap='tab20c', vmin=0, vmax=19)
+                
+                ax.set_xlabel("Cebra 1")
+                ax.set_ylabel("Cebra 2")
+                ax.set_zlabel("Cebra 3")
+                
+            plt.tight_layout(rect=[0, 0, 0.85, 1])
+            fig.subplots_adjust(right=0.85) 
+            cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
+            fig.legend(handles=legend_elements, title="Phases") 
+            fig.savefig(os.path.join("cebra_plots",f"phases_{grade}.png"))
+            plt.close()
+            
+            fig, ax = plt.subplots(figsize=(20, 20), subplot_kw={'projection': '3d'})
+            for i, d3_traj in enumerate(d3_trajs):
+                embryo_id = d3_traj_ids[i]
+                c_phase = get_phases(embryo_id, len(d3_traj))
+                ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=c_phase, cmap='tab20c', vmin=0, vmax=19)
+                
+            ax.set_xlim(x_lim)
+            ax.set_ylim(y_lim)
+            ax.set_zlim(z_lim) 
+            ax.set_xlabel("Cebra 1")
+            ax.set_ylabel("Cebra 2")
+            ax.set_zlabel("Cebra 3")
+                
+            plt.tight_layout(rect=[0, 0, 0.85, 1])
+            fig.subplots_adjust(right=0.85) 
+            cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
+            fig.legend(handles=legend_elements, title="Phases") 
+            fig.savefig(os.path.join("cebra_plots",f"phase_grouped_{grade}.png"))
+            plt.close()
+
 
 if __name__ == "__main__":
     import sys
