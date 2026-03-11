@@ -22,7 +22,7 @@ when_to_transfer_output = ON_EXIT_OR_EVICT
 Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
-transfer_input_files = train_and_eval_cebra.sh, train_and_eval_cebra.py, api_keys.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, build_index.py, raffael_model.py, raffael_conv_lstm.py, raffael_losses.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, dataset_ivf_embryo.py ,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv
+transfer_input_files = train_and_eval_cebra.sh, train_and_eval_cebra.py, api_keys.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, build_index.py, raffael_model.py, raffael_conv_lstm.py, raffael_losses.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, dataset_ivf_embryo.py ,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz
 gpus_minimum_capability = 7.0
 requirements= Machine=="bhaskargpu4000.chtc.wisc.edu"
 transfer_output_files = cebra_plots.tar.gz, $(model)_cebra_time_model.pt

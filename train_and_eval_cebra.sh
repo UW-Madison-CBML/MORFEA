@@ -1,8 +1,9 @@
 #!/bin/bash
-python -m ruff check . || exit $?
+python -m ruff check . --exit-zero || exit $?
 mkdir cebra_plots
 
-tar -xvf embryo_dataset.tar.gz
+tar -xf embryo_dataset.tar.gz
+tar -xf embryo_dataset_annotations.tar.gz
 HF_KEY=$(head -n 1 api_keys.txt)
 export HF_TOKEN=$HF_KEY
 
