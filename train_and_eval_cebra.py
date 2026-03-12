@@ -34,7 +34,7 @@ def get_phases(embryo_id, seq_len):
 
 def main(model_name):
     HOLDOUT = True
-    GRADE = "ICM"
+    GRADE = "TE"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     login(os.getenv("HF_KEY"))
     model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/" + model_name)     
@@ -42,6 +42,8 @@ def main(model_name):
     VAL_EMBRYOS = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"}).dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
     grades_df = pd.read_csv(os.path.abspath("embryo_dataset_grades.csv")).rename(columns={"video_name":"embryo_id"}).dropna(subset=[GRADE])[["embryo_id",GRADE]]
 
+    latents_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv"))
+    
     full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})    
     full_seq_df = full_seq_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")
     full_seq_val_mask = full_seq_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
@@ -98,8 +100,8 @@ def main(model_name):
     with torch.no_grad():
         grade_fig, grade_ax = plt.subplots(figsize=(20,20), subplot_kw={'projection': '3d'})
         all_x, all_y, all_z = [], [], [] 
-        for grade,g_color in zip(["A", "B", "C"], [0,0.5,0.99]):
-            grade_ds = IVFEmbryoDataset(full_seq_df_val[full_seq_df_val[GRADE] == grade], resize=128, norm="minmax01")
+        for grade,g_color in zip(["A", "B", "C"], [0,0.5,1]):
+            grade_ds = IVFEmbryoDataset(full_seq_df[full_seq_df[GRADE] == grade], resize=128, norm="minmax01")
             grade_loader = DataLoader(
                 grade_ds,
                 batch_size=1,
@@ -153,7 +155,7 @@ def main(model_name):
                 fig.colorbar(im, cax=cbar_ax, label='Normalized Time')
  
             fig.savefig(os.path.join("cebra_plots",f"{grade}.png"))
-                    
+            plt.close(fig) 
             fig, ax = plt.subplots(figsize=(20, 20), subplot_kw={'projection': '3d'})
             im = None
             for i, d3_traj in enumerate(d3_trajs):
@@ -172,6 +174,7 @@ def main(model_name):
             if im is not None:
                 fig.colorbar(im, cax=cbar_ax, label='Normalized Time')
             fig.savefig(os.path.join("cebra_plots",f"grouped_{grade}.png"))
+            plt.close(fig)
             # color by phases now
             fig, axes = plt.subplots(4, 4, figsize=(20, 20),subplot_kw={'projection': '3d'})
             axes = axes.ravel()
@@ -194,7 +197,7 @@ def main(model_name):
             cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
             fig.legend(handles=legend_elements, title="Phases") 
             fig.savefig(os.path.join("cebra_plots",f"phases_{grade}.png"))
-            
+            plt.close(fig) 
             fig, ax = plt.subplots(figsize=(20, 20), subplot_kw={'projection': '3d'})
             for i, d3_traj in enumerate(d3_trajs):
                 embryo_id = d3_traj_ids[i]
@@ -214,6 +217,7 @@ def main(model_name):
             fig.legend(handles=legend_elements, title="Phases") 
             fig.savefig(os.path.join("cebra_plots",f"phase_grouped_{grade}.png"))
             # now velocity
+            plt.close(fig)
             fig, axes = plt.subplots(4, 4, figsize=(20, 20),subplot_kw={'projection': '3d'})
             axes = axes.ravel()
             im = None
