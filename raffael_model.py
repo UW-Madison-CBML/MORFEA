@@ -174,7 +174,7 @@ class Encoder(nn.Module):
         z_compressed = F.relu(self.latent_compress(z_compressed))
         if self.use_convlstm:
             z_compressed, _ = self.lstm_enc(z_compressed)
-        z_compressed = F.relu(self.lin1(z_compressed))
+        z_compressed = self.lin1(z_compressed)
         z_seq = z_compressed.view(B, T, self.latent_size)  
 
 
