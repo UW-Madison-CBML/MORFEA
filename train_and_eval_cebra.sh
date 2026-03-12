@@ -1,5 +1,5 @@
 #!/bin/bash
-python -m ruff check . --exit-zero || exit $?
+python -m ruff check . --select F821,E9 || exit 1
 mkdir cebra_plots
 
 tar -xf embryo_dataset.tar.gz

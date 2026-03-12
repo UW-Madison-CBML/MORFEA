@@ -18,7 +18,6 @@ def get_phases(embryo_id, seq_len):
     df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
 
     new_column = []
-    lat_cols = [column for column in group.columns if column.startswith("z_")]
     
     new_column += ["pre_phase"] * (df.iloc[0]["stage_begin"] - 1)
     col_len_seq = []
@@ -98,8 +97,8 @@ def main(model_name):
     max_imgs = 16
     with torch.no_grad():
         grade_fig, grade_ax = plt.subplots(figsize=(20,20), subplot_kw={'projection': '3d'})
-        im_grade = None
-        for grade in ["A", "B", "C"]:
+        all_x, all_y, all_z = [], [], [] 
+        for grade,g_color in zip(["A", "B", "C"], [0,0.5,0.99]):
             grade_ds = IVFEmbryoDataset(full_seq_df_val[full_seq_df_val[GRADE] == grade], resize=128, norm="minmax01")
             grade_loader = DataLoader(
                 grade_ds,
@@ -130,10 +129,13 @@ def main(model_name):
             x_lim = (min(x_list),max(x_list))
             y_lim = (min(y_list),max(y_list))
             z_lim = (min(z_list),max(z_list))
-
+             # Track limits for the master plot
+            all_x.extend([x for t in d3_trajs for x in t[:, 0]])
+            all_y.extend([y for t in d3_trajs for y in t[:, 1]])
+            all_z.extend([z for t in d3_trajs for z in t[:, 2]])
             im = None
             for i, d3_traj in enumerate(d3_trajs):
-                im_grade = grade_ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.ones((d3_traj.shape[0],)) * (["A","B","C"].index(grade) / 3), cmap='viridis')
+                im_grade = grade_ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.full((d3_traj.shape[0],), g_color), cmap='viridis', vmin=0, vmax=1)
                 ax = axes[i]
                 im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1,d3_traj.shape[0]), cmap='viridis')
                 
@@ -151,12 +153,11 @@ def main(model_name):
                 fig.colorbar(im, cax=cbar_ax, label='Normalized Time')
  
             fig.savefig(os.path.join("cebra_plots",f"{grade}.png"))
-            plt.close()
                     
             fig, ax = plt.subplots(figsize=(20, 20), subplot_kw={'projection': '3d'})
             im = None
             for i, d3_traj in enumerate(d3_trajs):
-                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1, d3_traj.shape[0]), cmap='viridis')
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1, d3_traj.shape[0]), cmap='viridis', vmin=0, vmax=1)
                 
             ax.set_xlim(x_lim)
             ax.set_ylim(y_lim)
@@ -171,7 +172,6 @@ def main(model_name):
             if im is not None:
                 fig.colorbar(im, cax=cbar_ax, label='Normalized Time')
             fig.savefig(os.path.join("cebra_plots",f"grouped_{grade}.png"))
-            plt.close()
             # color by phases now
             fig, axes = plt.subplots(4, 4, figsize=(20, 20),subplot_kw={'projection': '3d'})
             axes = axes.ravel()
@@ -194,7 +194,6 @@ def main(model_name):
             cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
             fig.legend(handles=legend_elements, title="Phases") 
             fig.savefig(os.path.join("cebra_plots",f"phases_{grade}.png"))
-            plt.close()
             
             fig, ax = plt.subplots(figsize=(20, 20), subplot_kw={'projection': '3d'})
             for i, d3_traj in enumerate(d3_trajs):
@@ -214,15 +213,14 @@ def main(model_name):
             cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
             fig.legend(handles=legend_elements, title="Phases") 
             fig.savefig(os.path.join("cebra_plots",f"phase_grouped_{grade}.png"))
-            plt.close()
             # now velocity
             fig, axes = plt.subplots(4, 4, figsize=(20, 20),subplot_kw={'projection': '3d'})
             axes = axes.ravel()
             im = None
             vels = []
             for i, d3_traj in enumerate(d3_trajs):
-                vel = np.concatenate((d3_traj.diff(axis=0).mean(axis=1), np.array([0])))
-                vel = vel / val.max()
+                vel = np.concatenate((np.diff(d3_traj, axis=0).mean(axis=1), np.array([0])))
+                vel = vel / vel.max()
                 vels.append(vel)
                 ax = axes[i]
                 im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=vel, cmap='viridis')
@@ -259,21 +257,24 @@ def main(model_name):
             if im is not None:
                 fig.colorbar(im, cax=cbar_ax, label='Normalized Vel')
             fig.savefig(os.path.join("cebra_plots",f"vel_grouped_{grade}.png"))
-            plt.close()
         # do all the grade stuff now
-        grade_ax.set_xlim(x_lim)
-        grade_ax.set_ylim(y_lim)
-        grade_ax.set_zlim(z_lim) 
+        
+        grade_ax.set_xlim(min(all_x), max(all_x))
+        grade_ax.set_ylim(min(all_y), max(all_y))
+        grade_ax.set_zlim(min(all_z), max(all_z))
+    
         grade_ax.set_xlabel("Cebra 1")
         grade_ax.set_ylabel("Cebra 2")
         grade_ax.set_zlabel("Cebra 3")
         plt.tight_layout(rect=[0, 0, 0.85, 1])
         grade_fig.subplots_adjust(right=0.85) 
         cbar_ax = grade_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
-        if im_grade is not None:
-            fig.colorbar(im_grade, cax=cbar_ax, label='Normalized Time')
+        sm = matplotlib.cm.ScalarMappable(norm=matplotlib.colors.Normalize(vmin=0, vmax=1), cmap='viridis')
+        cbar = grade_fig.colorbar(sm, cax=cbar_ax, label='Grade')
+        cbar.set_ticks([0, 0.5, 0.99])
+        cbar.set_ticklabels(['Grade A', 'Grade B', 'Grade C']) 
 
-        grade_fig.savefig(os.path.join("cebra_plots",f"{grade}.png"))
+        grade_fig.savefig(os.path.join("cebra_plots","grouped_grade.png"))
         plt.close()
 
 
