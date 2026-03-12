@@ -793,8 +793,8 @@ ABLATION STUDY CONFIGURATION
                 recon_img = (recon_img * 255).astype(np.uint8)
                 comparison = np.concatenate((vol_img, recon_img), axis=1)
      
-                images = wandb.Image(comparison, caption="Embryo vs Recon comparison")
-
+                images = wandb.Image(comparison, caption="embryo_recon_val")
+                run.log({"reconstruction_val": images})
 
         rand_img = np.random.randint(40, 64) 
         with torch.no_grad():
