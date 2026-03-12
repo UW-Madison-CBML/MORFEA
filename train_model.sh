@@ -1,5 +1,6 @@
 #!/bin/bash
 
+python -m ruff check . --select F821,E9 || exit 1
 # Parse positional arguments
 MODE="${1:-convlstm_latent_split}"  # Default to convlstm_latent_split
 LOSS_TYPE="${2:-l1}"  # Default to l1
