@@ -469,13 +469,13 @@ ABLATION STUDY CONFIGURATION
         pin_memory=True,
         drop_last=False 
     )
-    cebra_time_model = CEBRA(model_architecture="offset10-model",
-                        batch_size=128,
-                        learning_rate=1e-2,
-                        temperature=1,
+    cebra_time_model = CEBRA(model_architecture="offset10-model-mse",
+                        batch_size=512,
+                        learning_rate=5e-5,
+                        temperature=10,
                         output_dimension=3,
                         num_hidden_units=128,
-                        max_iterations=200,
+                        max_iterations=3000,
                         distance="euclidean",
                         conditional="time",
                         device="cuda_if_available",
@@ -731,14 +731,16 @@ ABLATION STUDY CONFIGURATION
         cebra_latents = []
         cebra_labels = []
         model.eval()
+        offset = 0
         with torch.no_grad():
             for embryo_vol in full_seq_loader_train:
                 embryo_vol = embryo_vol.to(DEVICE)
                 _, z_seq = model(embryo_vol)
                 traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
                 cebra_latents.append(traj)
-                cebra_labels.append(np.arange(len(traj)).reshape(-1, 1).astype(np.float32))
-        cebra_time_model.fit(cebra_latents, cebra_labels)
+                cebra_labels.append((np.arange(len(traj)) + offset ).reshape(-1, 1).astype(np.float32))
+                offset += len(traj) + 10000
+        cebra_time_model.fit(np.concatenate(cebra_latents, axis=0), np.concatenate(cebra_labels, axis=0))
         #cebra_time_model.save("cebra_time_model.pt")
 
 
@@ -748,7 +750,7 @@ ABLATION STUDY CONFIGURATION
                 if i % rand_img != 0:
                     continue
                 embryo_vol = embryo_vol.to(DEVICE) 
-                _, z_seq = model(embryo_vol)
+                embryo_recon, z_seq = model(embryo_vol)
                 traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
                 distance_mat = distance_matrix(traj,traj)
                 fig, ax = plt.subplots(figsize=(8, 6))
@@ -783,6 +785,16 @@ ABLATION STUDY CONFIGURATION
                 wandb.log({"cebra_val": wandb.Image(fig)})
 
                 plt.close(fig) 
+                # look at some validation recons
+                vol_img = embryo_vol[0, -1, 0].cpu().detach().numpy()
+                recon_img = embryo_recon[0, -1, 0].cpu().detach().numpy()
+
+                vol_img = (vol_img * 255).astype(np.uint8)
+                recon_img = (recon_img * 255).astype(np.uint8)
+                comparison = np.concatenate((vol_img, recon_img), axis=1)
+     
+                images = wandb.Image(comparison, caption="Embryo vs Recon comparison")
+
 
         rand_img = np.random.randint(40, 64) 
         with torch.no_grad():
