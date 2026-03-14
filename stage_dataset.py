@@ -162,8 +162,8 @@ def addAnnotations(group_name, group, annotations_dir, curvature = True, velocit
         group["z_dist"] = mat
     
     if(acceleration):
-        group["z_speed"] = group[lat_cols].diff(axis=0).fillna(0).mean(axis=1)
-        group["z_acc"] = group[lat_cols].diff(axis=0).fillna(0)
+        group["z_speed"] = group[lat_cols].diff(axis=0).mean(axis=1).fillna(0)
+        group["z_acc"] = group[lat_cols].diff(axis=0).diff(axis=0).mean(axis=1).fillna(0)
          
 
 
