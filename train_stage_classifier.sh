@@ -1,7 +1,5 @@
 #!/bin/bash
 echo "Installing dependencies..."
-pip install safetensors wandb
-pip install scikit-learn 
 # Extract dataset
 echo "Extracting dataset..."
 tar -zxf latents.tar.gz

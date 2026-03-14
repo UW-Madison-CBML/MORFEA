@@ -30,7 +30,7 @@ class StageModel(Module):
         self.lin2 = torch.nn.Linear(256, 128)
         self.lstm = torch.nn.LSTM(128, 128, batch_first = True)
         self.lin3 = torch.nn.Linear(128, num_classes)
-        self.transition_params = nn.Parameter(torch.randn(num_classes, num_classes))
+        self.transition_params = torch.nn.Parameter(torch.randn(num_classes, num_classes))
         self.register_buffer("mask", torch.triu(torch.ones(num_classes, num_classes)))
 
         with torch.no_grad():
@@ -42,7 +42,7 @@ class StageModel(Module):
         x,_  = self.lstm(x)
         emissions = self.lin3(x)
         
-        transitions = self.transition_params.masked_fill(self.mask == 0, -1e9)
+        #transitions = self.transition_params.masked_fill(self.mask == 0, -1e9)
 
-        
-        return viterbi_decode_batch(emissions, transitions)
+        return emissions 
+        #return viterbi_decode_batch(emissions, transitions)
