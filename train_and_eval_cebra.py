@@ -12,6 +12,83 @@ from torch.utils.data import DataLoader
 from dataset_ivf_embryo import IVFEmbryoDataset
 from raffael_model import ConvLSTMAutoencoder
 from matplotlib.patches import Patch
+def fit_circle_curvature(points, how=""):
+    """
+    Fit a circle to 3 consecutive points and return curvature (1/radius).
+    If points are collinear or too close, return 0.
+    """
+    if(how == "triangle"):
+    
+        # Get three points
+        points = points[::max(1,len(points)//3)]
+        p1, p2, p3 = points[0], points[1], points[2]
+
+        # Calculate the radius using the circumradius formula
+        a = np.linalg.norm(p2 - p1)
+        b = np.linalg.norm(p3 - p2)
+        c = np.linalg.norm(p3 - p1)
+        
+        # Area using Heron's formula
+        s = (a + b + c) / 2
+        area_squared = s * (s - a) * (s - b) * (s - c)
+        
+        if area_squared <= 0:
+            return 0  # Collinear points
+        
+        area = np.sqrt(area_squared)
+         
+        if area == 0:
+            return 0
+        
+        # Radius = (a*b*c) / (4*Area)
+        radius = (a * b * c) / (4 * area)
+        if radius == 0:
+            return 0
+        return 1 / radius
+    else:
+        if(np.isnan(points).any()):
+            return 0 
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(points)
+        pca = PCA(n_components=2)
+        pca.fit(X_scaled)
+        points_2d = pca.transform(X_scaled)       
+        def circle_residuals(params, points):
+            xc, yc, R = params
+            distances = np.sqrt((points[:, 0] - xc)**2 + (points[:, 1] - yc)**2)
+            return distances - R
+        x = points_2d[:,0]
+        y = points_2d[:,1]
+        points = np.column_stack((x, y))
+        x0 = [np.mean(x), np.mean(y), np.std(np.sqrt(x**2 + y**2))]
+        try:
+            res = least_squares(circle_residuals, x0, args=(points,))
+        except ValueError as e:
+            print(e)
+            return 0
+        if not res.success:
+            return 0
+        _, _, radius = res.x
+        
+        if(radius == 0):
+            return 0 
+        return 1/radius
+ 
+def calculate_curvatures(trajectory):
+    """Calculate curvature for each point in trajectory using sliding window."""
+    offset = 20
+    curvatures = []
+    
+    for i in range(len(trajectory)):
+        points = trajectory[max(0,i-offset):min(i+offset, len(trajectory))]
+        if len(points) >= 3:
+            curvatures.append(fit_circle_curvature(points))
+        else:
+            curvatures.append(0)
+    
+    return np.array(curvatures)
+
+
 PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
 def get_phases(embryo_id, seq_len):
     annotation_file = os.path.join("embryo_dataset_annotations", f"{embryo_id}_phases.csv")
@@ -131,7 +208,7 @@ def main(model_name):
             x_lim = (min(x_list),max(x_list))
             y_lim = (min(y_list),max(y_list))
             z_lim = (min(z_list),max(z_list))
-             # Track limits for the master plot
+            # track limits for the master plot
             all_x.extend([x for t in d3_trajs for x in t[:, 0]])
             all_y.extend([y for t in d3_trajs for y in t[:, 1]])
             all_z.extend([z for t in d3_trajs for z in t[:, 2]])
@@ -261,6 +338,51 @@ def main(model_name):
             if im is not None:
                 fig.colorbar(im, cax=cbar_ax, label='Normalized Vel')
             fig.savefig(os.path.join("cebra_plots",f"vel_grouped_{grade}.png"))
+            plt.close(fig)
+            fig, axes = plt.subplots(4, 4, figsize=(20, 20),subplot_kw={'projection': '3d'})
+            axes = axes.ravel()
+            im = None
+            curves = []
+            for i, d3_traj in enumerate(d3_trajs):
+                curv = calculate_curvatures(d3_traj)
+                curv = curv / np.std(curv)
+                curves.append(curv)
+                ax = axes[i]
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=curv, cmap='viridis')
+                
+                ax.set_xlim(x_lim)
+                ax.set_ylim(y_lim)
+                ax.set_zlim(z_lim) 
+                ax.set_xlabel("Cebra 1")
+                ax.set_ylabel("Cebra 2")
+                ax.set_zlabel("Cebra 3")
+                
+            plt.tight_layout(rect=[0, 0, 0.85, 1])
+            fig.subplots_adjust(right=0.85) 
+            cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
+            if im is not None:
+                fig.colorbar(im, cax=cbar_ax, label='Normalized Curvature')
+ 
+            fig.savefig(os.path.join("cebra_plots",f"curve_{grade}.png"))
+            fig, ax = plt.subplots(figsize=(20, 20), subplot_kw={'projection': '3d'})
+            im = None
+            for i, d3_traj in enumerate(d3_trajs):
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=curves[i], cmap='viridis')
+                
+            ax.set_xlim(x_lim)
+            ax.set_ylim(y_lim)
+            ax.set_zlim(z_lim) 
+            ax.set_xlabel("Cebra 1")
+            ax.set_ylabel("Cebra 2")
+            ax.set_zlabel("Cebra 3")
+                
+            plt.tight_layout(rect=[0, 0, 0.85, 1])
+            fig.subplots_adjust(right=0.85) 
+            cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
+            if im is not None:
+                fig.colorbar(im, cax=cbar_ax, label='Normalized Curvature')
+            fig.savefig(os.path.join("cebra_plots",f"curve_grouped_{grade}.png"))
+            plt.close(fig) 
         # do all the grade stuff now
         
         grade_ax.set_xlim(min(all_x), max(all_x))

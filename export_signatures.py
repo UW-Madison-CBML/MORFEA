@@ -8,7 +8,7 @@ import time
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import umap
-
+import iisignature
 from scipy.stats import skew, kurtosis
 from scipy.optimize import least_squares
 from scipy.stats import kurtosis
@@ -109,7 +109,7 @@ def flatten_list(nested_list):
             flat_list.append(item)
     return flat_list
 # ig assume embryo timesteps are equally spaced
-def get_quad_tphate_interp(latents, how="PCA", n_components=2):
+def get_dim_reduce(latents, how="PCA", n_components=2):
     X_out = np.zeros((latents.shape[0], n_components))
     if(how == "PCA"):
         scaler = StandardScaler()
@@ -127,10 +127,11 @@ def get_quad_tphate_interp(latents, how="PCA", n_components=2):
         X_out = latents 
     else:
         raise ValueError("invalid how")
-    timesteps = np.linspace(0, 1, latents.shape[0])
-    interps = [make_interp_spline(timesteps, X_out[:,i], k=3) for i in range(X_out.shape[1])]
+    return X_out
+    #timesteps = np.linspace(0, 1, latents.shape[0])
+    #interps = [make_interp_spline(timesteps, X_out[:,i], k=3) for i in range(X_out.shape[1])]
 
-    return interps
+    #return interps
 def get_accel_features(velocity):
     features['velocity_mean'] = np.mean(velocity)
     features['velocity_std'] = np.std(velocity)
@@ -150,53 +151,33 @@ def get_accel_features(velocity):
     return features
      
 
-def compute_path_signature(X, a=0, b=1, level_threshold=3, n_points=1000):
-
-    N = len(X)
-    level_threshold=N
-    t = np.linspace(a, b, n_points)
-    dt = t[1] - t[0]
-    X_t = [Xi(t) for Xi in X]
-    t = t[:-1]
-    dX_t = [np.diff(Xi_t) for Xi_t in X_t]
-    X_prime_t = [dXi_t / dt for dXi_t in dX_t]
-    sig_flat = [] 
-    signature = [[np.ones(len(t))]]
-    for k in range(level_threshold):
-        previous_level = signature[-1]
-        current_level = []
-        for previous_level_integral in previous_level:
-            for i in range(N):
-                current_level.append(np.cumsum(previous_level_integral * dX_t[i]))
-                sig_flat.append(np.cumsum(previous_level_integral * dX_t[i])[-1])
-        signature.append(current_level)
-
-    signature_terms = [list(itertools.product(*([np.arange(1, N+1).tolist()] * i)))
-                       for i in range(0, level_threshold+1)]
-    return t, X_t, X_prime_t, signature, signature_terms, np.array(sig_flat)
 def get_new_row(group, cell_id, max_len=0):
-    #(_,_,_,sig,terms, signature) = compute_path_signature(get_quad_tphate_interp(group, how="FULL", n_components=0))
+    
+    pca = get_dim_reduce(group, how="PCA", n_components=8))
+    signature = iisignature.sig(pca, 4) # 4680 features
+    
+    #get_quad_tphate_interp(group, how="FULL", n_components=0))
     #signature = np.array([i(np.linspace(0,1, 500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).flatten()
     #signature = group[:-50,:].flatten()
 
 
     #new_rows = []
     #for i in range(50):
-    interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T if max_len == 0 else group
+    #interped_latents = np.array([i(np.linspace(0,1,500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=10)]).T if max_len == 0 else group
     #if(np.isnan(interped_latents).any()):
     #    print(f"{cell_id} has nan!!!")
-    signature = np.array(calculate_curvatures(interped_latents))
+    #signature = np.array(calculate_curvatures(interped_latents))
     # Basic velocity
     #velocity = np.linalg.norm(np.diff(trajectory, axis=0), axis=1)
     #features = get_accel_features(velocity)
     
-    if max_len > 0:
-        if(len(signature) > max_len):
-            raise ValueError(f"{cell_id} exceeds max len for padding")
-        elif(len(signature) != max_len):
-            pad_width = max(0, max_len - len(signature))
-            #signature = np.pad(signature, ((0, pad_width), (0, 0)), mode='constant') 
-            signature = np.pad(signature, (0, pad_width), mode='constant') 
+    #if max_len > 0:
+    #if(len(signature) > max_len):
+    #        raise ValueError(f"{cell_id} exceeds max len for padding")
+    #    elif(len(signature) != max_len):
+    #        pad_width = max(0, max_len - len(signature))
+    #        #signature = np.pad(signature, ((0, pad_width), (0, 0)), mode='constant') 
+    #        signature = np.pad(signature, (0, pad_width), mode='constant') 
     #signature = np.concatenate((np.array([val for val in features.values()]), np.array(curvature)))
     #signature = np.array(curvature)
     #    #new_rows.append(signature)
