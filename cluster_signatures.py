@@ -13,6 +13,7 @@ import umap
 import matplotlib
 import iisignature
 
+from sklearn.feature_selection import SelectKBest, mutual_info_classif
 import matplotlib.patches as patches
 def main(model_name, grade):
     sig_df = pd.read_csv(os.path.abspath(f"signatures/{model_name}_sigs.csv"))
@@ -32,19 +33,34 @@ def main(model_name, grade):
     df = sig_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")
     df = df[["embryo_id", grade] + sig_cols].dropna(subset=[grade])
     feature_cols = [col for col in df.columns if col.startswith('s_')]
+    s_info = iisignature.prepare(8, 4)
+    sig_basis = s_info.basis
     X = df[feature_cols].values
     grade_classes = ["A", "B", "C"]
     grades = np.array([grade_classes.index(val) for val in df[grade].values])
     X[np.isnan(X)] = 0
     print(f"Starting with {X.shape[0]} samples, {X.shape[1]} features\n")
-    selector = VarianceThreshold(threshold=0) 
-    X_filtered = selector.fit_transform(X)
     
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X_filtered)
+    X_scaled = scaler.fit_transform(X)
+    
+    selector = SelectKBest(score_func=mutual_info_classif, k='all')
+
+    X_selected = selector.fit_transform(X_scaled, grades)
+    scores = selector.scores_
+    print("x_scaled: ",X_scaled.shape)
+    print("sig_bases: ", len(sig_basis))
+    print("scores: ", len(scores))
+
+    results = pd.DataFrame({
+        'Feature_Index': range(len(scores)),
+        'Signature_Word': sig_basis[:len(feature_cols)],
+        'Signal_Score': scores
+    }).sort_values(by='Signal_Score', ascending=False)
+
     
     reducer = umap.UMAP(n_neighbors=25, min_dist=0.1, n_components=2, random_state=42)
-    embedding = reducer.fit_transform(X_scaled)
+    embedding = reducer.fit_transform(X_selected)
     cmap = matplotlib.colors.ListedColormap(['green', 'yellow', 'red'])
     scatter = plt.scatter(embedding[:, 0], embedding[:,1], c=grades, cmap=cmap)
 
