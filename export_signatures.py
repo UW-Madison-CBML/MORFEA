@@ -12,6 +12,9 @@ import iisignature
 from scipy.stats import skew, kurtosis
 from scipy.optimize import least_squares
 from scipy.stats import kurtosis
+import warnings
+
+warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 def fit_circle_curvature(points, how=""):
     """
     Fit a circle to 3 consecutive points and return curvature (1/radius).
@@ -152,9 +155,9 @@ def get_accel_features(velocity):
      
 
 def get_new_row(group, cell_id, max_len=0):
-    
+    print(cell_id)    
     #pca = get_dim_reduce(group, how="PCA", n_components=8))
-    s_info = iisignature.prepare(8, 4)
+    s_info = iisignature.prepare(16, 3)
 
     signature = iisignature.logsig(group, s_info)
     
@@ -195,20 +198,24 @@ def get_new_row(group, cell_id, max_len=0):
     
     return result
 def main(model_name):
+
+    USE_PCA = True
     file_name = "latents/"+ model_name
     #file_name =
     keys = pd.read_csv(file_name+".csv").rename(columns={"cell_id":"embryo_id", "video_name":"embryo_id"})
     values = np.load(file_name+'.npy')
     if(len(keys) != values.shape[0]):
         raise ValueError("keys and values sizes do not match")
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(values)
+    if USE_PCA:
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(values)
 
-    pca = PCA(n_components=8)
-    pca.fit(X_scaled)
+        pca = PCA(n_components=16)
+        pca.fit(X_scaled)
 
-    values = pca.transform(X_scaled)
+        values = pca.transform(X_scaled)
     lat_columns = [f"z_{i}" for i in range(values.shape[1])]
+    print(len(lat_columns))
     values_df = pd.DataFrame(values, columns=lat_columns)
     df = pd.concat([keys, values_df], axis = 1)
     # This returns a DataFrame where each row is a cell_id with its signature
