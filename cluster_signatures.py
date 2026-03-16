@@ -11,7 +11,7 @@ import seaborn as sns
 from itertools import product
 import umap
 import matplotlib
-
+import iisignature
 
 import matplotlib.patches as patches
 def main(model_name, grade):
