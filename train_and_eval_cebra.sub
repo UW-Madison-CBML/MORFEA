@@ -38,7 +38,7 @@ request_gpus = 1
 
 
 queue model from (
-notemp-2026-03-08
-nolstm-2026-03-08
-control-2026-03-08
+notemp-2026-03-12
+nolstm-2026-03-12
+control-2026-03-12
 )
