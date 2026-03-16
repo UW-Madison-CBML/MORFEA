@@ -202,12 +202,11 @@ def get_new_row(group, cell_id, cebra_model, max_len=0):
     return result
 def main(model_name):
 
-    USE_PCA = True
+    USE_PCA = False
     file_name = "latents/"+ model_name
     cebra_time_model = cebra.CEBRA.load(
         os.path.abspath(f"{model_name}_cebra_time_model.pt"),
         weights_only=False,
-        map_location="cpu" 
     )
     #file_name =
     keys = pd.read_csv(file_name+".csv").rename(columns={"cell_id":"embryo_id", "video_name":"embryo_id"})
