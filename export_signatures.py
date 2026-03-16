@@ -154,7 +154,9 @@ def get_accel_features(velocity):
 def get_new_row(group, cell_id, max_len=0):
     
     #pca = get_dim_reduce(group, how="PCA", n_components=8))
-    signature = iisignature.sig(group, 4) # 4680 features
+    s_info = iisignature.prepare(8, 4)
+
+    signature = iisignature.logsig(group, s_info)
     
     #get_quad_tphate_interp(group, how="FULL", n_components=0))
     #signature = np.array([i(np.linspace(0,1, 500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).flatten()
