@@ -33,13 +33,18 @@ def main(model_name, grade):
     df = sig_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")
     df = df[["embryo_id", grade] + sig_cols].dropna(subset=[grade])
     feature_cols = [col for col in df.columns if col.startswith('s_')]
-    s_info = iisignature.prepare(8, 4)
-    sig_basis = s_info.basis
     X = df[feature_cols].values
     grade_classes = ["A", "B", "C"]
     grades = np.array([grade_classes.index(val) for val in df[grade].values])
     X[np.isnan(X)] = 0
     print(f"Starting with {X.shape[0]} samples, {X.shape[1]} features\n")
+    
+    s_info = iisignature.prepare(16, 3)
+
+    sig_basis = iisignature.basis(s_info)
+    print(len(sig_basis))
+    print(set([ord(char) for char in "".join(sig_basis)]))
+
     
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
@@ -48,18 +53,17 @@ def main(model_name, grade):
 
     X_selected = selector.fit_transform(X_scaled, grades)
     scores = selector.scores_
-    print("x_scaled: ",X_scaled.shape)
-    print("sig_bases: ", len(sig_basis))
-    print("scores: ", len(scores))
 
     results = pd.DataFrame({
         'Feature_Index': range(len(scores)),
-        'Signature_Word': sig_basis[:len(feature_cols)],
-        'Signal_Score': scores
+        'Signal_Score': scores,
+        'signature_words':sig_basis,
+
     }).sort_values(by='Signal_Score', ascending=False)
 
+    print(results.head(20))
     
-    reducer = umap.UMAP(n_neighbors=25, min_dist=0.1, n_components=2, random_state=42)
+    reducer = umap.UMAP(n_neighbors=30, min_dist=0.1, n_components=2)
     embedding = reducer.fit_transform(X_selected)
     cmap = matplotlib.colors.ListedColormap(['green', 'yellow', 'red'])
     scatter = plt.scatter(embedding[:, 0], embedding[:,1], c=grades, cmap=cmap)
@@ -70,7 +74,7 @@ def main(model_name, grade):
 
     plt.xlabel("UMAP 1")
     plt.ylabel("UMAP 2")
-    plt.title("Embryo Curvature Timestep Feature UMAP Embedding")
+    plt.title("Embryo path sig Timestep Feature UMAP Embedding")
    
     plt.savefig(os.path.join("clusters", "umap.png"), dpi=300, bbox_inches='tight')
     plt.close() 
