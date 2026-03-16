@@ -13,7 +13,9 @@ from scipy.stats import skew, kurtosis
 from scipy.optimize import least_squares
 from scipy.stats import kurtosis
 import warnings
-
+import cebra
+from cebra import CEBRA
+import torch
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 def fit_circle_curvature(points, how=""):
     """
@@ -154,12 +156,13 @@ def get_accel_features(velocity):
     return features
      
 
-def get_new_row(group, cell_id, max_len=0):
+def get_new_row(group, cell_id, cebra_model, max_len=0):
     print(cell_id)    
     #pca = get_dim_reduce(group, how="PCA", n_components=8))
-    s_info = iisignature.prepare(16, 3)
+    cebra_path = cebra_model.transform(group)
+    s_info = iisignature.prepare(3, 6)
 
-    signature = iisignature.logsig(group, s_info)
+    signature = iisignature.logsig(cebra_path, s_info)
     
     #get_quad_tphate_interp(group, how="FULL", n_components=0))
     #signature = np.array([i(np.linspace(0,1, 500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).flatten()
@@ -201,6 +204,11 @@ def main(model_name):
 
     USE_PCA = True
     file_name = "latents/"+ model_name
+    cebra_time_model = cebra.CEBRA.load(
+        os.path.abspath(f"{model_name}_cebra_time_model.pt"),
+        weights_only=False,
+        map_location="cpu" 
+    )
     #file_name =
     keys = pd.read_csv(file_name+".csv").rename(columns={"cell_id":"embryo_id", "video_name":"embryo_id"})
     values = np.load(file_name+'.npy')
@@ -224,7 +232,7 @@ def main(model_name):
     max_points = sizes.max()
     print("max points", max_points)
     signatures_df = df.groupby('embryo_id').apply(
-        lambda group: get_new_row(group[lat_columns].to_numpy().astype(np.float32), group.name, max_len=max_points)
+        lambda group: get_new_row(group[lat_columns].to_numpy().astype(np.float32), group.name, cebra_time_model, max_len=max_points)
     ).reset_index(drop=True)
 
     # Save to CSV
