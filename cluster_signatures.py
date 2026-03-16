@@ -39,21 +39,21 @@ def main(model_name, grade):
     X[np.isnan(X)] = 0
     print(f"Starting with {X.shape[0]} samples, {X.shape[1]} features\n")
     
-    s_info = iisignature.prepare(16, 3)
+    s_info = iisignature.prepare(3, 6)
 
     sig_basis = iisignature.basis(s_info)
-    print(len(sig_basis))
-    print(set([ord(char) for char in "".join(sig_basis)]))
+    print("basis:", len(sig_basis))
 
     
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
-    
+    print(X_scaled.shape) 
     selector = SelectKBest(score_func=mutual_info_classif, k='all')
 
     X_selected = selector.fit_transform(X_scaled, grades)
     scores = selector.scores_
 
+    print("scores: ", len(scores))
     results = pd.DataFrame({
         'Feature_Index': range(len(scores)),
         'Signal_Score': scores,
