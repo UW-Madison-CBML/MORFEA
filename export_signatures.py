@@ -153,8 +153,8 @@ def get_accel_features(velocity):
 
 def get_new_row(group, cell_id, max_len=0):
     
-    pca = get_dim_reduce(group, how="PCA", n_components=8))
-    signature = iisignature.sig(pca, 4) # 4680 features
+    #pca = get_dim_reduce(group, how="PCA", n_components=8))
+    signature = iisignature.sig(group, 4) # 4680 features
     
     #get_quad_tphate_interp(group, how="FULL", n_components=0))
     #signature = np.array([i(np.linspace(0,1, 500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).flatten()
@@ -199,13 +199,13 @@ def main(model_name):
     values = np.load(file_name+'.npy')
     if(len(keys) != values.shape[0]):
         raise ValueError("keys and values sizes do not match")
-    """scaler = StandardScaler()
+    scaler = StandardScaler()
     X_scaled = scaler.fit_transform(values)
 
-    pca = PCA(n_components=100)
+    pca = PCA(n_components=8)
     pca.fit(X_scaled)
 
-    values = pca.transform(X_scaled)""" 
+    values = pca.transform(X_scaled)
     lat_columns = [f"z_{i}" for i in range(values.shape[1])]
     values_df = pd.DataFrame(values, columns=lat_columns)
     df = pd.concat([keys, values_df], axis = 1)
