@@ -12,6 +12,9 @@ from torch.utils.data import DataLoader
 from dataset_ivf_embryo import IVFEmbryoDataset
 from raffael_model import ConvLSTMAutoencoder
 from matplotlib.patches import Patch
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from scipy.optimize import least_squares
 def fit_circle_curvature(points, how=""):
     """
     Fit a circle to 3 consecutive points and return curvature (1/radius).
@@ -119,7 +122,7 @@ def main(model_name):
     VAL_EMBRYOS = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"}).dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
     grades_df = pd.read_csv(os.path.abspath("embryo_dataset_grades.csv")).rename(columns={"video_name":"embryo_id"}).dropna(subset=[GRADE])[["embryo_id",GRADE]]
 
-    latents_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv"))
+    #latents_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv"))
     
     full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})    
     full_seq_df = full_seq_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")
