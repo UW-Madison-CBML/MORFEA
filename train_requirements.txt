@@ -52,3 +52,4 @@ seaborn
 cebra
 info-nce-pytorch
 ruff
+iisignature
