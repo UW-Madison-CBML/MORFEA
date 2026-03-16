@@ -12,6 +12,9 @@ from torch.utils.data import DataLoader
 from dataset_ivf_embryo import IVFEmbryoDataset
 from raffael_model import ConvLSTMAutoencoder
 from matplotlib.patches import Patch
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from scipy.optimize import least_squares
 def fit_circle_curvature(points, how=""):
     """
     Fit a circle to 3 consecutive points and return curvature (1/radius).
