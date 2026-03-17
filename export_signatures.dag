@@ -1,0 +1,10 @@
+JOB A export_signatures.sub
+VARS A model="notemp-2026-03-12"
+JOB B export_signatures.sub
+VARS B model="control-2026-03-12"
+JOB C export_signatures.sub
+VARS C model="nolstm-2026-03-12"
+
+
+PARENT A CHILD B
+PARENT B CHILD C
