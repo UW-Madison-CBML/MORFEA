@@ -12,7 +12,7 @@ def get_path_sigs(trajectory, depth):
     s_info = iisignature.prepare(trajectory.shape[1], depth)
     signature = []
     for i in range(len(trajectory)):
-        signature.append(iisignature.logsig(trajectory[:i+1], s_info))
+        signature.append(iisignature.logsig(trajectory[:i+1], s_info)
     
     return np.array(signature)
 def fit_circle_curvature(points, how=""):
