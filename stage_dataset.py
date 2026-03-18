@@ -57,7 +57,7 @@ def addAnnotations(group_name, group, annotations_dir, curvature = True, velocit
         group["z_dist"] = mat
     
     if(acceleration):
-         
+        print("")         
 
 
     if (not latents):

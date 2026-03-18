@@ -3,6 +3,7 @@ python -m ruff check . --exit-zero
 echo "Installing dependencies..."
 # Extract dataset
 echo "Extracting dataset..."
+pip install iisignature
 tar -zxf latents.tar.gz
 tar -zxf embryo_dataset_annotations.tar.gz
 # Set HuggingFace token from api_keys.txt
