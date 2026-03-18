@@ -115,6 +115,7 @@ def get_phases(embryo_id, seq_len):
 def main(model_name):
     HOLDOUT = True
     GRADE = "TE"
+    DIM = 8
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     login(os.getenv("HF_KEY"))
     model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/" + model_name)     
@@ -144,9 +145,9 @@ def main(model_name):
  
     cebra_time_model = CEBRA(model_architecture="offset10-model-mse",
                         batch_size=512,
-                        learning_rate=2e-5,
-                        temperature=10,
-                        output_dimension=3,
+                        learning_rate=1e-5,
+                        temperature=13,
+                        output_dimension=DIM,
                         num_hidden_units=128,
                         max_iterations=5000,
                         distance="euclidean",
@@ -175,6 +176,8 @@ def main(model_name):
     cebra_time_model.save(f"{model_name}_cebra_time_model.pt")
 
     torch.cuda.empty_cache()
+    if(DIM != 3):
+        return
     
     max_imgs = 16
     with torch.no_grad():

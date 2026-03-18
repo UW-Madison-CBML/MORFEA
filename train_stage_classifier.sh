@@ -1,4 +1,5 @@
 #!/bin/bash
+python -m ruff check . --exit-zero
 echo "Installing dependencies..."
 # Extract dataset
 echo "Extracting dataset..."
