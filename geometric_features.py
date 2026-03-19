@@ -91,4 +91,24 @@ def get_dynam_features(trajectory):
     features = pd.DataFrame()
 
     return features
- 
+def get_vel(trajectory, dt=1):
+    v_vecs = np.diff(trajectory, axis=0) / dt
+    v_scalars = np.linalg.norm(v_vecs, axis=1)
+
+    v_padded = np.pad(v_scalars, (0, 1), mode='edge')
+
+    return v_padded
+
+def get_acc(trajectory, dt=1):
+    v_vecs = np.diff(trajectory, axis=0) / dt
+    v_scalars = np.linalg.norm(v_vecs, axis=1)
+
+    v_padded = np.pad(v_scalars, (0, 1), mode='edge')
+
+    a_vecs = np.diff(v_vecs, axis=0) / dt
+    a_scalars = np.linalg.norm(a_vecs, axis=1)
+
+    a_padded = np.pad(a_scalars, (1, 1), mode='edge')
+    return a_padded
+
+
