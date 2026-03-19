@@ -76,7 +76,7 @@ class StageDataset(Dataset):
         Args: pd.read_csv(grades_csv, keep_default_na=False).
         """
         self.latents_df = latents_df
-        values = self.latents_df[[col for i in self.latents_df.columns if i.startswith("z_")]].to_numpy()
+        values = self.latents_df[[i for i in self.latents_df.columns if i.startswith("z_")]].to_numpy()
         scaler = StandardScaler()
         scaled_data = scaler.fit_transform(values)
 
