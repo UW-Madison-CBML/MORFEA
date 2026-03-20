@@ -101,7 +101,7 @@ def monotonicity_loss(batched_logits_seq, temp=8.0):
     
     
     
-def main(model_name, curvature = True, velocity = True, acceleration = True, path_signatures = None, latents = True, distance_mat=True):
+def main(model_name, curvature = True, velocity = True, acceleration = True, path_signatures = True, latents = True, distance_mat=True):
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -125,8 +125,8 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
     val_df = df[mask]
     df = df[~mask]
  
-    dataset = StageDataset(df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, distance_mat=distance_mat)
-    dataset_val = StageDataset(val_df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, distance_mat=distance_mat, return_embryo_id=True)
+    dataset = StageDataset(df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, distance_mat=distance_mat, path_signatures=path_signatures)
+    dataset_val = StageDataset(val_df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, distance_mat=distance_mat, path_signatures=path_signatures, return_embryo_id=True)
     weights = get_class_weights(os.path.abspath("embryo_dataset_annotations"), df.groupby("embryo_id").size().reset_index(name='counts'), dataset.phases).to(DEVICE)
     crit = torch.nn.CrossEntropyLoss(weight=weights)
     model = StageModel(input_size = len(dataset.lat_cols))
@@ -238,4 +238,4 @@ if __name__ == "__main__":
   
     args = parser.parse_args()
  
-    main(args.name,curvature=args.curvature,latents=args.latents,velocity=args.velocity, acceleration=args.acceleration, distance_mat=args.distance_mat)
+    main(args.name,curvature=args.curvature,latents=args.latents,velocity=args.velocity, acceleration=args.acceleration, distance_mat=args.distance_mat, path_signatures=args.path_signatures)
