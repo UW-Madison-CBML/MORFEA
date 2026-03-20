@@ -38,16 +38,16 @@ def addAnnotations(group_name, group, annotations_dir, curvature = True, velocit
     pca_trajectory = group[pca_cols].to_numpy()
 
     if (curvature):
-        group["z_curvature_12"] = calculate_curvatures(group, offset=12, retrospective=True)
+        group["z_curvature_12"] = calculate_curvatures(trajectory, offset=12, retrospective=True, how="triangle")
         group["z_curvature_12"] = group["z_curvature_12"] * (1 / (group["z_curvature_12"].std() + 0.0001))
-        group["z_curvature_20"] = calculate_curvatures(group, offset=20, retrospective=True)
+        group["z_curvature_20"] = calculate_curvatures(trajectory, offset=20, retrospective=True, how="triangle")
         group["z_curvature_20"] = group["z_curvature_20"] * (1 / (group["z_curvature_20"].std() + 0.0001))
-        group["z_curvature_4"] = calculate_curvatures(group, offset=4, retrospective=True)
+        group["z_curvature_4"] = calculate_curvatures(trajectory, offset=4, retrospective=True, how="triangle")
         group["z_curvature_4"] = group["z_curvature_4"] * (1 / (group["z_curvature_4"].std() + 0.0001))
 
 
     if (path_signatures):
-        sigs = get_path_sigs(pca_traj)
+        sigs = get_path_sigs(pca_trajectory, 4)
         for feature in range(sigs.shape[1]):
             group[f"z_sig_{feature}"] = sigs[:, feature]
         
@@ -90,7 +90,7 @@ class StageDataset(Dataset):
         sizes = self.latents_df.groupby("embryo_id")["time_step"].size()
         self.max_points = sizes.max()
         
-        self.df = self.latents_df.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,self.annotations_dir, curvature = curvature, velocity = velocity, latents = latents, acceleration = acceleration, path_signatures = None, distance_mat=distance_mat)).reset_index()
+        self.df = self.latents_df.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,self.annotations_dir, curvature = curvature, velocity = velocity, latents = latents, acceleration = acceleration, path_signatures = path_signatures, distance_mat=distance_mat)).reset_index()
         self.groups = self.df.groupby("embryo_id")
         self.seqlength = 64
         
