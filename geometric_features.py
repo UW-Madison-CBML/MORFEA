@@ -28,8 +28,11 @@ def fit_circle_curvature(points, how=""):
         
         # Area using Heron's formula
         s = (a + b + c) / 2
-        area_squared = s * (s - a) * (s - b) * (s - c)
-        
+        area_squared = 0.0
+        try:
+            area_squared = s * (s - a) * (s - b) * (s - c)
+        except OverflowError: 
+            return 0
         if area_squared <= 0:
             return 0  # Collinear points
         
