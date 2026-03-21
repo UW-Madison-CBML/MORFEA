@@ -5,99 +5,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 from matplotlib.patches import Patch
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from scipy.optimize import least_squares
-def fit_circle_curvature(points, how=""):
-    """
-    Fit a circle to 3 consecutive points and return curvature (1/radius).
-    If points are collinear or too close, return 0.
-    """
-    if(how == "triangle"):
-    
-        # Get three points
-        points = points[::max(1,len(points)//3)]
-        p1, p2, p3 = points[0], points[1], points[2]
 
-        # Calculate the radius using the circumradius formula
-        a = np.linalg.norm(p2 - p1)
-        b = np.linalg.norm(p3 - p2)
-        c = np.linalg.norm(p3 - p1)
-        
-        # Area using Heron's formula
-        s = (a + b + c) / 2
-        area_squared = s * (s - a) * (s - b) * (s - c)
-        
-        if area_squared <= 0:
-            return 0  # Collinear points
-        print(area_squared)
-        
-        area = np.sqrt(area_squared)
-         
-        print(area)
-        if area == 0:
-            return 0
-        
-        # Radius = (a*b*c) / (4*Area)
-        radius = (a * b * c) / (4 * area)
-        print(radius)
-        if radius == 0:
-            return 0
-        print(1/radius) 
-        return 1 / radius
-    else:
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(points)
-        pca = PCA(n_components=2)
-        pca.fit(X_scaled)
-        points_2d = pca.transform(X_scaled)       
-        def circle_residuals(params, points):
-            xc, yc, R = params
-            # Calculate distance from each point to the center (xc, yc)
-            distances = np.sqrt((points[:, 0] - xc)**2 + (points[:, 1] - yc)**2)
-            # The residual is the difference between these distances and the radius R
-            return distances - R
-
-
-        x = points[:,0]
-        y = points[:,1]
-        points = np.column_stack((x, y))
-
-        x0 = [np.mean(x), np.mean(y), np.std(np.sqrt(x**2 + y**2))]
-        try:
-            res = least_squares(circle_residuals, x0, args=(points,))
-        except ValueError as e:
-            print(e)
-            return 0
-        if not res.success:
-            return 0
-        _, _, radius = res.x
-
-        if(radius == 0):
-            return 0 
-        return 1/radius
-        
-
-def calculate_curvatures(trajectory):
-    """Calculate curvature for each point in trajectory using sliding window."""
-    offset = 20
-    curvatures = []
-    
-    for i in range(len(trajectory)):
-        if i < offset:
-            points = trajectory[i:i+(2*offset)]
-            curvatures.append(fit_circle_curvature(points))
-
-        elif i >= len(trajectory) - offset:
-            points = trajectory[i-(2*offset):i]
-            curvatures.append(fit_circle_curvature(points))
-
-        else:
-            points = trajectory[i-offset:i+offset]
-            curvatures.append(fit_circle_curvature(points))
-    
-    return np.array(curvatures)
-
+from geometric_features import calculate_curvatures
 def load_phase_annotations(embryo_id, phases_dir='embryo_dataset_annotations'):
     """Load phase annotations for a given embryo_id."""
     phase_file = Path(phases_dir) / f"{embryo_id}_phases.csv"
@@ -189,7 +98,7 @@ def main():
         if(count % 50 == 0):
             print(trajectory)
         # Calculate curvatures
-        curvatures = calculate_curvatures(trajectory)
+        curvatures = calculate_curvatures(trajectory, offset=20, how="triangle")
         
         # Load phase annotations
         phases = load_phase_annotations(embryo_id)
