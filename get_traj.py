@@ -20,7 +20,7 @@ def plot(traj, c, color_name, f_name, title, axis_label = "R", cmap="viridis"):
     plt.close(fig)
 
 def main():
-    num_points = 5
+    num_points = 10
     points = np.random.rand(num_points,3)
     anchors = np.linspace(0,1,num_points)
     filled_points = np.linspace(0,1,1000)
@@ -48,6 +48,19 @@ def main():
     plot((plot_x,plot_y,plot_z), kmeds_traj.labels_ / num_points, "Path Cluster Labels", "path_clusters", "Path Clusters", cmap="tab10")
     plot((plot_x,plot_y,plot_z), get_vel(trajectory), "Vel", "vel", "Velocity")
     plot((plot_x,plot_y,plot_z), get_acc(trajectory), "Acc", "acc", "Acceleration")
-    
+    # now look at really bad trajectories
+    points = np.random.rand(num_points,3)
+    anchors = np.linspace(0,1,num_points)
+    filled_points = np.linspace(0,1,1000)
+    plot_x = make_interp_spline(anchors, points[:,0], k=3)(filled_points) + np.random.normal(0, 0.01, 1000)
+    plot_y = make_interp_spline(anchors, points[:,1], k=3)(filled_points) + np.random.normal(0, 0.01, 1000)
+    plot_z = make_interp_spline(anchors, points[:,2], k=3)(filled_points) + np.random.normal(0, 0.01, 1000)
+    trajectory = np.column_stack((plot_x, plot_y, plot_z))
+    plot((plot_x,plot_y,plot_z), filled_points, "[a,b]", "bad_time", "Trajectory")
+
+    plot((plot_x,plot_y,plot_z), calculate_curvatures(trajectory, offset=80, how="triangle"), "Curve", "bad_curve", "Curvature")
+    plot((plot_x,plot_y,plot_z), get_vel(trajectory), "Vel", "bad_vel", "Velocity")
+    plot((plot_x,plot_y,plot_z), get_acc(trajectory), "Acc", "bad_acc", "Acceleration")
+
 if __name__ == "__main__":
     main()
