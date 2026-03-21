@@ -3,6 +3,7 @@ import torch
 from cebra import CEBRA
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 matplotlib.use('Agg') 
 import numpy as np
 import pandas as pd
@@ -14,83 +15,7 @@ from raffael_model import ConvLSTMAutoencoder
 from matplotlib.patches import Patch
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from scipy.optimize import least_squares
-def fit_circle_curvature(points, how=""):
-    """
-    Fit a circle to 3 consecutive points and return curvature (1/radius).
-    If points are collinear or too close, return 0.
-    """
-    if(how == "triangle"):
-    
-        # Get three points
-        points = points[::max(1,len(points)//3)]
-        p1, p2, p3 = points[0], points[1], points[2]
-
-        # Calculate the radius using the circumradius formula
-        a = np.linalg.norm(p2 - p1)
-        b = np.linalg.norm(p3 - p2)
-        c = np.linalg.norm(p3 - p1)
-        
-        # Area using Heron's formula
-        s = (a + b + c) / 2
-        area_squared = s * (s - a) * (s - b) * (s - c)
-        
-        if area_squared <= 0:
-            return 0  # Collinear points
-        
-        area = np.sqrt(area_squared)
-         
-        if area == 0:
-            return 0
-        
-        # Radius = (a*b*c) / (4*Area)
-        radius = (a * b * c) / (4 * area)
-        if radius == 0:
-            return 0
-        return 1 / radius
-    else:
-        if(np.isnan(points).any()):
-            return 0 
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(points)
-        pca = PCA(n_components=2)
-        pca.fit(X_scaled)
-        points_2d = pca.transform(X_scaled)       
-        def circle_residuals(params, points):
-            xc, yc, R = params
-            distances = np.sqrt((points[:, 0] - xc)**2 + (points[:, 1] - yc)**2)
-            return distances - R
-        x = points_2d[:,0]
-        y = points_2d[:,1]
-        points = np.column_stack((x, y))
-        x0 = [np.mean(x), np.mean(y), np.std(np.sqrt(x**2 + y**2))]
-        try:
-            res = least_squares(circle_residuals, x0, args=(points,))
-        except ValueError as e:
-            print(e)
-            return 0
-        if not res.success:
-            return 0
-        _, _, radius = res.x
-        
-        if(radius == 0):
-            return 0 
-        return 1/radius
- 
-def calculate_curvatures(trajectory):
-    """Calculate curvature for each point in trajectory using sliding window."""
-    offset = 20
-    curvatures = []
-    
-    for i in range(len(trajectory)):
-        points = trajectory[max(0,i-offset):min(i+offset, len(trajectory))]
-        if len(points) >= 3:
-            curvatures.append(fit_circle_curvature(points))
-        else:
-            curvatures.append(0)
-    
-    return np.array(curvatures)
-
+from geometric_features import calculate_curvatures, get_acc, get_vel
 
 PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
 def get_phases(embryo_id, seq_len):
@@ -182,6 +107,7 @@ def main(model_name):
     max_imgs = 16
     with torch.no_grad():
         grade_fig, grade_ax = plt.subplots(figsize=(20,20), subplot_kw={'projection': '3d'})
+        grade_cmap = mcolors.ListedColormap('#FF0000', '#FFFF00', '#00FF00')
         all_x, all_y, all_z = [], [], [] 
         for grade,g_color in zip(["A", "B", "C"], [0,0.5,1]):
             grade_ds = IVFEmbryoDataset(full_seq_df[full_seq_df[GRADE] == grade], resize=128, norm="minmax01")
@@ -220,7 +146,7 @@ def main(model_name):
             all_z.extend([z for t in d3_trajs for z in t[:, 2]])
             im = None
             for i, d3_traj in enumerate(d3_trajs):
-                im_grade = grade_ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.full((d3_traj.shape[0],), g_color), cmap='viridis', vmin=0, vmax=1)
+                im_grade = grade_ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.full((d3_traj.shape[0],), g_color), cmap=grade_cmap, vmin=0, vmax=1)
                 ax = axes[i]
                 im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1,d3_traj.shape[0]), cmap='viridis')
                 
@@ -306,8 +232,8 @@ def main(model_name):
             im = None
             vels = []
             for i, d3_traj in enumerate(d3_trajs):
-                vel = np.concatenate((np.diff(d3_traj, axis=0).mean(axis=1), np.array([0])))
-                vel = vel / vel.max()
+                vel = get_vel(d3_traj)
+                #vel = vel / vel.max()
                 vels.append(vel)
                 ax = axes[i]
                 im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=vel, cmap='viridis')
@@ -350,7 +276,7 @@ def main(model_name):
             im = None
             curves = []
             for i, d3_traj in enumerate(d3_trajs):
-                curv = calculate_curvatures(d3_traj)
+                curv = calculate_curvatures(d3_traj, how="triangle", offset=20)
                 curv = curv / np.std(curv)
                 curves.append(curv)
                 ax = axes[i]
@@ -390,7 +316,8 @@ def main(model_name):
             fig.savefig(os.path.join("cebra_plots",f"curve_grouped_{grade}.png"))
             plt.close(fig) 
         # do all the grade stuff now
-        
+        grade_bounds = np.arange(N + 1)
+        grade_norm = mcolors.BoundaryNorm(grade_bounds, grade_cmap.N) 
         grade_ax.set_xlim(min(all_x), max(all_x))
         grade_ax.set_ylim(min(all_y), max(all_y))
         grade_ax.set_zlim(min(all_z), max(all_z))
@@ -401,10 +328,15 @@ def main(model_name):
         plt.tight_layout(rect=[0, 0, 0.85, 1])
         grade_fig.subplots_adjust(right=0.85) 
         cbar_ax = grade_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
-        sm = matplotlib.cm.ScalarMappable(norm=matplotlib.colors.Normalize(vmin=0, vmax=1), cmap='viridis')
-        cbar = grade_fig.colorbar(sm, cax=cbar_ax, label='Grade')
-        cbar.set_ticks([0, 0.5, 0.99])
-        cbar.set_ticklabels(['Grade A', 'Grade B', 'Grade C']) 
+        cb = grade_fig.colorbar(plt.cm.ScalarMappable(cmap=grade_cmap, norm=grade_norm), 
+                        cax = grade_ax,
+                          ticks=grade_bounds + 0.5, 
+                          spacing='uniform',
+                          orientation='vertical')
+
+        cb.set_ticklabels(["C", "B", "A"])
+
+        cb.set_label('Grade')
 
         grade_fig.savefig(os.path.join("cebra_plots","grouped_grade.png"))
         plt.close()
