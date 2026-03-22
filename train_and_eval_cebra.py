@@ -203,7 +203,6 @@ def main(model_name):
                 
             plt.tight_layout(rect=[0, 0, 0.85, 1])
             fig.subplots_adjust(right=0.85) 
-            cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
             fig.legend(handles=legend_elements, title="Phases") 
             fig.savefig(os.path.join("cebra_plots",f"phases_{grade}.png"))
             plt.close(fig) 
@@ -327,10 +326,9 @@ def main(model_name):
         grade_ax.set_zlabel("Cebra 3")
         plt.tight_layout(rect=[0, 0, 0.85, 1])
         grade_fig.subplots_adjust(right=0.85) 
-        cbar_ax = grade_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
         cb = grade_fig.colorbar(plt.cm.ScalarMappable(cmap=grade_cmap, norm=grade_norm), 
                         ax = grade_ax,
-                          ticks=grade_bounds + 0.5, 
+                          ticks= [0.5, 1.5, 2.5],
                           spacing='uniform',
                           orientation='vertical')
 
