@@ -1,13 +1,3 @@
-"""
-Complete High-Quality ConvLSTM Autoencoder
-- Uses true ConvLSTM (not regular LSTM)
-- Complete Encoder (2D CNN + ConvLSTM) with flattened latents
-- Complete Decoder (ConvLSTM + ConvTranspose)
-- Optional Empty/Non-empty Classifier
-- Works with 128x128 input images
-- Latent format: (B, T, N) where N is flattened spatial dimensions
-- Includes ResNet-style residual connections in CNN layers
-"""
 import torch
 import torch.nn as nn
 from raffael_conv_lstm import ConvLSTM
@@ -15,9 +5,6 @@ from huggingface_hub import PyTorchModelHubMixin
 import torch.nn.functional as F
 
 class ResidualBlock(nn.Module):
-    """
-    Residual block for encoder with optional downsampling
-    """
     def __init__(self, in_channels, out_channels, downsample=False):
         super(ResidualBlock, self).__init__()
 
@@ -55,9 +42,6 @@ class ResidualBlock(nn.Module):
 
 
 class ResidualUpBlock(nn.Module):
-    """
-    Residual block for decoder with upsampling
-    """
     def __init__(self, in_channels, out_channels):
         super(ResidualUpBlock, self).__init__()
 
@@ -86,10 +70,6 @@ class ResidualUpBlock(nn.Module):
 
 
 class Encoder(nn.Module):
-    """
-    Encoder: 2D CNN spatial compression + ConvLSTM temporal modeling + flatten to (B, T, N)
-    Output: z_seq (B, T, latent_size) and z_last (B, latent_size)
-    """
 
     def __init__(self, input_channels=1, hidden_dim=256, num_layers=2, latent_size=4096, use_convlstm=True):
         super(Encoder, self).__init__()
@@ -127,26 +107,14 @@ class Encoder(nn.Module):
         else:
             self.lstm_enc = None
 
-        # Dropout before latent compression
         self.dropout = nn.Dropout(0.1)
 
-        # Linear layer to compress spatial latent to fixed size
-        # Input: (B*T, hidden_dim * 16 * 16)
-        # Output: (B*T, latent_size)
         self.latent_compress = nn.Linear(hidden_dim * 16 * 16, latent_size)
         self.lin1 = nn.Linear(latent_size,latent_size)
 
 
 
     def forward(self, x):
-        """
-        Args:
-            x: (B, T, 1, H, W) - input video sequence (any size, will be resized to 128x128)
-
-        Returns:
-            z_seq: (B, T, latent_size) - compressed latent sequence
-            z_last: (B, latent_size) - last timestep compressed latent
-        """
         B, T, C, H, W = x.shape
 
         # Resize to 128x128 if needed
@@ -270,12 +238,6 @@ class Decoder(nn.Module):
 
 
 class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
-    """
-    Complete ConvLSTM Autoencoder
-    Includes Encoder, Decoder, and optional Classifier
-    Compatible with HuggingFace Hub
-    Works with 128x128 images
-    """
     def __init__(
         self,
         config=None,
