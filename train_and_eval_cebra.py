@@ -40,7 +40,7 @@ def get_phases(embryo_id, seq_len):
 def main(model_name):
     HOLDOUT = True
     GRADE = "TE"
-    DIM = 8
+    DIM = 3
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     login(os.getenv("HF_KEY"))
     model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/" + model_name)     
@@ -107,9 +107,9 @@ def main(model_name):
     max_imgs = 16
     with torch.no_grad():
         grade_fig, grade_ax = plt.subplots(figsize=(20,20), subplot_kw={'projection': '3d'})
-        grade_cmap = mcolors.ListedColormap('#FF0000', '#FFFF00', '#00FF00')
+        grade_cmap = mcolors.ListedColormap(['#FF0000', '#FFFF00', '#00FF00'])
         all_x, all_y, all_z = [], [], [] 
-        for grade,g_color in zip(["A", "B", "C"], [0,0.5,1]):
+        for grade,g_color in zip(["A", "B", "C"], ['#00FF00', '#FFFF00', '#FF0000']):
             grade_ds = IVFEmbryoDataset(full_seq_df[full_seq_df[GRADE] == grade], resize=128, norm="minmax01")
             grade_loader = DataLoader(
                 grade_ds,
@@ -140,13 +140,13 @@ def main(model_name):
             x_lim = (min(x_list),max(x_list))
             y_lim = (min(y_list),max(y_list))
             z_lim = (min(z_list),max(z_list))
-            # track limits for the master plot
+            # track limits for the grouped grade
             all_x.extend([x for t in d3_trajs for x in t[:, 0]])
             all_y.extend([y for t in d3_trajs for y in t[:, 1]])
             all_z.extend([z for t in d3_trajs for z in t[:, 2]])
             im = None
             for i, d3_traj in enumerate(d3_trajs):
-                im_grade = grade_ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.full((d3_traj.shape[0],), g_color), cmap=grade_cmap, vmin=0, vmax=1)
+                im_grade = grade_ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=[g_color for _ in range(d3_traj.shape[0])])
                 ax = axes[i]
                 im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1,d3_traj.shape[0]), cmap='viridis')
                 
@@ -316,7 +316,7 @@ def main(model_name):
             fig.savefig(os.path.join("cebra_plots",f"curve_grouped_{grade}.png"))
             plt.close(fig) 
         # do all the grade stuff now
-        grade_bounds = np.arange(N + 1)
+        grade_bounds = np.arange(4)
         grade_norm = mcolors.BoundaryNorm(grade_bounds, grade_cmap.N) 
         grade_ax.set_xlim(min(all_x), max(all_x))
         grade_ax.set_ylim(min(all_y), max(all_y))
@@ -329,7 +329,7 @@ def main(model_name):
         grade_fig.subplots_adjust(right=0.85) 
         cbar_ax = grade_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
         cb = grade_fig.colorbar(plt.cm.ScalarMappable(cmap=grade_cmap, norm=grade_norm), 
-                        cax = grade_ax,
+                        ax = grade_ax,
                           ticks=grade_bounds + 0.5, 
                           spacing='uniform',
                           orientation='vertical')
@@ -340,7 +340,6 @@ def main(model_name):
 
         grade_fig.savefig(os.path.join("cebra_plots","grouped_grade.png"))
         plt.close()
-
 
 
 if __name__ == "__main__":
