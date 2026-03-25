@@ -1,5 +1,4 @@
 #!/bin/bash
-pip install iisignature
 tar -zxf signatures.tar.gz
 tar -zxf latents.tar.gz
 mkdir -p signatures
