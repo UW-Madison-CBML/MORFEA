@@ -1,26 +1,9 @@
 import torch
 from torch.nn import Module
 import torch.nn.functional as F
+import torbi
+from torchcrf import CRF
 
-
-def viterbi_decode_batch(emissions, transitions):
-    B, T, C = emissions.shape
-    device = emissions.device
-    
-    path_metrics = torch.full((B, C), -1e9, device=device)
-    path_metrics[:, 0] = emissions[:, 0, 0] 
-    
-    all_scores = [path_metrics]
-
-    for t in range(1, T):
-        scores = path_metrics.unsqueeze(1) + transitions.unsqueeze(0)
-        
-        max_prev_scores, _ = torch.max(scores, dim=2)
-        
-        path_metrics = max_prev_scores + emissions[:, t, :]
-        all_scores.append(path_metrics)
-
-    return torch.stack(all_scores, dim=1) # [B, T, C]
 class StageModel(Module):
 
     def __init__(self, input_size, num_classes=18):
@@ -30,19 +13,28 @@ class StageModel(Module):
         self.lin2 = torch.nn.Linear(256, 128)
         self.lstm = torch.nn.LSTM(128, 128, batch_first = True)
         self.lin3 = torch.nn.Linear(128, num_classes)
-        self.transition_params = torch.nn.Parameter(torch.randn(num_classes, num_classes))
+        
+        self.crf = CRF(num_classes, batch_first=True)
+        
         self.register_buffer("mask", torch.triu(torch.ones(num_classes, num_classes)))
 
-        with torch.no_grad():
-            self.transition_params.copy_(torch.eye(num_classes) * 2.0)
-
-    def forward(self, x):
+        
+    def forward(self, x, tags=None):
+        masked_transitions = self.transition_params.masked_fill(self.mask == 0, float("-inf"))
+        
         x = F.relu(self.lin1(x))
         x = F.relu(self.lin2(x))
-        x,_  = self.lstm(x)
-        emissions = self.lin3(x)
-        
-        #transitions = self.transition_params.masked_fill(self.mask == 0, -1e9)
+        x, _ = self.lstm(x)
+        emissions = F.log_softmax(self.lin3(x), dim=-1)
 
-        return emissions 
-        #return viterbi_decode_batch(emissions, transitions)
+        #start_scores = torch.full((self.num_classes,), float("-inf"), device=x.device) # use this if you want to train on just prefixes
+        #start_scores[0] = 0.0
+        with torch.no_grad():
+            self.crf.transitions.masked_fill_(self.mask == 0, float("-inf"))
+
+        if self.training and tags is not None:
+            return -self.crf(emissions, tags)
+        else:
+            return torbi.viterbi(emissions, self.crf.transitions)
+        
+        
