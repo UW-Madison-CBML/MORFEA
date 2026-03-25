@@ -127,8 +127,8 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
  
     dataset = StageDataset(df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, distance_mat=distance_mat, path_signatures=path_signatures)
     dataset_val = StageDataset(val_df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, distance_mat=distance_mat, path_signatures=path_signatures, return_embryo_id=True)
-    weights = get_class_weights(os.path.abspath("embryo_dataset_annotations"), df.groupby("embryo_id").size().reset_index(name='counts'), dataset.phases).to(DEVICE)
-    crit = torch.nn.CrossEntropyLoss(weight=weights)
+    #weights = get_class_weights(os.path.abspath("embryo_dataset_annotations"), df.groupby("embryo_id").size().reset_index(name='counts'), dataset.phases).to(DEVICE)
+    crit = torch.nn.CrossEntropyLoss()
     model = StageModel(input_size = len(dataset.lat_cols))
     model.to(DEVICE)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
@@ -157,8 +157,8 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
         for lats, labels in loader:
             lats = lats.to(DEVICE).float()
             labels = labels.to(DEVICE).long()
-            logits = model(lats)
-            loss = crit(logits.view(-1, 18), labels.view(-1)) + 0.1 * monotonicity_loss(logits)
+            loss = model(lats, tags=labels)
+            #loss = crit(logits.view(-1, 18), labels.view(-1)) + 0.1 * monotonicity_loss(logits)
              
             optimizer.zero_grad()
             loss.backward()
@@ -209,10 +209,12 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
                 print("Predicted Phases:")
                 current = ""
                 len_seq = 0
+                current_idx = 0
                 for i, idx in enumerate(pred_indices):
                     if(i == 0 or pred_indices[i-1] != idx):
-                        print(f"{current} {len_seq} times")
+                        print(f"{current} {current_idx}, {current_idx + len_seq} times")
                         current = dataset_val.phases[idx]
+                        current_idx += len_seq
                         len_seq = 1
                     
                     else:
