@@ -1,6 +1,6 @@
 # train_and_eval_cebra.sub
    
-container_image =docker://jenslundsgaard/ivf-training:v1.6
+container_image =docker://jenslundsgaard/ivf-training:v1.7
 
 #docker_image = pytorch/pytorch:2.9.0-cuda12.8-cudnn9-runtime
 #docker_image = pytorch/pytorch:1.1.0-cuda10.0-cudnn7.5-runtime
