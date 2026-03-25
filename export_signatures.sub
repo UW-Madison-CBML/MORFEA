@@ -20,7 +20,7 @@ Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
 transfer_output_remaps = "signatures.tar.gz =  file:///staging/groups/bhaskar_group/ivf/signatures.tar.gz;"
-transfer_input_files = export_signatures.sh, export_signatures.py, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz,  file:///staging/groups/bhaskar_group/ivf/signatures.tar.gz, $(model)_cebra_time_model.pt
+transfer_input_files = export_signatures.sh, export_signatures.py, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz,  file:///staging/groups/bhaskar_group/ivf/signatures.tar.gz
 #Requirements = (Machine == "bhaskargpu4000.chtc.wisc.edu") && (DriverVersion == "12.8") && (DeviceName == "NVIDIA H200")
  
 transfer_output_files = signatures.tar.gz

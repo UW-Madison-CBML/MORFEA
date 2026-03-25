@@ -59,10 +59,10 @@ def get_dim_reduce(latents, how="PCA", n_components=2):
 def get_new_row(group, cell_id, cebra_model, max_len=0):
     print(cell_id)    
     #pca = get_dim_reduce(group, how="PCA", n_components=8))
-    cebra_path = cebra_model.transform(group)
-    s_info = iisignature.prepare(3, 6)
+    #cebra_path = cebra_model.transform(group)
+    s_info = iisignature.prepare(group.shape[1], 2)
 
-    signature = iisignature.logsig(cebra_path, s_info)
+    signature = iisignature.logsig(group, s_info)
     
     #get_quad_tphate_interp(group, how="FULL", n_components=0))
     #signature = np.array([i(np.linspace(0,1, 500)) for i in get_quad_tphate_interp(group, how="FULL", n_components=0)]).flatten()
@@ -117,7 +117,7 @@ def main(model_name):
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(values)
 
-        pca = PCA(n_components=16)
+        pca = PCA(n_components=0.9)
         pca.fit(X_scaled)
 
         values = pca.transform(X_scaled)
