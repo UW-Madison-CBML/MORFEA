@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
 COPY train_requirements.txt .
 
 RUN pip install --no-cache-dir -r train_requirements.txt
-
+RUN pip install torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
 COPY . .
 
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
