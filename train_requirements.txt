@@ -22,7 +22,6 @@ pytz==2025.2
 setuptools==80.9.0
 six==1.17.0
 sympy==1.14.0
-torchaudio
 torchinfo==1.8.0
 torchsummary==1.5.1
 tqdm==4.67.1
