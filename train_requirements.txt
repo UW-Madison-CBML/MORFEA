@@ -38,5 +38,4 @@ cebra
 info-nce-pytorch
 ruff
 iisignature
-torbi
 pytorch-crf
