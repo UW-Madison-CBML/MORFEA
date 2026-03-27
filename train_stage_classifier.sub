@@ -22,12 +22,9 @@ Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
 transfer_input_files = train_stage_classifier.sh, train_stage_classifier.py, stage_model.py, api_keys.txt, stage_dataset.py, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz, geometric_features.py
-+WantGPULab = true
-+GPUJobLength = "long"
 gpus_minimum_capability = 7.0
 requirements= Machine=="bhaskargpu4000.chtc.wisc.edu"
  
-+GPUModel = "NVIDIA H200"
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
 request_cpus = 16
