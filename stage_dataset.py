@@ -10,7 +10,7 @@ from scipy.stats import kurtosis
 import iisignature
 import umap
 from geometric_features import calculate_curvatures, get_path_sigs
- 
+from torch.nn.utils.rnn import pad_sequence 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 from scipy.spatial import distance_matrix
 def addAnnotations(group_name, group, annotations_dir, curvature = True, velocity = True, latents = True, acceleration = True, path_signatures = True, distance_mat=True):
@@ -114,26 +114,33 @@ class StageDataset(Dataset):
         group = self.groups.get_group(row["embryo_id"])
 
         
-        seqindex = int(((row["time_step"] - 1) / len(group)) * (len(group) - self.seqlength - 1))
+        #seqindex = int(((row["time_step"] - 1) / len(group)) * (len(group) - self.seqlength - 1))
 
-        seq_df = group.iloc[seqindex : seqindex + self.seqlength]
+        seq_df = group.loc[:idx+1]
 
         if (self.return_embryo_id):
 
-            return seq_df[self.lat_cols].to_numpy(), torch.tensor([self.phases.index(r["phase"]) for _,r in seq_df.iterrows()], dtype = torch.long), row["embryo_id"]
+            return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.phases.index(r["phase"]) for _,r in seq_df.iterrows()], dtype = torch.long), row["embryo_id"]
 
-        return seq_df[self.lat_cols].to_numpy(), torch.tensor([self.phases.index(r["phase"]) for _,r in seq_df.iterrows()], dtype = torch.long)
+        return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.phases.index(r["phase"]) for _,r in seq_df.iterrows()], dtype = torch.long)
         
-
-        # [EMBRYO1, 0, .... (latent vector),
-        # EMBRYO1, 1, .... (latent vector)]
-        # [EMBRYO2, 0, .... (latent vector),
-        # EMBRYO2, 1, .... (latent vector)]
-        # grab index with self.df.loc[idx]
-        # that row['stage'] will be in some set of ["stage0","stage1","stage2"...],
-        # CEL does not expect [0,0,1...] but rather 1 "stage1", 3 "stage3"
-        # return velocity, curvature, stage (stage is an long 64 integer)
-
 
     def __len__(self):
         return len(self.df)
+
+    def pad_collate(self, batch):
+        if(self.return_embryo_id):
+            (data, labels,embryo_id) = zip(*batch)
+        else:  
+            (data, labels) = zip(*batch)
+        
+        data_padded = pad_sequence(data, batch_first=True, padding_value=0)
+        
+        labels_padded = pad_sequence(labels, batch_first=True, padding_value=0)
+        mask = torch.zeros(labels_padded.shape, dtype=torch.bool)
+        for i, seq in enumerate(labels):
+            mask[i, :len(seq)] = True
+        
+        if(self.return_embryo_id):
+            return data_padded, labels_padded, mask, embryo_id
+        return data_padded, labels_padded, mask

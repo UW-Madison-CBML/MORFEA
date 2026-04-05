@@ -137,11 +137,12 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
  
     loader = DataLoader(
         dataset,
-        batch_size=128,
+        batch_size=32,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
-        drop_last=True
+        drop_last=True,
+        collate_fn = lambda x: dataset.pad_collate(x)
     )
     loader_val = DataLoader(
         dataset_val,
@@ -150,15 +151,18 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
         num_workers=4,
         pin_memory=True,
         drop_last=False
+        
+        #collate_fn = lambda x: dataset.pad_collate(x) # i dont think this is necessary for batch of 1
     )
     print(len(loader))
     for epoch in range(8):
         print(epoch)
         model.train()
-        for lats, labels in loader:
+        for lats, labels,masks in loader:
             lats = lats.to(DEVICE).float()
             labels = labels.to(DEVICE).long()
-            loss = model(lats, tags=labels)
+            masks = masks.to(DEVICE)
+            loss = model(lats, masks, tags=labels)
             #loss = crit(logits.view(-1, 18), labels.view(-1)) + 0.1 * monotonicity_loss(logits)
              
             optimizer.zero_grad()
@@ -175,7 +179,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
             for lats, labels, embryo_id in loader_val:
                 lats = lats.to(DEVICE).float()
                 labels = labels.to(DEVICE).long()
-                logits = model(lats)
+                logits = model(lats, None) # no mask for single batch
 
                 embryo_id = embryo_id[0]
 
@@ -200,7 +204,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
                 print(data.shape)
                 whole_seq = torch.tensor(data, dtype=torch.float32).unsqueeze(0).to(DEVICE)
                 
-                logits = model(whole_seq)
+                logits = model(whole_seq, None)
                 
                 pred_indices = logits.argmax(dim=-1).squeeze(0).cpu().numpy()
                 print(pred_indices)

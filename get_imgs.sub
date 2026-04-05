@@ -1,6 +1,6 @@
 # get_imgs.sub
    
-docker_image = jenslundsgaard/ivf-training:v1.0
+docker_image = jenslundsgaard/ivf-training:v1.7
 #docker_image = pytorch/pytorch:2.9.0-cuda12.8-cudnn9-runtime
 #docker_image = pytorch/pytorch:1.1.0-cuda10.0-cudnn7.5-runtime
 universe = docker
@@ -38,5 +38,5 @@ request_disk = 80GB
 request_gpus = 1
 
 
-queue model in (notemp-2026-02-20,noconv-2026-02-20,control-2026-02-20)
+queue model in (notemp-2026-03-12)
 
