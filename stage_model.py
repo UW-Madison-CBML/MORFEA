@@ -15,25 +15,33 @@ class StageModel(Module):
         self.lin3 = torch.nn.Linear(128, num_classes)
         
         self.crf = CRF(num_classes, batch_first=True)
-        
+        with torch.no_grad():
+            self.crf.start_transitions.fill_(-10000.0)
+            self.crf.start_transitions[0] = 0.0 
         self.register_buffer("mask", torch.triu(torch.ones(num_classes, num_classes)))
 
         
-    def forward(self, x, tags=None):
+    def forward(self, x, mask, tags=None):
         B,T, L = x.shape 
         x = F.relu(self.lin1(x))
         x = F.relu(self.lin2(x))
         x, _ = self.lstm(x)
         emissions = F.log_softmax(self.lin3(x), dim=-1)
-
+        if torch.isnan(emissions).any():
+            print("bad emissions") 
         #start_scores = torch.full((self.num_classes,), float("-inf"), device=x.device) # use this if you want to train on just prefixes
         #start_scores[0] = 0.0
+        if mask is None:
+            mask = torch.ones(tags.shape, dtype=torch.bool) 
         with torch.no_grad():
             self.crf.transitions.masked_fill_(self.mask == 0, float("-inf"))
 
         if self.training and tags is not None:
-            return -self.crf(emissions, tags)
+            loss = -self.crf(emissions, tags, mask=mask)
+            if(torch.isnan(loss).any()):
+                print("bad loss")
+            return loss
         else:
-            decoded = self.crf.decode(emissions)
+            decoded = self.crf.decode(emissions, mask=mask)
             decoded_tensor = torch.tensor(decoded, device = emissions.device)
             return F.one_hot(decoded_tensor, num_classes=self.num_classes) 
