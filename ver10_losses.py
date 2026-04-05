@@ -15,13 +15,6 @@ Rolled InfoNCE design (credit: collaborator suggestion):
     positive = z_seq[:, 1:]                next frame (enforces smoothness)
     negative = torch.roll(z_seq, 1, dim=0) same timesteps from another embryo
 
-    Why this works:
-    - positive is z_{t+1}: enforces temporal smoothness within trajectory
-    - negative is rolled batch: uses OTHER embryos as negatives
-    - prevents all embryos collapsing to same latent region
-    - does NOT suffer from LSTM trivial solution (near frames always closer
-      than rolled negatives from different embryos)
-    - batch_size >= 2 required (roll needs at least one other embryo)
 """
 
 import torch
