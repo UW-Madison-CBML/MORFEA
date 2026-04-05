@@ -1,13 +1,13 @@
 import torch
 from torch.nn import Module
 import torch.nn.functional as F
-import torbi
 from torchcrf import CRF
 
 class StageModel(Module):
 
     def __init__(self, input_size, num_classes=18):
         super().__init__()
+        self.num_classes = num_classes
 
         self.lin1 = torch.nn.Linear(input_size, 256)
         self.lin2 = torch.nn.Linear(256, 128)
@@ -20,8 +20,7 @@ class StageModel(Module):
 
         
     def forward(self, x, tags=None):
-        masked_transitions = self.transition_params.masked_fill(self.mask == 0, float("-inf"))
-        
+        B,T, L = x.shape 
         x = F.relu(self.lin1(x))
         x = F.relu(self.lin2(x))
         x, _ = self.lstm(x)
@@ -35,6 +34,6 @@ class StageModel(Module):
         if self.training and tags is not None:
             return -self.crf(emissions, tags)
         else:
-            return torbi.viterbi(emissions, self.crf.transitions)
-        
-        
+            decoded = self.crf.decode(emissions)
+            decoded_tensor = torch.tensor(decoded, device = emissions.device)
+            return F.one_hot(decoded_tensor, num_classes=self.num_classes) 

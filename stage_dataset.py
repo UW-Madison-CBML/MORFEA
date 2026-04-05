@@ -8,6 +8,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from scipy.stats import kurtosis
 import iisignature
+import umap
 from geometric_features import calculate_curvatures, get_path_sigs
  
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -87,7 +88,7 @@ class StageDataset(Dataset):
         scaler = StandardScaler()
         scaled_data = scaler.fit_transform(values)
 
-        pca = PCA(n_components=20) 
+        pca = umap.UMAP(n_neighbors=10, random_state=42, n_components=8) #PCA(n_components=20) 
         pca_results = pca.fit_transform(scaled_data)
         
         self.pca_latents_df = pd.DataFrame(pca_results, columns=[f"pca_{i}" for i in range(pca_results.shape[1])], index=self.latents_df.index)
