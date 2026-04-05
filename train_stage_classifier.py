@@ -130,6 +130,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
     #weights = get_class_weights(os.path.abspath("embryo_dataset_annotations"), df.groupby("embryo_id").size().reset_index(name='counts'), dataset.phases).to(DEVICE)
     crit = torch.nn.CrossEntropyLoss()
     model = StageModel(input_size = len(dataset.lat_cols))
+    torch.backends.cudnn.enabled = False
     model.to(DEVICE)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
  
@@ -175,8 +176,6 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
                 lats = lats.to(DEVICE).float()
                 labels = labels.to(DEVICE).long()
                 logits = model(lats)
-                loss = crit(logits.view(-1, 18), labels.view(-1))
-                loss_stats.push(loss.item())
 
                 embryo_id = embryo_id[0]
 
@@ -188,8 +187,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
                 # Calculate accuracy
                 preds = logits.view(-1,18).argmax(dim=1)  # Get predicted class (0, 1, or 2)
                 acc_stats.push((preds == labels.view(-1)).sum().item()/labels.view(-1).shape[0])
-        run.log({"val_loss":loss_stats.mean,
-            "val_loss_std":loss_stats.std_dev,
+        run.log({
             "val_acc":acc_stats.mean,
             "val_acc_std":acc_stats.std_dev})
         highest_std = sorted(list(stats_dict.items()), key = lambda x: (x[1].std_dev))[:5]
@@ -205,6 +203,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
                 logits = model(whole_seq)
                 
                 pred_indices = logits.argmax(dim=-1).squeeze(0).cpu().numpy()
+                print(pred_indices)
 
                 print("Predicted Phases:")
                 current = ""
