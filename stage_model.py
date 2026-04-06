@@ -31,7 +31,7 @@ class StageModel(Module):
             print("bad emissions") 
         #start_scores = torch.full((self.num_classes,), float("-inf"), device=x.device) # use this if you want to train on just prefixes
         #start_scores[0] = 0.0
-        if mask is None:
+        if mask is None and tags is not None:
             mask = torch.ones(tags.shape, dtype=torch.bool) 
         with torch.no_grad():
             self.crf.transitions.masked_fill_(self.mask == 0, float("-inf"))
