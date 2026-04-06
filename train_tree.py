@@ -5,6 +5,7 @@ import numpy as np
 import math
 from sklearn import tree
 from torch.utils.data import DataLoader
+from sklearn.ensemble import RandomForestClassifier
 class RunningStats:
     def __init__(self):
         self.n = 0
@@ -125,8 +126,8 @@ def main(model_name):
         drop_last=False
     )
 
-    model_te = tree.DecisionTreeClassifier()
-    model_icm = tree.DecisionTreeClassifier()
+    model_te = RandomForestClassifier(max_depth=2, random_state=0)
+    model_icm = RandomForestClassifier(max_depth=2, random_state=0)
 
     def get_full_data(loader):
         sigs, labels = [], []
