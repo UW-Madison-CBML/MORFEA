@@ -136,7 +136,7 @@ class StageDataset(Dataset):
         
         data_padded = pad_sequence(data, batch_first=True, padding_value=0)
         
-        labels_padded = pad_sequence(labels, batch_first=True, padding_value=0)
+        labels_padded = pad_sequence(labels, batch_first=True, padding_value=-1)
         mask = torch.zeros(labels_padded.shape, dtype=torch.bool)
         for i, seq in enumerate(labels):
             mask[i, :len(seq)] = True
