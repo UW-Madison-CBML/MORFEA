@@ -104,11 +104,11 @@ def main(model_name):
 
     USE_PCA = False
     file_name = "latents/"+ model_name
-    cebra_time_model = cebra.CEBRA.load(
+    """cebra_time_model = cebra.CEBRA.load(
         os.path.abspath(f"{model_name}_cebra_time_model.pt"),
         weights_only=False,
     )
-    #file_name =
+    #file_name ="""
     keys = pd.read_csv(file_name+".csv").rename(columns={"cell_id":"embryo_id", "video_name":"embryo_id"})
     values = np.load(file_name+'.npy')
     if(len(keys) != values.shape[0]):
