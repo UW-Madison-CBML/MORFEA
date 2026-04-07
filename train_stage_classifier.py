@@ -137,7 +137,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
  
     loader = DataLoader(
         dataset,
-        batch_size=32,
+        batch_size=128,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
