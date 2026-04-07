@@ -30,4 +30,5 @@ request_memory = 50GB
 request_disk = 50GB
 
 
-queue model from signature_models.txt
+#queue model from signature_models.txt # for non dag use
+queue 1 # for dag use, use VARS to insert model variable
