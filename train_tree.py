@@ -126,8 +126,8 @@ def main(model_name):
         drop_last=False
     )
 
-    model_te = RandomForestClassifier(max_depth=2, random_state=0)
-    model_icm = RandomForestClassifier(max_depth=2, random_state=0)
+    model_te = RandomForestClassifier(max_depth=4, random_state=0)
+    model_icm = RandomForestClassifier(max_depth=4, random_state=0)
 
     def get_full_data(loader):
         sigs, labels = [], []
