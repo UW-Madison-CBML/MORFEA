@@ -13,12 +13,11 @@ from geometric_features import calculate_curvatures, get_path_sigs
 from torch.nn.utils.rnn import pad_sequence 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 from scipy.spatial import distance_matrix
-def addAnnotations(group_name, group, annotations_dir, curvature = True, velocity = True, latents = True, acceleration = True, path_signatures = True, distance_mat=True):
+def get_annotations_col(embryo_id, group_len, annotations_dir):
     annotation_file = os.path.join(annotations_dir, f"{group_name}_phases.csv")
     df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
 
     new_column = []
-    lat_cols = [column for column in group.columns if column.startswith("z_")]
     
     pca_cols = [column for column in group.columns if column.startswith("pca_")]
     new_column += ["pre_phase"] * (df.iloc[0]["stage_begin"] - 1)
@@ -30,9 +29,14 @@ def addAnnotations(group_name, group, annotations_dir, curvature = True, velocit
     
 
 
-    new_column += ["post_phase"] * (len(group) - len(new_column))
-    new_column = new_column[:len(group)]
-    
+    new_column += ["post_phase"] * (group_len - len(new_column))
+    new_column = new_column[:group_len]
+    return new_column
+ 
+def addAnnotations(group_name, group, annotations_dir, curvature = True, velocity = True, latents = True, acceleration = True, path_signatures = True, distance_mat=True):
+   
+    lat_cols = [column for column in group.columns if column.startswith("z_")]
+    new_column = get_annotations_col(group_name, len(group), annotations_dir)
     group["phase"] = new_column
 
     trajectory = group[lat_cols].to_numpy()

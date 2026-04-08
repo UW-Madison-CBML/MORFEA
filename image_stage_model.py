@@ -2,14 +2,21 @@ import torch
 from torch.nn import Module
 import torch.nn.functional as F
 from torchcrf import CRF
-
+from raffael_model import ResidualBlock
 class StageModel(Module):
 
     def __init__(self, input_size, num_classes=18):
         super().__init__()
         self.num_classes = num_classes
+        self.cnn = nn.Sequential(
+            ResidualBlock(input_channels, 32, downsample=True),
+            ResidualBlock(32, 32, downsample=True),
+            ResidualBlock(32, 32, downsample=True),
+            ResidualBlock(32, 32, downsample=True), # 8 * 8 * 32
+        )
 
-        self.lin1 = torch.nn.Linear(input_size, 256)
+
+        self.lin1 = torch.nn.Linear(2048, 256)
         self.lin2 = torch.nn.Linear(256, 128)
         self.lstm = torch.nn.LSTM(128, 128, batch_first = True)
         self.lin3 = torch.nn.Linear(128, num_classes)
@@ -22,7 +29,8 @@ class StageModel(Module):
 
         
     def forward(self, x, mask, tags=None):
-        B,T, L = x.shape 
+        B,T, C, H, W = x.shape 
+        x = self.cnn(x)
         x = F.relu(self.lin1(x))
         x = F.relu(self.lin2(x))
         x, _ = self.lstm(x)
