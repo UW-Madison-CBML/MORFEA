@@ -13,13 +13,12 @@ from geometric_features import calculate_curvatures, get_path_sigs
 from torch.nn.utils.rnn import pad_sequence 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 from scipy.spatial import distance_matrix
-def get_annotations_col(embryo_id, group_len, annotations_dir):
+def get_annotations_col(group_name, group_len, annotations_dir):
     annotation_file = os.path.join(annotations_dir, f"{group_name}_phases.csv")
     df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
 
     new_column = []
     
-    pca_cols = [column for column in group.columns if column.startswith("pca_")]
     new_column += ["pre_phase"] * (df.iloc[0]["stage_begin"] - 1)
     col_len_seq = []
     for index, row in df.iterrows():
@@ -40,6 +39,7 @@ def addAnnotations(group_name, group, annotations_dir, curvature = True, velocit
     group["phase"] = new_column
 
     trajectory = group[lat_cols].to_numpy()
+    pca_cols = [column for column in group.columns if column.startswith("pca_")]
     pca_trajectory = group[pca_cols].to_numpy()
 
     if (curvature):

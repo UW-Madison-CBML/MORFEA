@@ -26,18 +26,16 @@ class StageModel(Module):
         x = F.relu(self.lin1(x))
         x = F.relu(self.lin2(x))
         x, _ = self.lstm(x)
-        emissions = F.log_softmax(self.lin3(x), dim=-1)
+        emissions = self.lin3(x)
         if torch.isnan(emissions).any():
             print("bad emissions") 
         #start_scores = torch.full((self.num_classes,), float("-inf"), device=x.device) # use this if you want to train on just prefixes
         #start_scores[0] = 0.0
         if mask is None and tags is not None:
             mask = torch.ones(tags.shape, dtype=torch.bool) 
-        with torch.no_grad():
-            self.crf.transitions.masked_fill_(self.mask == 0, float("-inf"))
 
         if self.training and tags is not None:
-            loss = -self.crf(emissions, tags, mask=mask)
+            loss = -self.crf(emissions, tags, mask=mask, reduction='token_mean')
             if(torch.isnan(loss).any()):
                 print("bad loss")
             return loss
