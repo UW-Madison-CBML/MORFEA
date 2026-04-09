@@ -164,6 +164,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
             masks = masks.to(DEVICE)
             loss = model(lats, masks, tags=labels)
             #loss = crit(logits.view(-1, 18), labels.view(-1)) + 0.1 * monotonicity_loss(logits)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
              
             optimizer.zero_grad()
             loss.backward()
