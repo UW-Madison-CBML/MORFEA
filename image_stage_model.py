@@ -3,13 +3,13 @@ from torch.nn import Module
 import torch.nn.functional as F
 from torchcrf import CRF
 from raffael_model import ResidualBlock
-class StageModel(Module):
+class ImageStageModel(Module):
 
-    def __init__(self, input_size, num_classes=18):
+    def __init__(self, num_classes=18):
         super().__init__()
         self.num_classes = num_classes
-        self.cnn = nn.Sequential(
-            ResidualBlock(input_channels, 32, downsample=True),
+        self.cnn = torch.nn.Sequential(
+            ResidualBlock(1, 32, downsample=True),
             ResidualBlock(32, 32, downsample=True),
             ResidualBlock(32, 32, downsample=True),
             ResidualBlock(32, 32, downsample=True), # 8 * 8 * 32
@@ -30,7 +30,9 @@ class StageModel(Module):
         
     def forward(self, x, mask, tags=None):
         B,T, C, H, W = x.shape 
+        x = x.view(B * T, C, H, W)
         x = self.cnn(x)
+        x = x.view(B,T,-1)#should be 2048
         x = F.relu(self.lin1(x))
         x = F.relu(self.lin2(x))
         x, _ = self.lstm(x)

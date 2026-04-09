@@ -9,6 +9,8 @@ import numpy as np
 import math
 from torch.utils.data import Dataset
 from PIL import Image, ImageFile
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 from torch.nn.utils.rnn import pad_sequence 
 class RunningStats:
     def __init__(self):
@@ -33,12 +35,11 @@ class RunningStats:
     def std_dev(self):
         return math.sqrt(self.variance)
 def get_annotations_col(embryo_id, group_len, annotations_dir):
-    annotation_file = os.path.join(annotations_dir, f"{group_name}_phases.csv")
+    annotation_file = os.path.join(annotations_dir, f"{embryo_id}_phases.csv")
     df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
 
     new_column = []
     
-    pca_cols = [column for column in group.columns if column.startswith("pca_")]
     new_column += ["pre_phase"] * (df.iloc[0]["stage_begin"] - 1)
     col_len_seq = []
     for index, row in df.iterrows():
@@ -56,6 +57,7 @@ class StageImageDataset(Dataset):
     def __init__(self, df, resize=128, norm="minmax01", return_embryo_id=False):
         self.resize = resize
         self.norm = norm
+        self.return_embryo_id = return_embryo_id
         print("og df len: ", str(df["num_frames"].sum()))
         self.df = pd.concat([pd.DataFrame({"embryo_id":df.iloc[i]["embryo_id"],"phase":get_annotations_col(df.iloc[i]["embryo_id"],df.iloc[i]["num_frames"], "embryo_dataset_annotations"),"frame":df.iloc[i]["embryo_paths"].split("|")}) for i in range(len(df))], ignore_index=True).reset_index()
         print("neq df len: ", str(len(self.df)))
@@ -97,9 +99,9 @@ class StageImageDataset(Dataset):
         
         #seqindex = int(((row["time_step"] - 1) / len(group)) * (len(group) - self.seqlength - 1))
 
-        seq_df = group.loc[:idx+1]
+        seq_df = group.loc[:max(group.index[0] + 5, idx+1)]
 
-        embryo_paths = seq_df["embryo_id"]
+        embryo_paths = seq_df["frame"]
         embryo_frames = [self._read_gray(p) for p in embryo_paths]
         embryo_vol = np.stack(embryo_frames, axis=0)  # (T, H, W)
 
@@ -196,9 +198,7 @@ def main():
     )
  
     learning_rate = 0.001
-    lat_columns = [f"z_{i}" for i in range(lat_np.shape[1])]
-    values_df = pd.DataFrame(lat_np, columns=lat_columns)
-    df = pd.concat([lat_df, values_df], axis = 1)
+    df = pd.read_csv(os.path.abspath("index_embryo.csv"))
     mask = df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = df[mask]
     df = df[~mask]
@@ -215,7 +215,7 @@ def main():
  
     loader = DataLoader(
         dataset,
-        batch_size=128,
+        batch_size=32,
         shuffle=True,
         num_workers=16,
         pin_memory=True,

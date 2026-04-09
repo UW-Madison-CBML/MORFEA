@@ -120,7 +120,7 @@ class StageDataset(Dataset):
         
         #seqindex = int(((row["time_step"] - 1) / len(group)) * (len(group) - self.seqlength - 1))
 
-        seq_df = group.loc[:idx+1]
+        seq_df = group.loc[:max(group.index[0] + 5, idx+1)]
 
         if (self.return_embryo_id):
 

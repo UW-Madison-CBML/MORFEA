@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from raffael_conv_lstm import ConvLSTM
+#from raffael_conv_lstm import ConvLSTM
 from huggingface_hub import PyTorchModelHubMixin
 import torch.nn.functional as F
 

@@ -28,9 +28,9 @@ requirements= Machine=="bhaskargpu4000.chtc.wisc.edu"
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
 request_cpus = 16
-request_memory = 64GB
+request_memory = 200GB
 request_disk = 80GB
 request_gpus = 1
  
  
-queue model from train_stage_classifier.txt
+queue 1
