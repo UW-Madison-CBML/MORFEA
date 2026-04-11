@@ -8,6 +8,10 @@ import os
 import pandas as pd
 import numpy as np
 import math
+import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from matplotlib.patches import Patch
 class RunningStats:
     def __init__(self):
         self.n = 0
@@ -101,7 +105,7 @@ def monotonicity_loss(batched_logits_seq, temp=8.0):
     
     
     
-def main(model_name, curvature = True, velocity = True, acceleration = True, path_signatures = True, latents = True, distance_mat=True):
+def main(model_name, features):
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -110,7 +114,7 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
     run = wandb.init(
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
-        name=f"{model_name}-phase-{'c' if curvature else ''}{'v' if velocity else ''}{'p' if path_signatures else ''}{'l' if latents else ''}{'d' if distance_mat else ''}{'a' if acceleration else ''}",
+        name=f"{model_name}-phase-{'c' if features['curvature'] else ''}{'v' if features['velocity'] else ''}{'p' if features['path_signatures'] else ''}{'l' if features['latents'] else ''}{'d' if features['distance_mat'] else ''}{'a' if features['acceleration'] else ''}",
     )
  
     learning_rate = 0.001
@@ -125,8 +129,8 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
     val_df = df[mask]
     df = df[~mask]
  
-    dataset = StageDataset(df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, distance_mat=distance_mat, path_signatures=path_signatures)
-    dataset_val = StageDataset(val_df, "embryo_dataset_annotations", latents=latents, velocity=velocity, acceleration=acceleration, curvature=curvature, distance_mat=distance_mat, path_signatures=path_signatures, return_embryo_id=True)
+    dataset = StageDataset(df, "embryo_dataset_annotations", features)
+    dataset_val = StageDataset(val_df, "embryo_dataset_annotations", features, return_embryo_id=True)
     #weights = get_class_weights(os.path.abspath("embryo_dataset_annotations"), df.groupby("embryo_id").size().reset_index(name='counts'), dataset.phases).to(DEVICE)
     crit = torch.nn.CrossEntropyLoss()
     model = StageModel(input_size = len(dataset.lat_cols))
@@ -195,20 +199,21 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
         run.log({
             "val_acc":acc_stats.mean,
             "val_acc_std":acc_stats.std_dev})
-        highest_std = sorted(list(stats_dict.items()), key = lambda x: (x[1].std_dev))[:5]
+        highest_std = sorted(list(stats_dict.items()), key = lambda x: -1*(x[1].std_dev))[:10]
         model.eval()
         for embryo, _ in highest_std:
+            print(embryo)
             with open(os.path.join("embryo_dataset_annotations", f"{embryo}_phases.csv"), 'r') as file:
                 print("Ground Truth:\n", file.read())
+            
+            ground_truth_indices = np.array([dataset_val.phases.index(phase) for phase in dataset_val.df[dataset_val.df["embryo_id"] == embryo]["phase"].tolist()])
             with torch.no_grad():
                 data = dataset_val.df[dataset_val.df["embryo_id"] == embryo][dataset_val.lat_cols].to_numpy()
-                print(data.shape)
                 whole_seq = torch.tensor(data, dtype=torch.float32).unsqueeze(0).to(DEVICE)
                 
                 logits = model(whole_seq, None)
                 
                 pred_indices = logits.argmax(dim=-1).squeeze(0).cpu().numpy()
-                print(pred_indices)
 
                 print("Predicted Phases:")
                 current = ""
@@ -223,7 +228,19 @@ def main(model_name, curvature = True, velocity = True, acceleration = True, pat
                     
                     else:
                         len_seq += 1
-                
+                if(len(pred_indices) != len(ground_truth_indices)):
+                    print("bad index lists") 
+                else:
+                    fig, ax = plt.subplots()          
+                    ax.step(np.arange(len(pred_indices), pred_indices, where='post', label='Predicted'))
+                    ax.step(np.arange(len(pred_indices), ground_truth_indices, where='post', label='Ground Truth'))
+                    fig.set_ylabel('Phase')
+                    fig.set_xlabel('Timestep')
+                    fig.set_title(embryo)
+                    legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(dataset_val.phases)]
+                    fig.legend(handles=legend_elements, title="Phases") 
+                    run.log({"pred_vs_truth": wandb.Image(fig)}) 
+                    plt.close(fig)
                  
 
 
@@ -244,4 +261,4 @@ if __name__ == "__main__":
   
     args = parser.parse_args()
  
-    main(args.name,curvature=args.curvature,latents=args.latents,velocity=args.velocity, acceleration=args.acceleration, distance_mat=args.distance_mat, path_signatures=args.path_signatures)
+    main(args.name, vars(args))
