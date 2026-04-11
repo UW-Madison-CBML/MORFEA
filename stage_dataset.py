@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from scipy.stats import kurtosis
 import iisignature
 import umap
-from geometric_features import calculate_curvatures, get_path_sigs
+from geometric_features import calculate_curvatures, get_path_sigs, get_acc, get_vel
 from torch.nn.utils.rnn import pad_sequence 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 from scipy.spatial import distance_matrix
@@ -67,7 +67,10 @@ def add_annotations(group_name, group, annotations_dir, features):
         group["z_dist"] = mat
     
     if(features['acceleration']):
-        print("")         
+        group['z_acc'] = get_acc(trajectory)
+        
+    if(features['velocity']):
+        group['z_vel'] = get_vel(trajectory)
 
 
     if (not features['latents']):

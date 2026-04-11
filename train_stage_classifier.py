@@ -12,6 +12,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.patches import Patch
+
+from torch.optim.lr_scheduler import CosineAnnealingLR, CosineAnnealingWarmRestarts
 class RunningStats:
     def __init__(self):
         self.n = 0
@@ -80,7 +82,7 @@ VAL_EMBRYOS =[
     "AM918-2-5",
     "LNA592-9",
     ]
-def get_class_weights(annotations_dir, lat_group_sizes, phases):
+"""def get_class_weights(annotations_dir, lat_group_sizes, phases):
     stage_id_freq = {phase: 0 for phase in phases}
     for i, row in lat_group_sizes.iterrows():
         annotations_df = pd.read_csv(os.path.join(annotations_dir, f"{row['embryo_id']}_phases.csv"), header=None, names=["stage_id","stage_begin", "stage_end"])
@@ -99,7 +101,7 @@ def monotonicity_loss(batched_logits_seq, temp=8.0):
     soft_indices = (probs * indices).sum(dim=-1) # (B, T) 
     diffs = soft_indices.diff(dim=-1) # (B, T-1) 
     monotone_violations = F.leaky_relu(-diffs, negative_slope=0.1) 
-    return monotone_violations.mean()
+    return monotone_violations.mean()"""
  
     
     
@@ -117,7 +119,7 @@ def main(model_name, features):
         name=f"{model_name}-phase-{'c' if features['curvature'] else ''}{'v' if features['velocity'] else ''}{'p' if features['path_signatures'] else ''}{'l' if features['latents'] else ''}{'d' if features['distance_mat'] else ''}{'a' if features['acceleration'] else ''}",
     )
  
-    learning_rate = 0.001
+    learning_rate = 0.0001
     lat_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv")).rename(columns={"cell_id":"embryo_id"})
     lat_np = np.load(os.path.abspath(f"latents/{model_name}.npy"))
     if(len(lat_df) != lat_np.shape[0]):
@@ -136,8 +138,8 @@ def main(model_name, features):
     model = StageModel(input_size = len(dataset.lat_cols))
     torch.backends.cudnn.enabled = False
     model.to(DEVICE)
+    
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
- 
  
     loader = DataLoader(
         dataset,
@@ -158,8 +160,11 @@ def main(model_name, features):
         
         #collate_fn = lambda x: dataset.pad_collate(x) # i dont think this is necessary for batch of 1
     )
+
+    epochs = 5
+    scheduler = CosineAnnealingLR(optimizer, len(loader) * epochs)
     print(len(loader))
-    for epoch in range(8):
+    for epoch in range(epochs):
         print(epoch)
         model.train()
         for lats, labels,masks in loader:
@@ -173,9 +178,9 @@ def main(model_name, features):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            scheduler.step()
             run.log({"loss": loss.item()})
         model.eval()
-        loss_stats = RunningStats()
         acc_stats = RunningStats()
 
         stats_dict = {} 
@@ -187,19 +192,19 @@ def main(model_name, features):
                 logits = model(lats, None) # no mask for single batch
 
                 embryo_id = embryo_id[0]
+                preds = logits.view(-1,18).argmax(dim=1)  # Get predicted class (0, 1, or 2)
+                acc = (preds == labels.view(-1)).sum().item()/labels.view(-1).shape[0]
+                acc_stats.push(acc)
 
                 if (embryo_id in stats_dict.keys()):
-                    stats_dict[embryo_id].push(loss.item())
+                    stats_dict[embryo_id].push(acc)
                 else:
                     stats_dict[embryo_id] = RunningStats()
+                    stats_dict[embryo_id].push(acc)
+                    
  
-                # Calculate accuracy
-                preds = logits.view(-1,18).argmax(dim=1)  # Get predicted class (0, 1, or 2)
-                acc_stats.push((preds == labels.view(-1)).sum().item()/labels.view(-1).shape[0])
-        run.log({
-            "val_acc":acc_stats.mean,
-            "val_acc_std":acc_stats.std_dev})
-        highest_std = sorted(list(stats_dict.items()), key = lambda x: -1*(x[1].std_dev))[:10]
+        run.log({"val_acc":acc_stats.mean, "val_acc_std":acc_stats.std_dev})
+        highest_std = sorted(list(stats_dict.items()), key = lambda x: -1*(x[1].mean))[:10]
         model.eval()
         for embryo, _ in highest_std:
             print(embryo)
@@ -232,12 +237,23 @@ def main(model_name, features):
                     print("bad index lists") 
                 else:
                     fig, ax = plt.subplots()          
-                    ax.step(np.arange(len(pred_indices), pred_indices, where='post', label='Predicted'))
-                    ax.step(np.arange(len(pred_indices), ground_truth_indices, where='post', label='Ground Truth'))
-                    fig.set_ylabel('Phase')
-                    fig.set_xlabel('Timestep')
-                    fig.set_title(embryo)
-                    legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(dataset_val.phases)]
+                    cmap = plt.get_cmap('tab20c')  
+                    x = np.arange(len(pred_indices))
+                    for i in range(len(x)-1):
+                        color = cmap(ground_truth_indices[i])
+                        
+                        ax.plot([x[i], x[i+1]], [ground_truth_indices[i], ground_truth_indices[i]], color=color, lw=3)
+                        ax.plot([x[i+1], x[i+1]], [ground_truth_indices[i], ground_truth_indices[i+1]], color="black", lw=1)
+                    
+                    for i in range(len(x)-1):
+                        ax.plot([x[i], x[i+1]], [pred_indices[i], pred_indices[i]], color="red", lw=2)
+                        ax.plot([x[i+1], x[i+1]], [pred_indices[i], pred_indices[i+1]], color="red", lw=2)
+
+
+                    ax.set_ylabel('Phase')
+                    ax.set_xlabel('Timestep')
+                    ax.set_title(embryo)
+                    legend_elements = [Patch(facecolor=cmap(i), label=phase) for i, phase in enumerate(dataset_val.phases)]
                     fig.legend(handles=legend_elements, title="Phases") 
                     run.log({"pred_vs_truth": wandb.Image(fig)}) 
                     plt.close(fig)
