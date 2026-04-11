@@ -119,7 +119,7 @@ def main(model_name, features):
         name=f"{model_name}-phase-{'c' if features['curvature'] else ''}{'v' if features['velocity'] else ''}{'p' if features['path_signatures'] else ''}{'l' if features['latents'] else ''}{'d' if features['distance_mat'] else ''}{'a' if features['acceleration'] else ''}",
     )
  
-    learning_rate = 0.0001
+    learning_rate = 0.001
     lat_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv")).rename(columns={"cell_id":"embryo_id"})
     lat_np = np.load(os.path.abspath(f"latents/{model_name}.npy"))
     if(len(lat_df) != lat_np.shape[0]):
@@ -161,7 +161,7 @@ def main(model_name, features):
         #collate_fn = lambda x: dataset.pad_collate(x) # i dont think this is necessary for batch of 1
     )
 
-    epochs = 5
+    epochs = 8
     scheduler = CosineAnnealingLR(optimizer, len(loader) * epochs)
     print(len(loader))
     for epoch in range(epochs):
@@ -179,7 +179,7 @@ def main(model_name, features):
             loss.backward()
             optimizer.step()
             scheduler.step()
-            run.log({"loss": loss.item()})
+            run.log({"loss": loss.item(), "lr": scheduler.get_last_lr()[0]})
         model.eval()
         acc_stats = RunningStats()
 
