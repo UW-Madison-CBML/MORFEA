@@ -13,7 +13,6 @@ Changes from Ver10:
    decoder fc projects to 512 * 16 * 16 instead of 256 * 8 * 8.
    Upsampling path: 16 -> 32 -> 64 -> 128 (3 steps, 8x total)
    vs Ver10:        8  -> 16 -> 32 -> 64 -> 128 (4 steps, 16x total)
-   Less hallucination of detail, better reconstruction sharpness.
 """
 
 import torch
