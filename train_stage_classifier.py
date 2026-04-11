@@ -240,14 +240,14 @@ def main(model_name, features):
                     cmap = plt.get_cmap('tab20c')  
                     x = np.arange(len(pred_indices))
                     for i in range(len(x)-1):
+                        ax.plot([x[i], x[i+1]], [pred_indices[i], pred_indices[i]], color="red", lw=2)
+                        ax.plot([x[i+1], x[i+1]], [pred_indices[i], pred_indices[i+1]], color="red", lw=2)
+                    for i in range(len(x)-1):
                         color = cmap(ground_truth_indices[i])
                         
                         ax.plot([x[i], x[i+1]], [ground_truth_indices[i], ground_truth_indices[i]], color=color, lw=3)
                         ax.plot([x[i+1], x[i+1]], [ground_truth_indices[i], ground_truth_indices[i+1]], color="black", lw=1)
                     
-                    for i in range(len(x)-1):
-                        ax.plot([x[i], x[i+1]], [pred_indices[i], pred_indices[i]], color="red", lw=2)
-                        ax.plot([x[i+1], x[i+1]], [pred_indices[i], pred_indices[i+1]], color="red", lw=2)
 
 
                     ax.set_ylabel('Phase')
