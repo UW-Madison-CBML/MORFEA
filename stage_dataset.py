@@ -32,7 +32,7 @@ def get_annotations_col(group_name, group_len, annotations_dir):
     new_column = new_column[:group_len]
     return new_column
  
-def addAnnotations(group_name, group, annotations_dir, curvature = True, velocity = True, latents = True, acceleration = True, path_signatures = True, distance_mat=True):
+def add_annotations(group_name, group, annotations_dir, features):
    
     lat_cols = [column for column in group.columns if column.startswith("z_")]
     new_column = get_annotations_col(group_name, len(group), annotations_dir)
@@ -42,7 +42,7 @@ def addAnnotations(group_name, group, annotations_dir, curvature = True, velocit
     pca_cols = [column for column in group.columns if column.startswith("pca_")]
     pca_trajectory = group[pca_cols].to_numpy()
 
-    if (curvature):
+    if (features['curvature']):
         
         curv12 = calculate_curvatures(trajectory, offset=12, retrospective=True, how='triangle')
         curv12 = np.nan_to_num(curv12, nan=0.0, posinf=0.0, neginf=0.0)
@@ -56,35 +56,28 @@ def addAnnotations(group_name, group, annotations_dir, curvature = True, velocit
         group = pd.concat([group,pd.DataFrame({"z_curv12":curv12, "z_curv20":curv20, "curv4":curv4}, index = group.index)], axis=1)
 
 
-    if (path_signatures):
+    if (features['path_signatures']):
         sigs = get_path_sigs(pca_trajectory, 2)
         sigs_df = pd.DataFrame(sigs, columns = [f"z_sig_{feature}" for feature in range(sigs.shape[1])])
         sigs_df.index = group.index
         group = pd.concat([group, sigs_df], axis=1)
-    if(distance_mat):
+    if(features['distance_mat']):
         mat = distance_matrix(np.array([trajectory[0]]), trajectory).flatten()
         
         group["z_dist"] = mat
     
-    if(acceleration):
+    if(features['acceleration']):
         print("")         
 
 
-    if (not latents):
+    if (not features['latents']):
         group = group.drop(columns=lat_cols)
     
     print(f"Group {group_name} NaNs: {group.isna().sum().sum()}") 
     return group
 
 class StageDataset(Dataset):
-    """
-    Dataset that loads complete embryo sequences.
-    Each sample is one full embryo with all its frames.
-    """
-    def __init__(self, latents_df, annotations_dir, curvature=True, velocity=True, latents=True, acceleration=True, path_signatures=True, return_embryo_id=False, distance_mat=True): # preparing latents_df outside of the class i.e. from .csv .npy in latents/
-        """
-        Args: pd.read_csv(grades_csv, keep_default_na=False).
-        """
+    def __init__(self, latents_df, annotations_dir, features, return_embryo_id=False): # preparing latents_df outside of the class i.e. from .csv .npy in latents/
         self.latents_df = latents_df
         
         print("nan cols just lats", self.latents_df.columns[self.latents_df.isna().any()])
@@ -102,7 +95,7 @@ class StageDataset(Dataset):
         sizes = self.latents_df.groupby("embryo_id")["time_step"].size()
         self.max_points = sizes.max()
         
-        self.df = self.latents_df.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,self.annotations_dir, curvature = curvature, velocity = velocity, latents = latents, acceleration = acceleration, path_signatures = path_signatures, distance_mat=distance_mat)).reset_index()
+        self.df = self.latents_df.groupby("embryo_id", group_keys = False).apply(lambda group:add_annotations(group.name,group,self.annotations_dir, features)).reset_index()
         self.groups = self.df.groupby("embryo_id")
         self.seqlength = 64
         print("nan cols", self.latents_df.columns[self.latents_df.isna().any()])
