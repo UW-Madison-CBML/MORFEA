@@ -255,7 +255,7 @@ def main(model_name):
                 # ----------------------------------------------
                 # individual
                 fig_i, ax_i = plt.subplots(subplot_kw={'projection': '3d'})
-                im_i = ax_i.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=vel, cmap='viridis')
+                im_i = ax_i.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=vel, cmap='viridis', norm=matplotlib.colors.LogNorm())
                 
                 ax_i.set_xlabel("Cebra 1")
                 ax_i.set_ylabel("Cebra 2")
@@ -273,7 +273,7 @@ def main(model_name):
                 # grid
                 vels.append(vel)
                 ax = axes[i]
-                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=vel, cmap='viridis')
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=vel, cmap='viridis', norm=matplotlib.colors.LogNorm())
                 
                 ax.set_xlim(x_lim)
                 ax.set_ylim(y_lim)
@@ -294,7 +294,7 @@ def main(model_name):
             # grouped
             im = None
             for i, d3_traj in enumerate(d3_trajs):
-                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=vels[i], cmap='viridis')
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=vels[i], cmap='viridis', norm=matplotlib.colors.LogNorm())
                 
             ax.set_xlim(x_lim)
             ax.set_ylim(y_lim)
@@ -321,7 +321,7 @@ def main(model_name):
                 # ----------------------------------------------
                 # individual
                 fig_i, ax_i = plt.subplots(subplot_kw={'projection': '3d'})
-                im_i = ax_i.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=acc, cmap='viridis')
+                im_i = ax_i.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=acc, cmap='viridis'), norm=matplotlib.colors.LogNorm()
                 
                 ax_i.set_xlabel("Cebra 1")
                 ax_i.set_ylabel("Cebra 2")
@@ -339,7 +339,7 @@ def main(model_name):
                 # grid
                 accs.append(acc)
                 ax = axes[i]
-                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=acc, cmap='viridis')
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=acc, cmap='viridis', norm=matplotlib.colors.LogNorm())
                 
                 ax.set_xlim(x_lim)
                 ax.set_ylim(y_lim)
@@ -360,7 +360,7 @@ def main(model_name):
             # grouped
             im = None
             for i, d3_traj in enumerate(d3_trajs):
-                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=accs[i], cmap='viridis')
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=accs[i], cmap='viridis', norm=matplotlib.colors.LogNorm())
                 
             ax.set_xlim(x_lim)
             ax.set_ylim(y_lim)
@@ -382,12 +382,12 @@ def main(model_name):
             im = None
             curves = []
             for i, d3_traj in enumerate(d3_trajs):
-                curv = calculate_curvatures(d3_traj, how="triangle", offset=20)
+                curv = calculate_curvatures(d3_traj, how="triangle", offset=5)
                 curv = curv / np.std(curv)
                 #-----------------------------------------------------
                 # individual
                 fig_i, ax_i = plt.subplots(subplot_kw={'projection': '3d'})
-                im_i = ax_i.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=curv, cmap='viridis')
+                im_i = ax_i.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=curv, cmap='viridis', norm=matplotlib.colors.LogNorm())
                 
                 ax_i.set_xlabel("Cebra 1")
                 ax_i.set_ylabel("Cebra 2")
@@ -405,7 +405,7 @@ def main(model_name):
                 # grid
                 curves.append(curv)
                 ax = axes[i]
-                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=curv, cmap='viridis')
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=curv, cmap='viridis', norm=matplotlib.colors.LogNorm())
                 
                 ax.set_xlim(x_lim)
                 ax.set_ylim(y_lim)
@@ -426,7 +426,7 @@ def main(model_name):
             fig, ax = plt.subplots(figsize=(20, 20), subplot_kw={'projection': '3d'})
             im = None
             for i, d3_traj in enumerate(d3_trajs):
-                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=curves[i], cmap='viridis')
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=curves[i], cmap='viridis', norm=matplotlib.colors.LogNorm())
                 
             ax.set_xlim(x_lim)
             ax.set_ylim(y_lim)

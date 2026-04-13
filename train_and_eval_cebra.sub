@@ -36,9 +36,9 @@ request_memory = 64GB
 request_disk = 80GB
 request_gpus = 1
 
+#notemp-2026-03-12
+#nolstm-2026-03-12
 
 queue model from (
-notemp-2026-03-12
-nolstm-2026-03-12
 control-2026-03-12
 )
