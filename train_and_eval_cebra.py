@@ -321,7 +321,7 @@ def main(model_name):
                 # ----------------------------------------------
                 # individual
                 fig_i, ax_i = plt.subplots(subplot_kw={'projection': '3d'})
-                im_i = ax_i.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=acc, cmap='viridis'), norm=matplotlib.colors.LogNorm()
+                im_i = ax_i.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=acc, cmap='viridis', norm=matplotlib.colors.LogNorm())
                 
                 ax_i.set_xlabel("Cebra 1")
                 ax_i.set_ylabel("Cebra 2")
