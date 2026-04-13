@@ -182,19 +182,22 @@ def main(model_name, features):
             run.log({"loss": loss.item(), "lr": scheduler.get_last_lr()[0]})
         model.eval()
         acc_stats = RunningStats()
+        area_between_curves_stats = RunningStats()
 
         stats_dict = {} 
 
         with torch.no_grad():
             for lats, labels, embryo_id in loader_val:
                 lats = lats.to(DEVICE).float()
-                labels = labels.to(DEVICE).long()
                 logits = model(lats, None) # no mask for single batch
 
                 embryo_id = embryo_id[0]
-                preds = logits.view(-1,18).argmax(dim=1)  # Get predicted class (0, 1, or 2)
-                acc = (preds == labels.view(-1)).sum().item()/labels.view(-1).shape[0]
+                preds = logits.view(-1,18).detach().cpu().argmax(dim=1) # i think this is the right ordr
+                labels = labels.view(-1) # already on cpu, batch size of 1
+                acc = (preds == labels).sum().item()/labels.shape[0]
+                area_between_curves = torch.abs(preds - labels).sum().item()/labels.view(-1).shape[0]
                 acc_stats.push(acc)
+                area_between_curves_stats.push(area_between_curves)
 
                 if (embryo_id in stats_dict.keys()):
                     stats_dict[embryo_id].push(acc)
@@ -203,7 +206,7 @@ def main(model_name, features):
                     stats_dict[embryo_id].push(acc)
                     
  
-        run.log({"val_acc":acc_stats.mean, "val_acc_std":acc_stats.std_dev})
+        run.log({"val_acc":acc_stats.mean, "val_acc_std":acc_stats.std_dev,"area_between_curves_mean":area_between_curves_stats.mean,"area_between_curves_stddev":area_between_curves_stats.std_dev})
         highest_std = sorted(list(stats_dict.items()), key = lambda x: -1*(x[1].mean))[:10]
         model.eval()
         for embryo, _ in highest_std:
@@ -252,9 +255,9 @@ def main(model_name, features):
 
                     ax.set_ylabel('Phase')
                     ax.set_xlabel('Timestep')
-                    ax.set_title(embryo)
+                    ax.set_title(model_name + " " + embryo)
                     legend_elements = [Patch(facecolor=cmap(i), label=phase) for i, phase in enumerate(dataset_val.phases)]
-                    fig.legend(handles=legend_elements, title="Phases") 
+                    ax.legend(handles=legend_elements, title="Phases") 
                     run.log({"pred_vs_truth": wandb.Image(fig)}) 
                     plt.close(fig)
                  
