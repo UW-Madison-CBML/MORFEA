@@ -38,6 +38,8 @@ def get_phases(embryo_id, seq_len):
 
 
 def main(model_name):
+    
+    torch.backends.cudnn.enabled = False
     HOLDOUT = True
     GRADE = "TE"
     DIM = 3
@@ -146,6 +148,24 @@ def main(model_name):
             all_z.extend([z for t in d3_trajs for z in t[:, 2]])
             im = None
             for i, d3_traj in enumerate(d3_trajs):
+                #-------------------------------------------------
+                # do individual plots
+                fig_i, ax_i = plt.subplots(subplot_kw={'projection': '3d'})
+                im_i = ax_i.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1,d3_traj.shape[0]), cmap='viridis')
+                
+                ax_i.set_xlabel("Cebra 1")
+                ax_i.set_ylabel("Cebra 2")
+                ax_i.set_zlabel("Cebra 3")
+                
+                plt.tight_layout(rect=[0, 0, 0.85, 1])
+                fig_i.subplots_adjust(right=0.85) 
+                cbar_ax = fig_i.add_axes([0.88, 0.15, 0.03, 0.7]) 
+                if im_i is not None:
+                    fig_i.colorbar(im_i, cax=cbar_ax, label='Normalized Time')
+     
+                fig_i.savefig(os.path.join("cebra_plots",f"{grade}-{i}.png"))
+                plt.close(fig_i) 
+                # ------------------------------------------------------------------
                 im_grade = grade_ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=[g_color for _ in range(d3_traj.shape[0])])
                 ax = axes[i]
                 im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=np.linspace(0,1,d3_traj.shape[0]), cmap='viridis')
@@ -188,8 +208,7 @@ def main(model_name):
             fig, axes = plt.subplots(4, 4, figsize=(20, 20),subplot_kw={'projection': '3d'})
             axes = axes.ravel()
             im = None
-            legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) 
-                   for i, phase in enumerate(PHASES)]
+            legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(PHASES)]
 
             for i, d3_traj in enumerate(d3_trajs):
                 embryo_id = d3_traj_ids[i]
@@ -233,6 +252,25 @@ def main(model_name):
             for i, d3_traj in enumerate(d3_trajs):
                 vel = get_vel(d3_traj)
                 #vel = vel / vel.max()
+                # ----------------------------------------------
+                # individual
+                fig_i, ax_i = plt.subplots(subplot_kw={'projection': '3d'})
+                im_i = ax_i.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=vel, cmap='viridis')
+                
+                ax_i.set_xlabel("Cebra 1")
+                ax_i.set_ylabel("Cebra 2")
+                ax_i.set_zlabel("Cebra 3")
+                
+                plt.tight_layout(rect=[0, 0, 0.85, 1])
+                fig_i.subplots_adjust(right=0.85) 
+                cbar_ax = fig_i.add_axes([0.88, 0.15, 0.03, 0.7]) 
+                if im_i is not None:
+                    fig_i.colorbar(im_i, cax=cbar_ax, label='Normalized Time')
+     
+                fig_i.savefig(os.path.join("cebra_plots",f"vel_{grade}-{i}.png"))
+                plt.close(fig_i) 
+                # ------------------------------------
+                # grid
                 vels.append(vel)
                 ax = axes[i]
                 im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=vel, cmap='viridis')
@@ -252,6 +290,8 @@ def main(model_name):
  
             fig.savefig(os.path.join("cebra_plots",f"vel_{grade}.png"))
             fig, ax = plt.subplots(figsize=(20, 20), subplot_kw={'projection': '3d'})
+            #-----------------------------------------------------------------------
+            # grouped
             im = None
             for i, d3_traj in enumerate(d3_trajs):
                 im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=vels[i], cmap='viridis')
@@ -270,6 +310,73 @@ def main(model_name):
                 fig.colorbar(im, cax=cbar_ax, label='Normalized Vel')
             fig.savefig(os.path.join("cebra_plots",f"vel_grouped_{grade}.png"))
             plt.close(fig)
+            # accel
+            fig, axes = plt.subplots(4, 4, figsize=(20, 20),subplot_kw={'projection': '3d'})
+            axes = axes.ravel()
+            im = None
+            accs = []
+            for i, d3_traj in enumerate(d3_trajs):
+                acc = get_acc(d3_traj)
+                #acc = acc / acc.max()
+                # ----------------------------------------------
+                # individual
+                fig_i, ax_i = plt.subplots(subplot_kw={'projection': '3d'})
+                im_i = ax_i.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=acc, cmap='viridis')
+                
+                ax_i.set_xlabel("Cebra 1")
+                ax_i.set_ylabel("Cebra 2")
+                ax_i.set_zlabel("Cebra 3")
+                
+                plt.tight_layout(rect=[0, 0, 0.85, 1])
+                fig_i.subplots_adjust(right=0.85) 
+                cbar_ax = fig_i.add_axes([0.88, 0.15, 0.03, 0.7]) 
+                if im_i is not None:
+                    fig_i.colorbar(im_i, cax=cbar_ax, label='Normalized Time')
+     
+                fig_i.savefig(os.path.join("cebra_plots",f"acc_{grade}-{i}.png"))
+                plt.close(fig_i) 
+                # ------------------------------------
+                # grid
+                accs.append(acc)
+                ax = axes[i]
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=acc, cmap='viridis')
+                
+                ax.set_xlim(x_lim)
+                ax.set_ylim(y_lim)
+                ax.set_zlim(z_lim) 
+                ax.set_xlabel("Cebra 1")
+                ax.set_ylabel("Cebra 2")
+                ax.set_zlabel("Cebra 3")
+                
+            plt.tight_layout(rect=[0, 0, 0.85, 1])
+            fig.subplots_adjust(right=0.85) 
+            cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
+            if im is not None:
+                fig.colorbar(im, cax=cbar_ax, label='Acceleration')
+ 
+            fig.savefig(os.path.join("cebra_plots",f"acc_{grade}.png"))
+            fig, ax = plt.subplots(figsize=(20, 20), subplot_kw={'projection': '3d'})
+            #-----------------------------------------------------------------------
+            # grouped
+            im = None
+            for i, d3_traj in enumerate(d3_trajs):
+                im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=accs[i], cmap='viridis')
+                
+            ax.set_xlim(x_lim)
+            ax.set_ylim(y_lim)
+            ax.set_zlim(z_lim) 
+            ax.set_xlabel("Cebra 1")
+            ax.set_ylabel("Cebra 2")
+            ax.set_zlabel("Cebra 3")
+                
+            plt.tight_layout(rect=[0, 0, 0.85, 1])
+            fig.subplots_adjust(right=0.85) 
+            cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
+            if im is not None:
+                fig.colorbar(im, cax=cbar_ax, label='Acceleration')
+            fig.savefig(os.path.join("cebra_plots",f"acc_grouped_{grade}.png"))
+
+            # now curvature
             fig, axes = plt.subplots(4, 4, figsize=(20, 20),subplot_kw={'projection': '3d'})
             axes = axes.ravel()
             im = None
@@ -277,6 +384,25 @@ def main(model_name):
             for i, d3_traj in enumerate(d3_trajs):
                 curv = calculate_curvatures(d3_traj, how="triangle", offset=20)
                 curv = curv / np.std(curv)
+                #-----------------------------------------------------
+                # individual
+                fig_i, ax_i = plt.subplots(subplot_kw={'projection': '3d'})
+                im_i = ax_i.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=curv, cmap='viridis')
+                
+                ax_i.set_xlabel("Cebra 1")
+                ax_i.set_ylabel("Cebra 2")
+                ax_i.set_zlabel("Cebra 3")
+                
+                plt.tight_layout(rect=[0, 0, 0.85, 1])
+                fig_i.subplots_adjust(right=0.85) 
+                cbar_ax = fig_i.add_axes([0.88, 0.15, 0.03, 0.7]) 
+                if im_i is not None:
+                    fig_i.colorbar(im_i, cax=cbar_ax, label='Normalized Time')
+     
+                fig_i.savefig(os.path.join("cebra_plots",f"curve_{grade}-{i}.png"))
+                plt.close(fig_i) 
+                # -----------------------------------------------
+                # grid
                 curves.append(curv)
                 ax = axes[i]
                 im = ax.scatter(d3_traj[:,0], d3_traj[:,1], d3_traj[:,2], c=curv, cmap='viridis')
@@ -295,6 +421,8 @@ def main(model_name):
                 fig.colorbar(im, cax=cbar_ax, label='Normalized Curvature')
  
             fig.savefig(os.path.join("cebra_plots",f"curve_{grade}.png"))
+            #------------------------------------------
+            # grouped
             fig, ax = plt.subplots(figsize=(20, 20), subplot_kw={'projection': '3d'})
             im = None
             for i, d3_traj in enumerate(d3_trajs):
@@ -314,6 +442,7 @@ def main(model_name):
                 fig.colorbar(im, cax=cbar_ax, label='Normalized Curvature')
             fig.savefig(os.path.join("cebra_plots",f"curve_grouped_{grade}.png"))
             plt.close(fig) 
+        # ----------------------------------------
         # do all the grade stuff now
         grade_bounds = np.arange(4)
         grade_norm = mcolors.BoundaryNorm(grade_bounds, grade_cmap.N) 
