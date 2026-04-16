@@ -4,6 +4,8 @@ import pandas as pd
 # reqs: trame trame-vuetify trame-vtk "pyvista[jupyter]" trame 'pyvista[all]' panel
 # i am running this on windows not sure how it will work on other os's
 # you will need to download latents and annotations to this folder, and eventually the cebra embeddings as well
+import nest_asyncio
+nest_asyncio.apply()
 import streamlit as st
 import pyvista as pv
 from stpyvista import stpyvista
@@ -31,7 +33,7 @@ def get_annotations_col(group, group_name, group_len, annotations_dir):
 
     new_column += ["post_phase"] * (group_len - len(new_column))
     new_column = new_column[:group_len]
-    group['phase'] = new_column
+    group = group.assign(phase=new_column)
     return group
 #-------------------------------------------------------------------------
 # do the dataframe stuff
@@ -46,6 +48,9 @@ def build_df():
     lat_columns = [f"z_{i}" for i in range(lat_np.shape[1])]
     values_df = pd.DataFrame(lat_np, columns=lat_columns)
     df = pd.concat([lat_df, values_df], axis = 1)
+     
+    embryos = random.sample(df["embryo_id"].unique().tolist(),5)
+    df = df[df["embryo_id"].str.contains("|".join(embryos),regex=True)]
 
     trajectories = df[lat_columns].to_numpy()
     pca = PCA(n_components=3)
@@ -56,9 +61,10 @@ def build_df():
     umap_trajs = ump.fit_transform(trajectories)
 
     df = pd.concat([df, pd.DataFrame(umap_trajs, columns=["umap_1", "umap_2", "umap_3"])], axis=1)
-    df = df.groupby("embryo_id").apply(lambda group: get_annotations_col(group, group.name, len(group), "embryo_dataset_annotations")).reset_index()
+    df = df.groupby("embryo_id").apply(lambda group: get_annotations_col(group, group.name, len(group), "embryo_dataset_annotations"), include_groups=False).reset_index()
     return df
 df = build_df()
+df
 #---------------------------------------------------------------------------
 # now do streamlit
 
@@ -72,20 +78,20 @@ reduction_method = st.sidebar.selectbox(
     "Dimension Reduction Technique",
     ("PCA", "UMAP") # also need cebra eventually
 )
-grade = st.sidebar.selectbox(
+grade = st.sidebar.multiselect(
     "Dimension Reduction Technique",
     ("A", "B", "C", "NA") 
 )
-phase = st.sidebar.selectbox(
+phase = st.sidebar.multiselect(
     "Dimension Reduction Technique",
     ('pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase') 
 )
-num_embryos = st.number_input("Number of embryos")
+num_embryos = st.sidebar.number_input("Number of embryos", min_value=1, step=1)
 
 
 
-embryos = random.sample(df["embryo_id"].unique,num_embryos)
-points = df[df["TE"] == grade & df["phase"] == phase & df["embryo_id"].str.contains("|".join(embryos), regex=True)][["pca_1", "pca_2", "pca_3"] if reduction_method == "PCA" else ["umap_1", "umap_2", "umap_3"]].to_numpy()
+embryos = random.sample(df["embryo_id"].unique().tolist(),int(num_embryos))
+points = df[(df["TE"].str.contains("|".join(grade), regex=True)) & (df["phase"].str.contains("|".join(phase), regex=True)) & (df["embryo_id"].str.contains("|".join(embryos), regex=True))][["pca_1", "pca_2", "pca_3"] if reduction_method == "PCA" else ["umap_1", "umap_2", "umap_3"]].to_numpy()
 
 
 cloud = pv.PolyData(points)
@@ -107,7 +113,7 @@ with col1:
     
     plotter.add_mesh(
         glyphed_cloud, 
-        scalars="Intensity", 
+        #scalars="Intensity", 
         cmap="magma", 
         smooth_shading=True
     )
@@ -129,7 +135,7 @@ with col2:
     selected_idx = st.slider("Select Embryo Index", 0, T-1, 0)
     
     st.write(f"**Frame:** {selected_idx}")
-    st.write(f"**Intensity:** {intensities[selected_idx]:.4f}")
+    #st.write(f"**Intensity:** {intensities[selected_idx]:.4f}")
     
     # Render Image Placeholder
     # Replace 'dummy_image.png' with your actual image loading logic
