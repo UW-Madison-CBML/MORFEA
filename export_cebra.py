@@ -13,15 +13,16 @@ from cebra import CEBRA
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {DEVICE}")
 
+torch.backends.cudnn.enabled = False
 
 def export_latents_to_csv(model_name):
     cebra_time_model = CEBRA(model_architecture="offset10-model-mse",
                         batch_size=512,
                         learning_rate=1e-5,
                         temperature=13,
-                        output_dimension=DIM,
+                        output_dimension=3,
                         num_hidden_units=128,
-                        max_iterations=500,
+                        max_iterations=5000,
                         distance="euclidean",
                         conditional="time",
                         device="cuda_if_available",
@@ -41,8 +42,8 @@ def export_latents_to_csv(model_name):
     cebra_latents = []
     cebra_labels = []
     offset = 0
-    for group in train_df.groupby("embryo_id"):
-            traj = group[lat_colums].to_numpy()
+    for embryo_id, group in train_df.groupby("embryo_id"):
+            traj = group[lat_columns].to_numpy()
             cebra_latents.append(traj)
             cebra_labels.append((np.arange(len(traj)) + offset).reshape(-1, 1).astype(np.float32))
             offset += len(traj) + 10000
@@ -52,7 +53,7 @@ def export_latents_to_csv(model_name):
 
     print("cebra:", len(cebra_out_lats))
     print("latents:", len(df))
-    cebra_out_lats.save("{model_name}.npy")
+    np.save("{model_name}.npy",cebra_out_lats)
 
 
 
