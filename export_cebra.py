@@ -53,7 +53,7 @@ def export_latents_to_csv(model_name):
 
     print("cebra:", len(cebra_out_lats))
     print("latents:", len(df))
-    np.save("{model_name}.npy",cebra_out_lats)
+    np.save(f"{model_name}.npy",cebra_out_lats)
 
 
 
