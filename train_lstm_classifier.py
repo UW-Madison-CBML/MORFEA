@@ -26,10 +26,10 @@ def collate_fn_padd(batch):
 def recall_precision_f1(confusion_mat, i):
     recall = 0 if confusion_mat[:, i].sum() == 0 else confusion_mat[i,i]/confusion_mat[:, i].sum()
             
-    precision = 0 if confusion_mat[i,:].sum() == 0 else confusion_mat[i,i]/ te_confusion_mat[i, :].sum()
+    precision = 0 if confusion_mat[i,:].sum() == 0 else confusion_mat[i,i]/ confusion_mat[i, :].sum()
     f1 = 0
     if (precision + recall) > 0:
-        f1 = 2 * (te_precision * te_recall) / (precision + recall)
+        f1 = 2 * (precision * recall) / (precision + recall)
     return recall, precision, f1
 
 VAL_EMBRYOS =[
@@ -224,7 +224,7 @@ def main(model_name):
 
                 preds = F.one_hot(preds, num_classes=3)
 
-                te_confusion_mat += torch.einsum('bi,bj->bij', preds, te).sum(dim=0) 
+                te_confusion_mat += torch.einsum('bi,bj->ij', preds, te) # this einsum calculates confusion mats
 
 
             for sig, icm, lengths in loader_icm_val:
@@ -237,7 +237,7 @@ def main(model_name):
                 icm = F.one_hot(icm, num_classes=3)
                 preds = F.one_hot(preds, num_classes=3)
 
-                icm_confusion_mat += torch.einsum('bi,bj->bij', preds, icm).sum(dim=0)
+                icm_confusion_mat += torch.einsum('bi,bj->ij', preds, icm)
                 
         
         for i, g in enumerate(grade_options):
