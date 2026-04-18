@@ -38,7 +38,7 @@ class GradeLSTMDataset(Dataset):
         if self.return_whole_seqs:
             _, rows = list(self.groups)[idx]
         else:
-            rows = self.df.iloc[:idx+1][self.df["embryo_id"] == embryo_id]
+            rows = self.groups.get_group(embryo_id).loc[:idx]
         lat_seq = rows[[i for i in self.df.columns.tolist() if i[:2] == "z_"]].to_numpy(dtype=np.float32)
         grade_index = grade_options.index(rows.iloc[-1][self.grade])
         return torch.from_numpy(lat_seq.astype(np.float32)), torch.tensor(grade_index)
