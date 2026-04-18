@@ -10,14 +10,11 @@ import math
 from torch.nn.utils.rnn import pad_sequence
 
 def collate_fn_padd(batch):
-    # batch is [(tensor1, label1), (tensor2, label2), ...]
     signals = [item[0] for item in batch]
     targets = [item[1] for item in batch]
     
-    # Calculate original lengths before padding
     lengths = torch.tensor([len(s) for s in signals])
     
-    # Pad the signals
     signals_padded = torch.nn.utils.rnn.pad_sequence(
         signals, batch_first=True, padding_value=0.0
     )
@@ -77,7 +74,6 @@ class RunningStats:
         self.m2 = 0.0
 
     def push(self, x):
-        """Add a new value and update statistics."""
         self.n += 1
         delta = x - self.mean
         self.mean += delta / self.n
@@ -86,12 +82,10 @@ class RunningStats:
 
     @property
     def variance(self):
-        """Returns sample variance (unbiased). Use self.m2 / self.n for population."""
         return self.m2 / (self.n - 1) if self.n > 1 else 0.0
 
     @property
     def std_dev(self):
-        """Returns sample standard deviation."""
         return math.sqrt(self.variance)
 
 
@@ -106,29 +100,34 @@ def main(model_name):
         project="IVF-Training",
     )
     
-    learning_rate = 0.001
+    KEEP_NA = False
+    learning_rate = 0.00001
     latents_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv")).rename(columns={"embryo_id":"cell_id"}).drop(columns=['TE',"ICM","grade1","grade2","te","icm"], axis=1, errors='ignore')
     latents = np.load(os.path.abspath(f"latents/{model_name}.npy"))
+    #normalize latents here
+    lat_mean = latents.mean(axis=0)
+    lat_std_dev = np.std(latents, axis=0) + 1e-8
+    latents = (latents + lat_mean) / lat_std_dev
+
     lat_cols = [f"z_{i}" for i in range(latents.shape[1])]
     latents_df[lat_cols] = latents
-
-    grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"), keep_default_na=False)
+    
+    grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"), keep_default_na=(not KEEP_NA))
     mask = latents_df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = latents_df[mask]
     print(len(val_df)/len(latents_df))
     latents_df = latents_df[~mask]
 
-
-    dataset_te = GradeLSTMDataset(latents_df, grades_df, "TE", keep_na=True) 
-    dataset_icm = GradeLSTMDataset(latents_df, grades_df, "ICM", keep_na=True)
-    dataset_te_val = GradeLSTMDataset(val_df, grades_df, "TE", keep_na=True) 
-    dataset_icm_val = GradeLSTMDataset(val_df, grades_df, "ICM", keep_na=True)
+    dataset_te = GradeLSTMDataset(latents_df, grades_df, "TE", keep_na=KEEP_NA) 
+    dataset_icm = GradeLSTMDataset(latents_df, grades_df, "ICM", keep_na=KEEP_NA)
+    dataset_te_val = GradeLSTMDataset(val_df, grades_df, "TE", keep_na=KEEP_NA, return_whole_seqs=True) 
+    dataset_icm_val = GradeLSTMDataset(val_df, grades_df, "ICM", keep_na=KEEP_NA, return_whole_seqs=True)
     lat_size = len(lat_cols)
     crit_te = torch.nn.CrossEntropyLoss()
     crit_icm = torch.nn.CrossEntropyLoss()
-    model_te = GradeLSTMClassifier(lat_size, keep_na=True)
+    model_te = GradeLSTMClassifier(lat_size, keep_na=KEEP_NA)
     model_te = model_te.to(DEVICE)
-    model_icm = GradeLSTMClassifier(lat_size, keep_na=True)
+    model_icm = GradeLSTMClassifier(lat_size, keep_na=KEEP_NA)
     model_icm = model_icm.to(DEVICE)
     optimizer_te = torch.optim.Adam(model_te.parameters(), lr=learning_rate, weight_decay=1e-5)
     optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=learning_rate, weight_decay=1e-5)
@@ -155,14 +154,14 @@ def main(model_name):
         shuffle=False,
         num_workers=4,
         pin_memory=True,
-        drop_last=True, collate_fn=collate_fn_padd)
+        drop_last=True) # no collate for 1 batch
     loader_icm_val = DataLoader(
         dataset_icm_val,
         batch_size=1,
         shuffle=False,
         num_workers=4,
         pin_memory=True,
-        drop_last=True, collate_fn=collate_fn_padd)
+        drop_last=True)
 
     for epoch in range(20):
         model_te.train(); model_icm.train()
@@ -171,7 +170,6 @@ def main(model_name):
             te = te.to(DEVICE).long()
             if -1 in te:
                 continue 
-            print(sig.shape)
             label = model_te(sig, lengths)
             loss = crit_te(label, te)
 
@@ -186,7 +184,6 @@ def main(model_name):
             if -1 in icm:
                 continue
             
-            print(sig.shape)
             label = model_icm(sig, lengths)
             loss = crit_icm(label, icm)
 
@@ -209,8 +206,7 @@ def main(model_name):
             loss = crit_te(logits, te)
             te_loss_stats.push(loss.item())
             
-            # Calculate accuracy
-            preds = logits.argmax(dim=1)  # Get predicted class (0, 1, or 2)
+            preds = logits.argmax(dim=1)  
             te_acc_stats.push((preds == te).sum().item()/te.shape[0])
         for sig, icm, lengths in loader_icm_val:
             sig = sig.to(DEVICE)
