@@ -125,10 +125,17 @@ def main(model_name):
     lat_cols = [f"z_{i}" for i in range(latents.shape[1])]
     latents_df[lat_cols] = latents
     
-    grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"), keep_default_na=(not KEEP_NA))
+    grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"), keep_default_na=(not KEEP_NA)).rename(columns={"video_name":"embryo_id"})
+    te_graded = grades_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
+    np.random.shuffle(te_graded)
+    val_ratio = 0.15
+    VAL_EMBRYOS = te_graded[:int(val_ratio * len(te_graded))]
+    for embryo in VAL_EMBRYOS:
+        print(f"{embryo}: {grades_df[grades_df['embryo_id'] == embryo].iloc[0]['TE']}")
+    
     mask = latents_df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = latents_df[mask]
-    print(len(val_df)/len(latents_df))
+    print(f"val_ratio={val_ratio}, actual val ratio: {len(val_df)/len(latents_df)}")
     latents_df = latents_df[~mask]
 
     dataset_te = GradeLSTMDataset(latents_df, grades_df, "TE", keep_na=KEEP_NA) 
@@ -247,7 +254,9 @@ def main(model_name):
             
             recall, precision, f1 = recall_precision_f1(icm_confusion_mat, i)
             run.log({f"icm_{g}_recall": recall,f"icm_{g}_precision": precision,f"icm_{g}_f1":f1})
-
+        print(grade_options)
+        print("te confusion:"); print(te_confusion_mat)
+        print("icm confusion:"); print(icm_confusion_mat)
         run.log({"te_acc_mean": te_acc_stats.mean, "te_acc_std":te_acc_stats.std_dev, "icm_acc_mean":icm_acc_stats.mean, "icm_acc_std":icm_acc_stats.std_dev})
 
 if __name__ == "__main__":
