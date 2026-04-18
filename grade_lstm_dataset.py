@@ -29,15 +29,19 @@ class GradeLSTMDataset(Dataset):
         self.lat_cols = [col for col in self.latents_df.columns if col.startswith("z_")]
         self.df =  self.latents_df.merge(self.grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", self.grade, "time_step"] + self.lat_cols] if self.keep_na else self.latents_df.merge(self.grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", self.grade, "time_step"] + self.lat_cols].dropna(subset=[self.grade])
         self.df = self.df.sort_values(["embryo_id", "time_step"])
-        lat_data = self.df[self.lat_cols].values
+        self.groups = self.df.groupby("embryo_id") 
 
     def __getitem__(self, idx):
         grade_options = ["A", "B", "C", "NA"] if self.keep_na else ["A","B","C"]
         embryo_id = self.df.iloc[idx]["embryo_id"]
-        rows = self.df.iloc[:idx+1][self.df["embryo_id"] == embryo_id] if self.return_whole_seqs == False else self.df[self.df["embryo_id"] == embryo_id]
+        rows = None
+        if self.return_whole_seqs:
+            _, rows = list(self.groups)[idx]
+        else:
+            rows = self.df.iloc[:idx+1][self.df["embryo_id"] == embryo_id]
         lat_seq = rows[[i for i in self.df.columns.tolist() if i[:2] == "z_"]].to_numpy(dtype=np.float32)
         grade_index = grade_options.index(rows.iloc[-1][self.grade])
         return torch.from_numpy(lat_seq.astype(np.float32)), torch.tensor(grade_index)
 
     def __len__(self):
-        return len(self.df)
+        return len(self.df) if self.return_whole_seqs == False else len(self.groups)
