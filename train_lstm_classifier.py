@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import math
 from torch.nn.utils.rnn import pad_sequence
+import torch.nn.functional as F
 
 def collate_fn_padd(batch):
     signals = [item[0] for item in batch]
@@ -22,6 +23,15 @@ def collate_fn_padd(batch):
     targets = torch.tensor(targets)
     
     return signals_padded, targets, lengths # Return all three
+def recall_precision_f1(confusion_mat, i):
+    recall = 0 if confusion_mat[:, i].sum() == 0 else confusion_mat[i,i]/confusion_mat[:, i].sum()
+            
+    precision = 0 if confusion_mat[i,:].sum() == 0 else confusion_mat[i,i]/ te_confusion_mat[i, :].sum()
+    f1 = 0
+    if (precision + recall) > 0:
+        f1 = 2 * (te_precision * te_recall) / (precision + recall)
+    return recall, precision, f1
+
 VAL_EMBRYOS =[
     "RG434-11",
     "RC1103-1",
@@ -100,6 +110,7 @@ def main(model_name):
         project="IVF-Training",
     )
     
+    torch.backends.cudnn.enabled = False
     KEEP_NA = False
     
     grade_options = ["A", "B", "C", "NA"] if KEEP_NA else ["A","B","C"]
@@ -137,7 +148,7 @@ def main(model_name):
 
     loader_te = DataLoader(
         dataset_te,
-        batch_size=32,
+        batch_size=128,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
@@ -145,30 +156,31 @@ def main(model_name):
         collate_fn=collate_fn_padd)
     loader_icm = DataLoader(
         dataset_icm,
-        batch_size=32,
+        batch_size=128,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
         drop_last=True, collate_fn=collate_fn_padd)
     loader_te_val = DataLoader(
         dataset_te_val,
-        batch_size=1,
+        batch_size=len(dataset_te_val),
         shuffle=False,
         num_workers=4,
         pin_memory=True,
-        drop_last=True) # no collate for 1 batch
+        drop_last=True,
+        collate_fn=collate_fn_padd)
     loader_icm_val = DataLoader(
         dataset_icm_val,
-        batch_size=1,
+        batch_size=len(dataset_icm_val),
         shuffle=False,
         num_workers=4,
         pin_memory=True,
-        drop_last=True)
-
+        drop_last=True,
+        collate_fn=collate_fn_padd)
     for epoch in range(20):
         model_te.train(); model_icm.train()
         for sig, te, lengths in loader_te:
-            sig = sig.to(DEVICE).view(32,-1, lat_size)
+            sig = sig.to(DEVICE)
             te = te.to(DEVICE).long()
             if -1 in te:
                 continue 
@@ -181,7 +193,7 @@ def main(model_name):
             run.log({"te": loss.item()})
 
         for sig, icm, lengths in loader_icm:
-            sig = sig.to(DEVICE).view(32,-1, lat_size)
+            sig = sig.to(DEVICE)
             icm = icm.to(DEVICE).long()
             if -1 in icm:
                 continue
@@ -198,44 +210,43 @@ def main(model_name):
         icm_acc_stats = RunningStats()
 
         model_te.eval(); model_icm.eval()
-        te_confusion_mat = np.zeros((3,3))
-        icm_confusion_mat = np.zeros((3,3))
+        te_confusion_mat = torch.zeros((3,3))
+        icm_confusion_mat = torch.zeros((3,3))
         with torch.no_grad():
             for sig, te, lengths in loader_te_val:
                 sig = sig.to(DEVICE)
                 logits = model_te(sig, lengths)
                 
-                preds = logits.cpu()[0].argmax(dim=1).item() # batch size 1
-                te = te[0]
-                te_acc_stats.push((preds == te).sum()) 
-                te_confusion_mat[preds, te] += 1 
+                preds = logits.cpu().argmax(dim=1)
+                
+                te_acc_stats.push((preds == te).sum().item()/te.shape[0]) 
+                te = F.one_hot(te, num_classes=3)
+
+                preds = F.one_hot(preds, num_classes=3)
+
+                te_confusion_mat += torch.einsum('bi,bj->bij', preds, te).sum(dim=0) 
+
+
             for sig, icm, lengths in loader_icm_val:
                 sig = sig.to(DEVICE)
-
                 logits = model_icm(sig, lengths)
-                preds = logits.cpu()[0].argmax(dim=1).item()  # batch size 1
-                icm = icm[0]
 
-                icm_acc_stats.push((preds == icm).sum())
-                icm_confusion_mat[preds, icm] += 1 
+                preds = logits.cpu().argmax(dim=1) # size = (batch)
+
+                icm_acc_stats.push((preds == icm).sum().item()/icm.shape[0])
+                icm = F.one_hot(icm, num_classes=3)
+                preds = F.one_hot(preds, num_classes=3)
+
+                icm_confusion_mat += torch.einsum('bi,bj->bij', preds, icm).sum(dim=0)
+                
         
         for i, g in enumerate(grade_options):
-            te_recall = 0 if te_confusion_mat[:, g].sum() == 0 else te_confusion_mat[g,g]/te_confusion_mat[:, g].sum()
-            
-            te_precision = 0 if te_confusion_mat[g,:].sum() == 0 else te_confusion_mat[g,g]/ te_confusion_mat[g, :].sum()
-            te_f1 = 0
-            if (precision + recall) > 0:
-                te_f1 = 2 * (precision * recall) / (precision + recall)
-            run.log({f"te_{g}_recall": te_recall,f"te_{g}_precision": te_precision,f"te_{g}_f1":te_f1})
+            recall, precision, f1 = recall_precision_f1(te_confusion_mat, i)
+            run.log({f"te_{g}_recall": recall,f"te_{g}_precision": precision,f"te_{g}_f1":f1})
             #---------------------------------------------------------------------------------- 
-            icm_recall = 0 if icm_confusion_mat[:, g].sum() == 0 else icm_confusion_mat[g,g]/icm_confusion_mat[:, g].sum()
             
-            icm_precision = 0 if icm_confusion_mat[g,:].sum() == 0 else icm_confusion_mat[g,g]/ icm_confusion_mat[g, :].sum()
-            icm_f1 = 0
-            if (precision + recall) > 0:
-                icm_f1 = 2 * (precision * recall) / (precision + recall)
-
-            run.log({f"icm_{g}_recall": icm_recall,f"icm_{g}_precision": icm_precision,f"icm_{g}_f1":icm_f1})
+            recall, precision, f1 = recall_precision_f1(icm_confusion_mat, i)
+            run.log({f"icm_{g}_recall": recall,f"icm_{g}_precision": precision,f"icm_{g}_f1":f1})
 
         run.log({"te_acc_mean": te_acc_stats.mean, "te_acc_std":te_acc_stats.std_dev, "icm_acc_mean":icm_acc_stats.mean, "icm_acc_std":icm_acc_stats.std_dev})
 
