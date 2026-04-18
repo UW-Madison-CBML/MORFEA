@@ -114,7 +114,7 @@ def main(model_name):
     KEEP_NA = False
     
     grade_options = ["A", "B", "C", "NA"] if KEEP_NA else ["A","B","C"]
-    learning_rate = 0.00001
+    learning_rate = 0.000001
     latents_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv")).rename(columns={"embryo_id":"cell_id"}).drop(columns=['TE',"ICM","grade1","grade2","te","icm"], axis=1, errors='ignore')
     latents = np.load(os.path.abspath(f"latents/{model_name}.npy"))
     #normalize latents here
@@ -184,7 +184,7 @@ def main(model_name):
         pin_memory=True,
         drop_last=True,
         collate_fn=collate_fn_padd)
-    for epoch in range(20):
+    for epoch in range(8):
         model_te.train(); model_icm.train()
         for sig, te, lengths in loader_te:
             sig = sig.to(DEVICE)
