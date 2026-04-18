@@ -194,50 +194,50 @@ def main(model_name):
             optimizer_icm.step()
             run.log({"icm": loss.item()})
     
-    te_acc_stats = RunningStats()
-    icm_acc_stats = RunningStats()
+        te_acc_stats = RunningStats()
+        icm_acc_stats = RunningStats()
 
-    model_te.eval(); model_icm.eval()
-    te_confusion_mat = np.zeros((3,3))
-    icm_confusion_mat = np.zeros((3,3))
-    with torch.no_grad():
-        for sig, te, lengths in loader_te_val:
-            sig = sig.to(DEVICE)
-            logits = model_te(sig, lengths)
+        model_te.eval(); model_icm.eval()
+        te_confusion_mat = np.zeros((3,3))
+        icm_confusion_mat = np.zeros((3,3))
+        with torch.no_grad():
+            for sig, te, lengths in loader_te_val:
+                sig = sig.to(DEVICE)
+                logits = model_te(sig, lengths)
+                
+                preds = logits.cpu()[0].argmax(dim=1).item() # batch size 1
+                te = te[0]
+                te_acc_stats.push((preds == te).sum()) 
+                te_confusion_mat[preds, te] += 1 
+            for sig, icm, lengths in loader_icm_val:
+                sig = sig.to(DEVICE)
+
+                logits = model_icm(sig, lengths)
+                preds = logits.cpu()[0].argmax(dim=1).item()  # batch size 1
+                icm = icm[0]
+
+                icm_acc_stats.push((preds == icm).sum())
+                icm_confusion_mat[preds, icm] += 1 
+        
+        for i, g in enumerate(grade_options):
+            te_recall = 0 if te_confusion_mat[:, g].sum() == 0 else te_confusion_mat[g,g]/te_confusion_mat[:, g].sum()
             
-            preds = logits.cpu()[0].argmax(dim=1).item() # batch size 1
-            te = te[0]
-            te_acc_stats.push((preds == te).sum()) 
-            te_confusion_mat[preds, te] += 1 
-        for sig, icm, lengths in loader_icm_val:
-            sig = sig.to(DEVICE)
+            te_precision = 0 if te_confusion_mat[g,:].sum() == 0 else te_confusion_mat[g,g]/ te_confusion_mat[g, :].sum()
+            te_f1 = 0
+            if (precision + recall) > 0:
+                te_f1 = 2 * (precision * recall) / (precision + recall)
+            run.log({f"te_{g}_recall": te_recall,f"te_{g}_precision": te_precision,f"te_{g}_f1":te_f1})
+            #---------------------------------------------------------------------------------- 
+            icm_recall = 0 if icm_confusion_mat[:, g].sum() == 0 else icm_confusion_mat[g,g]/icm_confusion_mat[:, g].sum()
+            
+            icm_precision = 0 if icm_confusion_mat[g,:].sum() == 0 else icm_confusion_mat[g,g]/ icm_confusion_mat[g, :].sum()
+            icm_f1 = 0
+            if (precision + recall) > 0:
+                icm_f1 = 2 * (precision * recall) / (precision + recall)
 
-            logits = model_icm(sig, lengths)
-            preds = logits.cpu()[0].argmax(dim=1).item()  # batch size 1
-            icm = icm[0]
+            run.log({f"icm_{g}_recall": icm_recall,f"icm_{g}_precision": icm_precision,f"icm_{g}_f1":icm_f1})
 
-            icm_acc_stats.push((preds == icm).sum())
-            icm_confusion_mat[preds, icm] += 1 
-    
-    for i, g in enumerate(grade_options):
-        te_recall = 0 if te_confusion_mat[:, g].sum() == 0 else te_confusion_mat[g,g]/te_confusion_mat[:, g].sum()
-        
-        te_precision = 0 if te_confusion_mat[g,:].sum() == 0 else te_confusion_mat[g,g]/ te_confusion_mat[g, :].sum()
-        te_f1 = 0
-        if (precision + recall) > 0:
-            te_f1 = 2 * (precision * recall) / (precision + recall)
-        run.log({f"te_{g}_recall": te_recall,f"te_{g}_precision": te_precision,f"te_{g}_f1":te_f1})
-        #---------------------------------------------------------------------------------- 
-        icm_recall = 0 if icm_confusion_mat[:, g].sum() == 0 else icm_confusion_mat[g,g]/icm_confusion_mat[:, g].sum()
-        
-        icm_precision = 0 if icm_confusion_mat[g,:].sum() == 0 else icm_confusion_mat[g,g]/ icm_confusion_mat[g, :].sum()
-        icm_f1 = 0
-        if (precision + recall) > 0:
-            icm_f1 = 2 * (precision * recall) / (precision + recall)
-
-        run.log({f"icm_{g}_recall": icm_recall,f"icm_{g}_precision": icm_precision,f"icm_{g}_f1":icm_f1})
-
-    run.log({"te_acc_mean": te_acc_stats.mean, "te_acc_std":te_acc_stats.std_dev, "icm_acc_mean":icm_acc_stats.mean, "icm_acc_std":icm_acc_stats.std_dev})
+        run.log({"te_acc_mean": te_acc_stats.mean, "te_acc_std":te_acc_stats.std_dev, "icm_acc_mean":icm_acc_stats.mean, "icm_acc_std":icm_acc_stats.std_dev})
 
 if __name__ == "__main__":
     import argparse
