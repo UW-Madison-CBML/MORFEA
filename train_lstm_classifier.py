@@ -101,13 +101,15 @@ def main(model_name):
     )
     
     KEEP_NA = False
+    
+    grade_options = ["A", "B", "C", "NA"] if KEEP_NA else ["A","B","C"]
     learning_rate = 0.00001
     latents_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv")).rename(columns={"embryo_id":"cell_id"}).drop(columns=['TE',"ICM","grade1","grade2","te","icm"], axis=1, errors='ignore')
     latents = np.load(os.path.abspath(f"latents/{model_name}.npy"))
     #normalize latents here
     lat_mean = latents.mean(axis=0)
     lat_std_dev = np.std(latents, axis=0) + 1e-8
-    latents = (latents + lat_mean) / lat_std_dev
+    latents = (latents - lat_mean) / lat_std_dev
 
     lat_cols = [f"z_{i}" for i in range(latents.shape[1])]
     latents_df[lat_cols] = latents
@@ -192,33 +194,50 @@ def main(model_name):
             optimizer_icm.step()
             run.log({"icm": loss.item()})
     
-    te_loss_stats = RunningStats()
-    icm_loss_stats = RunningStats()
     te_acc_stats = RunningStats()
     icm_acc_stats = RunningStats()
 
     model_te.eval(); model_icm.eval()
+    te_confusion_mat = np.zeros((3,3))
+    icm_confusion_mat = np.zeros((3,3))
     with torch.no_grad():
         for sig, te, lengths in loader_te_val:
             sig = sig.to(DEVICE)
-            te = te.to(DEVICE).long()
             logits = model_te(sig, lengths)
-            loss = crit_te(logits, te)
-            te_loss_stats.push(loss.item())
             
-            preds = logits.argmax(dim=1)  
-            te_acc_stats.push((preds == te).sum().item()/te.shape[0])
+            preds = logits.cpu()[0].argmax(dim=1).item() # batch size 1
+            te = te[0]
+            te_acc_stats.push((preds == te).sum()) 
+            te_confusion_mat[preds, te] += 1 
         for sig, icm, lengths in loader_icm_val:
             sig = sig.to(DEVICE)
-            icm = icm.to(DEVICE).long()
 
             logits = model_icm(sig, lengths)
-            loss = crit_icm(logits, icm)
-            icm_loss_stats.push(loss.item())
-    print("TE: " + str(te_loss_stats.mean) + " +- " + str(te_loss_stats.std_dev))
-    print("ICM: " + str(icm_loss_stats.mean) + " +- " + str(icm_loss_stats.std_dev))
-    print("TE Acc: " + str(te_acc_stats.mean) + " +- " + str(te_acc_stats.std_dev))
-    print("ICM Acc: " + str(icm_acc_stats.mean) + " +- " + str(icm_acc_stats.std_dev))
+            preds = logits.cpu()[0].argmax(dim=1).item()  # batch size 1
+            icm = icm[0]
+
+            icm_acc_stats.push((preds == icm).sum())
+            icm_confusion_mat[preds, icm] += 1 
+    
+    for i, g in enumerate(grade_options):
+        te_recall = 0 if te_confusion_mat[:, g].sum() == 0 else te_confusion_mat[g,g]/te_confusion_mat[:, g].sum()
+        
+        te_precision = 0 if te_confusion_mat[g,:].sum() == 0 else te_confusion_mat[g,g]/ te_confusion_mat[g, :].sum()
+        te_f1 = 0
+        if (precision + recall) > 0:
+            te_f1 = 2 * (precision * recall) / (precision + recall)
+        run.log({f"te_{g}_recall": te_recall,f"te_{g}_precision": te_precision,f"te_{g}_f1":te_f1})
+        #---------------------------------------------------------------------------------- 
+        icm_recall = 0 if icm_confusion_mat[:, g].sum() == 0 else icm_confusion_mat[g,g]/icm_confusion_mat[:, g].sum()
+        
+        icm_precision = 0 if icm_confusion_mat[g,:].sum() == 0 else icm_confusion_mat[g,g]/ icm_confusion_mat[g, :].sum()
+        icm_f1 = 0
+        if (precision + recall) > 0:
+            icm_f1 = 2 * (precision * recall) / (precision + recall)
+
+        run.log({f"icm_{g}_recall": icm_recall,f"icm_{g}_precision": icm_precision,f"icm_{g}_f1":icm_f1})
+
+    run.log({"te_acc_mean": te_acc_stats.mean, "te_acc_std":te_acc_stats.std_dev, "icm_acc_mean":icm_acc_stats.mean, "icm_acc_std":icm_acc_stats.std_dev})
 
 if __name__ == "__main__":
     import argparse

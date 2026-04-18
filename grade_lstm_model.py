@@ -21,7 +21,8 @@ class GradeLSTMClassifier(torch.nn.Module):
 
         _, (hn, cn) = self.lstm(x_packed)
 
-        x = self.lin4(hn[-1])
+        x = self.lin4(hn[-1]) # single layer, single direction so hidden state is (1, batch, lstm_out),  
+        #                     # hn.squeeze() is risky in case of batch=1, as then shape would be (lstm_out)
         
         return x 
 
