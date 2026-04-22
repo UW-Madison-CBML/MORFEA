@@ -14,6 +14,7 @@ def collate_fn_padd(batch):
     signals = [item[0] for item in batch]
     targets = [item[1] for item in batch]
     
+    print("lengths: ", [len(s) for s in signals])
     lengths = torch.tensor([len(s) for s in signals])
     
     signals_padded = torch.nn.utils.rnn.pad_sequence(
@@ -75,6 +76,14 @@ VAL_EMBRYOS =[
     "GA817-1-8",
     "AM918-2-5",
     "LNA592-9",
+"RS363-7",
+"JE021-4",
+"ZS435-6",
+"QC211-2",
+"GE1055-6",
+"LBS371-1-8",
+"CAV074-1",
+"RA803-4",
     ]
 
 class RunningStats:
@@ -126,12 +135,12 @@ def main(model_name):
     latents_df[lat_cols] = latents
     
     grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"), keep_default_na=(not KEEP_NA)).rename(columns={"video_name":"embryo_id"})
-    te_graded = grades_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
+    """te_graded = grades_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
     np.random.shuffle(te_graded)
     val_ratio = 0.15
-    VAL_EMBRYOS = te_graded[:int(val_ratio * len(te_graded))]
+    VAL_EMBRYOS = te_graded[:int(val_ratio * len(te_graded))] 
     for embryo in VAL_EMBRYOS:
-        print(f"{embryo}: {grades_df[grades_df['embryo_id'] == embryo].iloc[0]['TE']}")
+        print(f"{embryo}: {grades_df[grades_df['embryo_id'] == embryo].iloc[0]['TE']}")"""
     
     mask = latents_df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = latents_df[mask]
@@ -189,8 +198,6 @@ def main(model_name):
         for sig, te, lengths in loader_te:
             sig = sig.to(DEVICE)
             te = te.to(DEVICE).long()
-            if -1 in te:
-                continue 
             label = model_te(sig, lengths)
             loss = crit_te(label, te)
 
@@ -202,8 +209,6 @@ def main(model_name):
         for sig, icm, lengths in loader_icm:
             sig = sig.to(DEVICE)
             icm = icm.to(DEVICE).long()
-            if -1 in icm:
-                continue
             
             label = model_icm(sig, lengths)
             loss = crit_icm(label, icm)
