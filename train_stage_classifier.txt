@@ -1,3 +1,1 @@
-train_stage_classifier.py --name notemp-2026-03-12 --distance-mat --curvature --acceleration --velocity
 train_stage_classifier.py --name control-2026-03-12 --distance-mat --curvature --acceleration --velocity
-train_stage_classifier.py --name nolstm-2026-03-12 --distance-mat --curvature --acceleration --velocity

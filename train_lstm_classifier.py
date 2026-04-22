@@ -135,16 +135,20 @@ def main(model_name):
     latents_df[lat_cols] = latents
     
     grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"), keep_default_na=(not KEEP_NA)).rename(columns={"video_name":"embryo_id"})
-    """te_graded = grades_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
+    te_graded = grades_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
     np.random.shuffle(te_graded)
     val_ratio = 0.15
     VAL_EMBRYOS = te_graded[:int(val_ratio * len(te_graded))] 
+        for embryo in ["RS363-7","JE021-4","ZS435-6","QC211-2","GE1055-6","LBS371-1-8","CAV074-1","RA803-4",]: # remove a bunch of C's
+        if embryo in VAL_EMBRYOS:
+            VAL_EMBRYOS.remove(embryo)
+    for embryo in ["PH664-7","JV227-2","LLN873-1","LA367-4","RA580-2","MC373-5","DV210-4"]: # add a bunch of C's
+        VAL_EMBRYOS.append(embryo)
     for embryo in VAL_EMBRYOS:
-        print(f"{embryo}: {grades_df[grades_df['embryo_id'] == embryo].iloc[0]['TE']}")"""
-    
+        print(f"{embryo}: {grades_df[grades_df['embryo_id'] == embryo].iloc[0]['TE']}")
     mask = latents_df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = latents_df[mask]
-    print(f"val_ratio={val_ratio}, actual val ratio: {len(val_df)/len(latents_df)}")
+    #print(f"val_ratio={val_ratio}, actual val ratio: {len(val_df)/len(latents_df)}")
     latents_df = latents_df[~mask]
 
     dataset_te = GradeLSTMDataset(latents_df, grades_df, "TE", keep_na=KEEP_NA) 
@@ -152,8 +156,8 @@ def main(model_name):
     dataset_te_val = GradeLSTMDataset(val_df, grades_df, "TE", keep_na=KEEP_NA, return_whole_seqs=True) 
     dataset_icm_val = GradeLSTMDataset(val_df, grades_df, "ICM", keep_na=KEEP_NA, return_whole_seqs=True)
     lat_size = len(lat_cols)
-    crit_te = torch.nn.CrossEntropyLoss()
-    crit_icm = torch.nn.CrossEntropyLoss()
+    crit_te = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.6,0.3,0.1], device=DEVICE))
+    crit_icm = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.6,0.3,0.1], device=DEVICE))
     model_te = GradeLSTMClassifier(lat_size, keep_na=KEEP_NA)
     model_te = model_te.to(DEVICE)
     model_icm = GradeLSTMClassifier(lat_size, keep_na=KEEP_NA)
