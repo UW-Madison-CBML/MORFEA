@@ -100,7 +100,7 @@ VAL_EMBRYOS =[
         for _, phase_row in annotations_df.iterrows():
             stage_id_freq[phase_row["stage_id"]] += max(0,phase_row["stage_end"] - phase_row["stage_begin"])
     out_tensor = torch.tensor([stage_id_freq[phase] for phase in phases])
-    return out_tensor / out_tensor.sum()
+    return out_tensor / out_tensor.sum()"""
 
 def monotonicity_loss(batched_logits_seq, temp=8.0):
     B, T, C = batched_logits_seq.shape
@@ -141,7 +141,7 @@ def main(model_name, features):
     df = df[~mask]
  
     dataset = StageDataset(df, "embryo_dataset_annotations", features)
-    dataset_val = StageDataset(val_df, "embryo_dataset_annotations", features, return_embryo_id=True)
+    dataset_val = StageDataset(val_df, "embryo_dataset_annotations", features, return_embryo_id=True, return_whole_seqs=True)
     #weights = get_class_weights(os.path.abspath("embryo_dataset_annotations"), df.groupby("embryo_id").size().reset_index(name='counts'), dataset.phases).to(DEVICE)
     crit = torch.nn.CrossEntropyLoss()
     model = StageModel(input_size = len(dataset.lat_cols))
