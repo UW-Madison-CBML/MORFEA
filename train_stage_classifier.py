@@ -14,6 +14,15 @@ import matplotlib.colors as mcolors
 from matplotlib.patches import Patch
 
 from torch.optim.lr_scheduler import CosineAnnealingLR, CosineAnnealingWarmRestarts
+def recall_precision_f1(confusion_mat, i):
+    recall = 0 if confusion_mat[:, i].sum() == 0 else confusion_mat[i,i]/confusion_mat[:, i].sum()
+            
+    precision = 0 if confusion_mat[i,:].sum() == 0 else confusion_mat[i,i]/ confusion_mat[i, :].sum()
+    f1 = 0
+    if (precision + recall) > 0:
+        f1 = 2 * (precision * recall) / (precision + recall)
+    return recall, precision, f1
+
 class RunningStats:
     def __init__(self):
         self.n = 0
@@ -152,13 +161,12 @@ def main(model_name, features):
     )
     loader_val = DataLoader(
         dataset_val,
-        batch_size=1,
+        batch_size=32,
         shuffle=False,
         num_workers=4,
         pin_memory=True,
-        drop_last=False
-        
-        #collate_fn = lambda x: dataset.pad_collate(x) # i dont think this is necessary for batch of 1
+        drop_last=False,
+        collate_fn = lambda x: dataset.pad_collate(x)
     )
 
     epochs = 8
@@ -187,15 +195,17 @@ def main(model_name, features):
         stats_dict = {} 
 
         with torch.no_grad():
-            for lats, labels, embryo_id in loader_val:
+            for lats, labels, mask, embryo_id in loader_val:
+                B, T, L = lats.shape
+                # labels.shape = B, T 
                 lats = lats.to(DEVICE).float()
-                logits = model(lats, None) # no mask for single batch
+                logits = model(lats, mask) # no mask for single batch
 
                 embryo_id = embryo_id[0]
-                preds = logits.view(-1,18).detach().cpu().argmax(dim=1) # i think this is the right ordr
-                labels = labels.view(-1) # already on cpu, batch size of 1
+                preds = logits.view(B,T,18).detach().cpu().argmax(dim=1) # i think this is the right ordr
+                labels = labels.view(B,T)
                 acc = (preds == labels).sum().item()/labels.shape[0]
-                area_between_curves = torch.abs(preds - labels).sum().item()/labels.view(-1).shape[0]
+                area_between_curves = torch.abs(preds - labels).sum().item()
                 acc_stats.push(acc)
                 area_between_curves_stats.push(area_between_curves)
 
@@ -208,6 +218,9 @@ def main(model_name, features):
  
         run.log({"val_acc":acc_stats.mean, "val_acc_std":acc_stats.std_dev,"area_between_curves_mean":area_between_curves_stats.mean,"area_between_curves_stddev":area_between_curves_stats.std_dev})
         highest_std = sorted(list(stats_dict.items()), key = lambda x: -1*(x[1].mean))[:10]
+        f1_stats = {phase: RunningStats() for phase in dataset_val.phases}
+        recall_stats = {phase: RunningStats() for phase in dataset_val.phases}
+        precision_stats = {phase: RunningStats() for phase in dataset_val.phases}
         model.eval()
         for embryo, _ in highest_std:
             print(embryo)
@@ -236,6 +249,13 @@ def main(model_name, features):
                     
                     else:
                         len_seq += 1
+                confusion_mat = torch.einsum("ti,tj->ij", F.one_hot(torch.from_numpy(pred_indices), num_classes=18), F.one_hot(torch.from_numpy(ground_truth_indices), num_classes=18))
+                for i in range(18):
+                    recall, precision, f1 = recall_precision_f1(confusion_mat, i) 
+                    f1_stats[dataset_val.phases[i]].push(f1)
+                    recall_stats[dataset_val.phases[i]].push(recall)
+                    precision_stats[dataset_val.phases[i]].push(precision)
+                 
                 if(len(pred_indices) != len(ground_truth_indices)):
                     print("bad index lists") 
                 else:
@@ -260,7 +280,11 @@ def main(model_name, features):
                     ax.legend(handles=legend_elements, title="Phases") 
                     run.log({"pred_vs_truth": wandb.Image(fig)}) 
                     plt.close(fig)
-                 
+        for phase in val_dataset.phases:
+            run.log({f"{phase} recall": recall_stats.mean, f"{phase} recall std": recall_stats.std_dev, 
+                f"{phase} f1": f1_stats.mean, f"{phase} f1 std": f1_stats.std_dev, 
+                f"{phase} precision": precision_stats.mean, f"{phase} precision std": precision_stats.std_dev})
+
 
 
  
