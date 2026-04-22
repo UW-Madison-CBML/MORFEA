@@ -25,8 +25,6 @@ def get_annotations_col(group_name, group_len, annotations_dir):
         new_column += [row["stage_id"]] * (row["stage_end"] - row["stage_begin"]+1)
         col_len_seq.append(len(new_column))
 
-    
-
 
     new_column += ["post_phase"] * (group_len - len(new_column))
     new_column = new_column[:group_len]
@@ -76,13 +74,12 @@ def add_annotations(group_name, group, annotations_dir, features):
     if (not features['latents']):
         group = group.drop(columns=lat_cols)
     
-    print(f"Group {group_name} NaNs: {group.isna().sum().sum()}") 
     return group
 
 class StageDataset(Dataset):
-    def __init__(self, latents_df, annotations_dir, features, return_embryo_id=False): # preparing latents_df outside of the class i.e. from .csv .npy in latents/
+    def __init__(self, latents_df, annotations_dir, features, return_embryo_id=False, return_whole_seqs=False): # preparing latents_df outside of the class i.e. from .csv .npy in latents/
         self.latents_df = latents_df
-        
+        self.return_whole_seqs = return_whole_seqs 
         print("nan cols just lats", self.latents_df.columns[self.latents_df.isna().any()])
         values = self.latents_df[[i for i in self.latents_df.columns if i.startswith("z_")]].to_numpy()
         scaler = StandardScaler()
@@ -108,29 +105,29 @@ class StageDataset(Dataset):
         self.lat_cols = [column for column in self.df.columns if column.startswith("z_")]
 
     def __getitem__(self, idx):
+        seq_df = None
+        if(self.return_whole_seqs):
+            _, seq_df = list(self.groups)[idx]
+        else:
+            row = self.df.iloc[idx]
 
-        row = self.df.iloc[idx]
-
-        group = self.groups.get_group(row["embryo_id"])
-
-        
-        #seqindex = int(((row["time_step"] - 1) / len(group)) * (len(group) - self.seqlength - 1))
-
-        seq_df = group.loc[:max(group.index[0] + 5, idx+1)]
+            group = self.groups.get_group(row["embryo_id"])
+            group_idx = idx - group.index[0]
+            seq_df = group.iloc[:max(5, group_idx)]
 
         if (self.return_embryo_id):
 
             return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.phases.index(r["phase"]) for _,r in seq_df.iterrows()], dtype = torch.long), row["embryo_id"]
-
-        return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.phases.index(r["phase"]) for _,r in seq_df.iterrows()], dtype = torch.long)
+        else:
+            return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.phases.index(r["phase"]) for _,r in seq_df.iterrows()], dtype = torch.long)
         
 
     def __len__(self):
-        return len(self.df)
+        return len(self.groups) if self.return_whole_seqs else len(self.df)
 
     def pad_collate(self, batch):
         if(self.return_embryo_id):
-            (data, labels,embryo_id) = zip(*batch)
+            (data, labels, embryo_id) = zip(*batch)
         else:  
             (data, labels) = zip(*batch)
         
