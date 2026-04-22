@@ -34,14 +34,19 @@ class GradeLSTMDataset(Dataset):
     def __getitem__(self, idx):
         grade_options = ["A", "B", "C", "NA"] if self.keep_na else ["A","B","C"]
         embryo_id = self.df.iloc[idx]["embryo_id"]
+        group = self.groups.get_group(embryo_id)
         rows = None
         if self.return_whole_seqs:
             _, rows = list(self.groups)[idx]
         else:
-            rows = self.groups.get_group(embryo_id).loc[:idx]
-        lat_seq = rows[[i for i in self.df.columns.tolist() if i[:2] == "z_"]].to_numpy(dtype=np.float32)
-        grade_index = grade_options.index(rows.iloc[-1][self.grade])
-        return torch.from_numpy(lat_seq.astype(np.float32)), torch.tensor(grade_index)
+            rows = group.loc[ group.index <= idx]
+        if(len(rows) < 1):
+            rows = group.loc[group.index <= idx+5]
+        print("len rows: ", len(rows))
+
+        lat_seq = rows[self.lat_cols].to_numpy(dtype=np.float32)
+        grade_index = grade_options.index(self.groups.get_group(embryo_id).iloc[-1][self.grade])
+        return (lat_seq.astype(np.float32)), torch.tensor(grade_index)
 
     def __len__(self):
         return len(self.df) if self.return_whole_seqs == False else len(self.groups)
