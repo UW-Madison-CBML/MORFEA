@@ -7,7 +7,8 @@ from PIL import Image, ImageFile
 from geometric_features import get_acc, get_vel, calculate_curvatures
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-def add_annotations(group_name, group, annotations_dir, features):
+from scipy.spatial import distance_matrix
+def add_annotations(group_name, group, features):
    
     lat_cols = [column for column in group.columns if column.startswith("z_")]
     trajectory = group[lat_cols].to_numpy()
@@ -62,11 +63,12 @@ class GradeLSTMDataset(Dataset):
             print(self.latents_df.head())
             print(self.grades_df.head())
             raise ValueError("no embryo_id column")
+        self.lat_cols = [col for col in self.latents_df.columns if col.startswith("z_")] 
         self.df = self.latents_df.merge(self.grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", self.grade, "time_step"] + self.lat_cols] if self.keep_na else self.latents_df.merge(self.grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", self.grade, "time_step"] + self.lat_cols].dropna(subset=[self.grade])
         self.df = self.df.sort_values(["embryo_id", "time_step"])
         
         self.df = self.df.groupby("embryo_id", group_keys = False).apply(lambda group:add_annotations(group.name,group, features)).reset_index()
-        self.lat_cols = [col for col in self.latents_df.columns if col.startswith("z_")]
+        self.lat_cols = [col for col in self.df.columns if col.startswith("z_")] # recalculate lat cols after adding features
         self.groups = self.df.groupby("embryo_id") 
         self.grade_options = ["A", "B", "C", "NA"] if self.keep_na else ["A","B","C"]
 
