@@ -107,7 +107,7 @@ class RunningStats:
         return math.sqrt(self.variance)
 
 
-def main(model_name):
+def main(model_name, features):
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -150,10 +150,10 @@ def main(model_name):
     print(f"val_ratio={val_ratio}, actual val ratio: {len(val_df)/len(latents_df)}")
     latents_df = latents_df[~mask]
 
-    dataset_te = GradeLSTMDataset(latents_df, grades_df, "TE", keep_na=KEEP_NA) 
-    dataset_icm = GradeLSTMDataset(latents_df, grades_df, "ICM", keep_na=KEEP_NA)
-    dataset_te_val = GradeLSTMDataset(val_df, grades_df, "TE", keep_na=KEEP_NA, return_whole_seqs=True) 
-    dataset_icm_val = GradeLSTMDataset(val_df, grades_df, "ICM", keep_na=KEEP_NA, return_whole_seqs=True)
+    dataset_te = GradeLSTMDataset(latents_df, grades_df, "TE", features, keep_na=KEEP_NA) 
+    dataset_icm = GradeLSTMDataset(latents_df, grades_df, "ICM", features, keep_na=KEEP_NA)
+    dataset_te_val = GradeLSTMDataset(val_df, grades_df, "TE", features, keep_na=KEEP_NA, return_whole_seqs=True) 
+    dataset_icm_val = GradeLSTMDataset(val_df, grades_df, "ICM", features, keep_na=KEEP_NA, return_whole_seqs=True)
     lat_size = len(lat_cols)
     crit_te = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.2,0.3,0.6], device=DEVICE))
     crit_icm = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.2,0.3,0.6], device=DEVICE))
@@ -275,11 +275,17 @@ def main(model_name):
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="A simple script using argparse to greet a user.")
-
-
+    parser = argparse.ArgumentParser(description="Train seq-> grade lstm classifier.")
+ 
+ 
     parser.add_argument("--name", help="Model name. Must have already exported latents")
-
+    parser.add_argument("--curvature",action="store_true", help="Use to include curvature")
+    parser.add_argument("--latents",action="store_true", help="Use to include latents")
+    parser.add_argument("--velocity",action="store_true", help="Use to include velocity")
+    parser.add_argument("--acceleration", action="store_true", help="Use to include acceleration")
+    parser.add_argument("--distance-mat", action="store_true", help="Use to include distance to first frame")
+  
     args = parser.parse_args()
+ 
+    main(args.name, vars(args))
 
-    main(args.name)
