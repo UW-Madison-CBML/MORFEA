@@ -27,24 +27,24 @@ class GradeLSTMDataset(Dataset):
             print(self.grades_df.head())
             raise ValueError("no embryo_id column")
         self.lat_cols = [col for col in self.latents_df.columns if col.startswith("z_")]
-        self.df =  self.latents_df.merge(self.grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", self.grade, "time_step"] + self.lat_cols] if self.keep_na else self.latents_df.merge(self.grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", self.grade, "time_step"] + self.lat_cols].dropna(subset=[self.grade])
+        self.df = self.latents_df.merge(self.grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", self.grade, "time_step"] + self.lat_cols] if self.keep_na else self.latents_df.merge(self.grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", self.grade, "time_step"] + self.lat_cols].dropna(subset=[self.grade])
         self.df = self.df.sort_values(["embryo_id", "time_step"])
         self.groups = self.df.groupby("embryo_id") 
+        self.grade_options = ["A", "B", "C", "NA"] if self.keep_na else ["A","B","C"]
 
     def __getitem__(self, idx):
-        grade_options = ["A", "B", "C", "NA"] if self.keep_na else ["A","B","C"]
-        embryo_id = self.df.iloc[idx]["embryo_id"]
-        group = self.groups.get_group(embryo_id)
-        df_idx = idx - group.index[0] 
         rows = None
         if self.return_whole_seqs:
             _, rows = list(self.groups)[idx]
+            print(f"embryo_id: {rows.iloc[-1]['embryo_id']}, grade: {rows.iloc[-1][self.grade]}")
         else:
-            rows = group.iloc[:idx+8]
-        print("len rows: ", len(rows))
+            row = self.df.iloc[idx]
+            embryo_id = row["embryo_id"]
+            group = self.groups.get_group(embryo_id)
+            rows = group.loc[:max(idx + 8, group.index[8])]
 
         lat_seq = rows[self.lat_cols].to_numpy(dtype=np.float32)
-        grade_index = grade_options.index(self.groups.get_group(embryo_id).iloc[-1][self.grade])
+        grade_index = self.grade_options.index(rows.iloc[-1][self.grade])
         return torch.tensor(lat_seq.astype(np.float32)), torch.tensor(grade_index)
 
     def __len__(self):

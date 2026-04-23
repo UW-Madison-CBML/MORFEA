@@ -14,7 +14,6 @@ def collate_fn_padd(batch):
     signals = [item[0] for item in batch]
     targets = [item[1] for item in batch]
     
-    print("lengths: ", [len(s) for s in signals])
     lengths = torch.tensor([len(s) for s in signals])
     
     signals_padded = torch.nn.utils.rnn.pad_sequence(
@@ -76,14 +75,14 @@ VAL_EMBRYOS =[
     "GA817-1-8",
     "AM918-2-5",
     "LNA592-9",
-"RS363-7",
-"JE021-4",
-"ZS435-6",
-"QC211-2",
-"GE1055-6",
-"LBS371-1-8",
-"CAV074-1",
-"RA803-4",
+    "RS363-7",
+    "JE021-4",
+    "ZS435-6",
+    "QC211-2",
+    "GE1055-6",
+    "LBS371-1-8",
+    "CAV074-1",
+    "RA803-4",
     ]
 
 class RunningStats:
@@ -139,7 +138,7 @@ def main(model_name):
     np.random.shuffle(te_graded)
     val_ratio = 0.15
     VAL_EMBRYOS = te_graded[:int(val_ratio * len(te_graded))] 
-        for embryo in ["RS363-7","JE021-4","ZS435-6","QC211-2","GE1055-6","LBS371-1-8","CAV074-1","RA803-4",]: # remove a bunch of C's
+    for embryo in ["RS363-7","JE021-4","ZS435-6","QC211-2","GE1055-6","LBS371-1-8","CAV074-1","RA803-4",]: # remove a bunch of C's
         if embryo in VAL_EMBRYOS:
             VAL_EMBRYOS.remove(embryo)
     for embryo in ["PH664-7","JV227-2","LLN873-1","LA367-4","RA580-2","MC373-5","DV210-4"]: # add a bunch of C's
@@ -148,7 +147,7 @@ def main(model_name):
         print(f"{embryo}: {grades_df[grades_df['embryo_id'] == embryo].iloc[0]['TE']}")
     mask = latents_df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = latents_df[mask]
-    #print(f"val_ratio={val_ratio}, actual val ratio: {len(val_df)/len(latents_df)}")
+    print(f"val_ratio={val_ratio}, actual val ratio: {len(val_df)/len(latents_df)}")
     latents_df = latents_df[~mask]
 
     dataset_te = GradeLSTMDataset(latents_df, grades_df, "TE", keep_na=KEEP_NA) 
@@ -156,8 +155,8 @@ def main(model_name):
     dataset_te_val = GradeLSTMDataset(val_df, grades_df, "TE", keep_na=KEEP_NA, return_whole_seqs=True) 
     dataset_icm_val = GradeLSTMDataset(val_df, grades_df, "ICM", keep_na=KEEP_NA, return_whole_seqs=True)
     lat_size = len(lat_cols)
-    crit_te = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.6,0.3,0.1], device=DEVICE))
-    crit_icm = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.6,0.3,0.1], device=DEVICE))
+    crit_te = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.2,0.3,0.6], device=DEVICE))
+    crit_icm = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.2,0.3,0.6], device=DEVICE))
     model_te = GradeLSTMClassifier(lat_size, keep_na=KEEP_NA)
     model_te = model_te.to(DEVICE)
     model_icm = GradeLSTMClassifier(lat_size, keep_na=KEEP_NA)
@@ -183,19 +182,19 @@ def main(model_name):
         drop_last=True, collate_fn=collate_fn_padd)
     loader_te_val = DataLoader(
         dataset_te_val,
-        batch_size=len(dataset_te_val),
-        shuffle=False,
+        batch_size=len(VAL_EMBRYOS),
+        shuffle=True,
         num_workers=4,
         pin_memory=True,
-        drop_last=True,
+        drop_last=False,
         collate_fn=collate_fn_padd)
     loader_icm_val = DataLoader(
         dataset_icm_val,
-        batch_size=len(dataset_icm_val),
-        shuffle=False,
+        batch_size=len(VAL_EMBRYOS),
+        shuffle=True,
         num_workers=4,
         pin_memory=True,
-        drop_last=True,
+        drop_last=False,
         collate_fn=collate_fn_padd)
     for epoch in range(8):
         model_te.train(); model_icm.train()
@@ -230,30 +229,36 @@ def main(model_name):
         icm_confusion_mat = torch.zeros((3,3))
         with torch.no_grad():
             for sig, te, lengths in loader_te_val:
+                
+                print(f"te shape: {te.shape}")
+
+                print(f"sig shape: {sig.shape}")
+
                 sig = sig.to(DEVICE)
                 logits = model_te(sig, lengths)
                 
-                preds = logits.cpu().argmax(dim=1)
+                preds = logits.cpu().argmax(dim=-1)
                 
                 te_acc_stats.push((preds == te).sum().item()/te.shape[0]) 
+                
                 te = F.one_hot(te, num_classes=3)
-
                 preds = F.one_hot(preds, num_classes=3)
 
-                te_confusion_mat += torch.einsum('bi,bj->ij', preds, te) # this einsum calculates confusion mats
+
+                te_confusion_mat += torch.einsum('ti,tj->ij', preds, te) # this einsum calculates confusion mats
 
 
             for sig, icm, lengths in loader_icm_val:
                 sig = sig.to(DEVICE)
                 logits = model_icm(sig, lengths)
 
-                preds = logits.cpu().argmax(dim=1) # size = (batch)
+                preds = logits.cpu().argmax(dim=-1) 
 
                 icm_acc_stats.push((preds == icm).sum().item()/icm.shape[0])
                 icm = F.one_hot(icm, num_classes=3)
                 preds = F.one_hot(preds, num_classes=3)
 
-                icm_confusion_mat += torch.einsum('bi,bj->ij', preds, icm)
+                icm_confusion_mat += torch.einsum('ti,tj->ij', preds, icm)
                 
         
         for i, g in enumerate(grade_options):
