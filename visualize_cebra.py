@@ -35,9 +35,17 @@ def get_phases(embryo_id, seq_len):
     new_column = new_column[:seq_len]
     
     return np.array([PHASES.index(phase) for phase in new_column]) 
+def plot_points(points, c=None, cmap='viridis', 
+    # ------------------------------------------
+    # individual
 
+    # ------------------------------------------
+    # grouped
 
-def main(model_name):
+    # ------------------------------------------
+    # grid
+
+def main(model_name, grades_args, phases_args):
     
     torch.backends.cudnn.enabled = False
     HOLDOUT = True
@@ -470,5 +478,12 @@ def main(model_name):
 
 
 if __name__ == "__main__":
-    import sys
-    main(sys.argv[1])
+    import argparse
+    
+    parser.add_argument('model_name')           
+    parser.add_argument('--all-grades', action='store_true')
+    parser.add_argument('--all-phases', action='store_true')
+    parser.add_argument("--phases", action="extend", nargs="+", type=str) 
+    parser.add_argument("--grades", action="extend", nargs="+", type=str) 
+    args = parser.parse_args()
+    main(args.model_name, ["A","B","C"] if args.all_grades else args.grades, PHASES if args.all_phases else args.phases)
