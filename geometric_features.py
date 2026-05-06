@@ -78,7 +78,7 @@ def fit_circle_curvature(points, how=""):
             return 0 
         return 1/radius
  
-def calculate_curvatures(trajectory, offset = 10, how="", retrospective=False):
+def calculate_curvatures(trajectory, offset = 10, how="triangle", retrospective=False):
     curvatures = []
     
     for i in range(len(trajectory)):
