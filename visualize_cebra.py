@@ -15,10 +15,11 @@ from matplotlib.patches import Patch
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from geometric_features import calculate_curvatures, get_acc, get_vel
+import math
 
 PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
 GRADES = ["NA", "C", "B", "A"]
-GRADE_COLORS = ["888888", "FF0000", "FFFF00", "00FF00"]
+GRADE_COLORS = ["#888888", "#FF0000", "#FFFF00", "#00FF00"]
 
 def get_phases(embryo_id, seq_len):
     annotation_file = os.path.join("embryo_dataset_annotations", f"{embryo_id}_phases.csv")
@@ -39,7 +40,7 @@ def get_phases(embryo_id, seq_len):
     return np.array([PHASES.index(phase) for phase in new_column]) 
 def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, cbar_label="Time"):
     if(c is None):
-        c = [np.linspace(0,1,len(seq) for seq in seqs]
+        c = [np.linspace(0,1,len(seq)) for seq in seqs]
     x_list = [x for seq in seqs for x in seq[:, 0]]
     y_list = [y for seq in seqs for y in seq[:, 1]]
     z_list = [z for seq in seqs for z in seq[:, 2]]
@@ -47,14 +48,14 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
     y_lim = (min(y_list),max(y_list))
     z_lim = (min(z_list),max(z_list))
 
-    least_greater_square = int(math.sqrt(len(seqs))) + 1
-    grid_axes, grid_fig = plt.subplots(least_greater_square, least_greater_square, subplot_kw={'projection': '3d'})
+    least_greater_square = int(math.sqrt(len(seqs)) + 0.5)
+    grid_fig, grid_axes = plt.subplots(least_greater_square, least_greater_square,figsize=(5*least_greater_square, 5*least_greater_square), subplot_kw={'projection': '3d'})
     grid_axes = grid_axes.ravel()
     grid_im = None
-    group_ax, group_fig = plt.subplots(subplot_kw={'projection': '3d'})
+    group_fig, group_ax = plt.subplots(subplot_kw={'projection': '3d'})
     group_im = None
     for i, seq in enumerate(seqs):
-        individ_ax, individ_fig = plt.subplots(subplot_kw={'projection':'3d'})
+        individ_fig, individ_ax = plt.subplots(subplot_kw={'projection':'3d'})
         individ_im = None
         if(cmap =="phase"):
             grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap='tab20c', vmin=0, vmax=19)
@@ -78,7 +79,7 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
             if individ_im is not None:
                 individ_fig.colorbar(individ_im, cax=cbar_ax, label=cbar_label)
 
-        individ_ax.savefig(os.path.join("cebra_plots",f"individ-{f_name}-{i}.png"))
+        individ_fig.savefig(os.path.join("cebra_plots",f"individ-{f_name}-{i}.png"))
         plt.close(individ_fig) 
         if(uniform_bounds):
             grid_axes[i].set_xlim(x_lim)
@@ -102,12 +103,12 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
     grid_fig.savefig(os.path.join("cebra_plots",f"grid-{f_name}.png"))
     plt.close(grid_fig)   
     
-    group_axes.set_xlim(x_lim)
-    group_axes.set_ylim(y_lim)
-    group_axes.set_zlim(z_lim) 
-    group_axes.set_xlabel("Cebra 1")
-    group_axes.set_ylabel("Cebra 2")
-    group_axes.set_zlabel("Cebra 3")
+    group_ax.set_xlim(x_lim)
+    group_ax.set_ylim(y_lim)
+    group_ax.set_zlim(z_lim) 
+    group_ax.set_xlabel("Cebra 1")
+    group_ax.set_ylabel("Cebra 2")
+    group_ax.set_zlabel("Cebra 3")
     group_fig.subplots_adjust(right=0.85) 
     if(cmap == "phase"):
         legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(PHASES)]
@@ -127,7 +128,7 @@ def main(model_name, image_name, grade_args, phase_args):
 
     # latents df is also metadata for the cebra embeddings
     latents_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv"))
-    cebra_np = pd.read_csv(os.path.join("cebra_latents", f"{model_name}.npy"))
+    cebra_np = np.load(os.path.join("cebra_latents", f"{model_name}.npy"))
     cebra_df = pd.DataFrame(cebra_np, columns=["z_0","z_1","z_2"])
     df = pd.concat([latents_df, cebra_df], axis=1)
     if("NA" not in grade_args):
@@ -189,6 +190,10 @@ def main(model_name, image_name, grade_args, phase_args):
     
 if __name__ == "__main__":
     import argparse
+    parser = argparse.ArgumentParser(
+                    prog='Plot cebra latents',
+                    description='',
+                    epilog='')
     
     parser.add_argument('model_name')           
     parser.add_argument('image_name')           
