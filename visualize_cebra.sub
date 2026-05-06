@@ -9,7 +9,7 @@ universe = container
 #  commands) and arguments to be passed to jobs. 
 #  $(Process) will be a integer number for each job, starting with "0"
 #  and increasing for the relevant number of jobs.
-shell = ./visualize_cebra.sh $(model)
+shell = ./visualize_cebra.sh $(model) $(args)
    		
 # Specify the name of the log, standard error, and standard output (or
 # "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
@@ -22,7 +22,7 @@ when_to_transfer_output = ON_EXIT_OR_EVICT
 Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
-transfer_input_files = visualize_cebra.sh, visualize_cebra.py, api_keys.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, build_index.py, raffael_model.py, raffael_conv_lstm.py, raffael_losses.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, dataset_ivf_embryo.py ,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz, geometric_features.py
+transfer_input_files = visualize_cebra.sh, visualize_cebra.py, api_keys.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, build_index.py, raffael_model.py, raffael_conv_lstm.py, raffael_losses.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, dataset_ivf_embryo.py ,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz, geometric_features.py, file:///staging/groups/bhaskar_group/ivf/cebra_latents.tar.gz, cebra_plots.tar.gz
 transfer_output_files = cebra_plots.tar.gz, $(model)_cebra_time_model.pt
 transfer_output_remaps = "cebra_plots.tar.gz = $(model)_cebra_plots.tar.gz;"
 #transfer_output_files = model_weights.pth 
@@ -35,6 +35,7 @@ request_disk = 80GB
 #notemp-2026-03-12
 #nolstm-2026-03-12
 
-queue model from (
-control-2026-03-12
-)
+#queue model from (
+#control-2026-03-12
+#)
+queue 1
