@@ -38,7 +38,7 @@ def get_phases(embryo_id, seq_len):
     new_column = new_column[:seq_len]
     
     return np.array([PHASES.index(phase) for phase in new_column]) 
-def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, cbar_label="Time"):
+def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, cbar_label="Time", log_scale=False):
     if(c is None):
         c = [np.linspace(0,1,len(seq)) for seq in seqs]
     x_list = [x for seq in seqs for x in seq[:, 0]]
@@ -61,10 +61,15 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
             grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap='tab20c', vmin=0, vmax=19)
             individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap='tab20c', vmin=0, vmax=19)
             group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap='tab20c', vmin=0, vmax=19)
+        elif(log_scale): # discrete colorbar and log colorbar are mutually exclusive
+            grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
+            individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
+            group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
         else:
             grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
             individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
             group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
+
         individ_ax.set_xlabel("Cebra 1")
         individ_ax.set_ylabel("Cebra 2")
         individ_ax.set_zlabel("Cebra 3")
@@ -152,7 +157,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(group[["z_0","z_1","z_2"]].to_numpy())
             c.append([GRADE_COLORS[GRADES.index(g)]] * len(group))
             
-    plot_sequences(seqs, f"grade_{image_name}", c=c, cmap=None, uniform_bounds=True, cbar_label="Grade")
+    plot_sequences(seqs, f"grade_{image_name}", c=c, cmap=None, cbar_label="Grade")
     # do a bunch per grade using diff colormaps
     for g, embryo_groups in zip(grade_args, embryo_grade_groups):
         #--------------------------------
@@ -164,7 +169,7 @@ def main(model_name, image_name, grade_args, phase_args):
             c.append(group['time_step'].to_numpy()/group['time_step'].max()) # since we are removing some phases we need to use ground_truth time not inherent order of df
             
             
-        plot_sequences(seqs, f"time_{g}_{image_name}",c=c, uniform_bounds=True,cbar_label="Time")
+        plot_sequences(seqs, f"time_{g}_{image_name}",c=c, cbar_label="Time")
         #--------------------------------
         # phase
         seqs = []
@@ -183,7 +188,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(calculate_curvatures(seq, offset=13))
             
-        plot_sequences(seqs, f"curv_{g}_{image_name}", c=c, cmap=None, uniform_bounds=True, cbar_label="Grade")
+        plot_sequences(seqs, f"curv_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True)
 
         
     
