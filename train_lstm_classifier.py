@@ -123,18 +123,17 @@ def main(model_name, features):
     
     grade_options = ["A", "B", "C", "NA"] if KEEP_NA else ["A","B","C"]
     learning_rate = 0.000001
-    latents_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv")).rename(columns={"embryo_id":"cell_id"}).drop(columns=['TE',"ICM","grade1","grade2","te","icm"], axis=1, errors='ignore')
-    latents = np.load(os.path.abspath(f"latents/{model_name}.npy"))
+    metadata_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv"), keep_default_na=(not KEEP_NA))
+    latents = np.load(os.path.join("latents",f"{model_name}.npy"))
+    lat_cols = [f"z_{i}" for i in range(latents.shape[1])]
+    cebra_latents = np.load(os.path.join("cebra_latents", f"{model_name}.npy"))
     #normalize latents here
     lat_mean = latents.mean(axis=0)
     lat_std_dev = np.std(latents, axis=0) + 1e-8
     latents = (latents - lat_mean) / lat_std_dev
-
-    lat_cols = [f"z_{i}" for i in range(latents.shape[1])]
-    latents_df[lat_cols] = latents
+    latents_df = pd.concat([metadata_df, pd.DataFrame(latents, columns=lat_cols, index=metadata_df.index), pd.DataFrame(cebra_latents, columns=["cebra_0", "cebra_1", "cebra_2"], index=metadata_df.index)], axis=1)
     
-    grades_df = pd.read_csv(os.path.abspath(f"embryo_dataset_grades.csv"), keep_default_na=(not KEEP_NA)).rename(columns={"video_name":"embryo_id"})
-    te_graded = grades_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
+    te_graded = latents_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
     np.random.shuffle(te_graded)
     val_ratio = 0.15
     VAL_EMBRYOS = te_graded[:int(val_ratio * len(te_graded))] 
@@ -145,20 +144,20 @@ def main(model_name, features):
         VAL_EMBRYOS.append(embryo)
     for embryo in VAL_EMBRYOS:
         print(f"{embryo}: {grades_df[grades_df['embryo_id'] == embryo].iloc[0]['TE']}")
-    mask = latents_df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
+    mask = latents_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = latents_df[mask]
     print(f"val_ratio={val_ratio}, actual val ratio: {len(val_df)/len(latents_df)}")
     latents_df = latents_df[~mask]
-
-    dataset_te = GradeLSTMDataset(latents_df, grades_df, "TE", features, keep_na=KEEP_NA) 
-    dataset_icm = GradeLSTMDataset(latents_df, grades_df, "ICM", features, keep_na=KEEP_NA)
-    dataset_te_val = GradeLSTMDataset(val_df, grades_df, "TE", features, keep_na=KEEP_NA, return_whole_seqs=True) 
-    dataset_icm_val = GradeLSTMDataset(val_df, grades_df, "ICM", features, keep_na=KEEP_NA, return_whole_seqs=True)
+    # latents df will have the grade columns alread 
+    dataset_te = GradeLSTMDataset(latents_df, "TE", features, keep_na=KEEP_NA) 
+    dataset_icm = GradeLSTMDataset(latents_df, "ICM", features, keep_na=KEEP_NA)
+    dataset_te_val = GradeLSTMDataset(val_df, "TE", features, keep_na=KEEP_NA, return_whole_seqs=True) 
+    dataset_icm_val = GradeLSTMDataset(val_df, "ICM", features, keep_na=KEEP_NA, return_whole_seqs=True)
     crit_te = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.6,0.3,0.2], device=DEVICE))
     crit_icm = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.6,0.3,0.2], device=DEVICE))
     model_te = GradeLSTMClassifier(len(dataset_te.lat_cols), keep_na=KEEP_NA)
     model_te = model_te.to(DEVICE)
-    model_icm = GradeLSTMClassifier(len(dataset_te.lat_cols), keep_na=KEEP_NA)
+    model_icm = GradeLSTMClassifier(len(dataset_icm.lat_cols), keep_na=KEEP_NA)
     model_icm = model_icm.to(DEVICE)
     optimizer_te = torch.optim.Adam(model_te.parameters(), lr=learning_rate, weight_decay=1e-5)
     optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=learning_rate, weight_decay=1e-5)
@@ -283,6 +282,9 @@ if __name__ == "__main__":
     parser.add_argument("--velocity",action="store_true", help="Use to include velocity")
     parser.add_argument("--acceleration", action="store_true", help="Use to include acceleration")
     parser.add_argument("--distance-mat", action="store_true", help="Use to include distance to first frame")
+
+    parser.add_argument("--path-signatures", action="store_true", help="Use to include distance to first frame")
+    parser.add_argument("--cebra-latents", action="store_true", help="Use to include distance to first frame")
   
     args = parser.parse_args()
  

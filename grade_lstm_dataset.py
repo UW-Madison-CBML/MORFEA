@@ -4,7 +4,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 from PIL import Image, ImageFile
-from geometric_features import get_acc, get_vel, calculate_curvatures
+from geometric_features import get_acc, get_vel, calculate_curvatures, get_path_sigs
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 from scipy.spatial import distance_matrix
@@ -37,8 +37,14 @@ def add_annotations(group_name, group, features):
         
     if(features['velocity']):
         group['z_vel'] = get_vel(trajectory)
-
-
+    cebra_traj = group[["cebra_0","cebra_1","cebra_2"]].to_numpy()
+    if(features['path_signatures']):
+        path_sigs = get_path_sigs(cebra_traj)
+        path_sigs_df = pd.DataFrame(path_sigs, columns=[f"z_path_sig_{i}" for i in range(path_sigs.shape[1])], index=group.index)
+        group = pd.concat([group, path_sigs_df], axis=1)
+    if(features['cebra_latents']):
+        cebra_df = pd.DataFrame(cebra_traj, columns=["z_cebra_0","z_cebra_1", "z_cebra_2"], index=group.index)
+        group = pd.concat([group, cebra_df], axis=1)
     if (not features['latents']):
         group = group.drop(columns=lat_cols)
     
@@ -50,22 +56,18 @@ class GradeLSTMDataset(Dataset):
     Dataset that loads complete embryo sequences.
     Each sample is one full embryo with all its frames.
     """
-    def __init__(self, latents_df, grades_df, grade, features, keep_na=False, return_whole_seqs=False):
+    def __init__(self, latents_df, grade, features, keep_na=False, return_whole_seqs=False):
         """
         Args: pd.read_csv(grades_csv, keep_default_na=False).
         """
         self.keep_na = keep_na
         self.return_whole_seqs = return_whole_seqs
         self.grade = grade
-        self.latents_df = latents_df.rename(columns={"cell_id":"embryo_id", "video_name":"embryo_id"})
-        self.grades_df = grades_df.rename(columns={"cell_id":"embryo_id", "video_name":"embryo_id"})
-        if(not("embryo_id" in self.latents_df.columns and "embryo_id" in self.grades_df.columns and "time_step" in self.latents_df.columns)):
-            print(self.latents_df.head())
-            print(self.grades_df.head())
-            raise ValueError("no embryo_id column")
-        self.lat_cols = [col for col in self.latents_df.columns if col.startswith("z_")] 
-        self.df = self.latents_df.merge(self.grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", self.grade, "time_step"] + self.lat_cols] if self.keep_na else self.latents_df.merge(self.grades_df, how="left", left_on="embryo_id", right_on="embryo_id")[["embryo_id", self.grade, "time_step"] + self.lat_cols].dropna(subset=[self.grade])
-        self.df = self.df.sort_values(["embryo_id", "time_step"])
+        self.lat_cols = [col for col in latents_df.columns if col.startswith("z_")] 
+        self.df = latents_df
+        if(not self.keep_na):
+            self.df = self.df.dropna(subset=[self.grade])
+        #self.df = self.df.sort_values(["embryo_id", "time_step"])
         
         self.df = self.df.groupby("embryo_id", group_keys = False).apply(lambda group:add_annotations(group.name,group, features)).reset_index()
         self.lat_cols = [col for col in self.df.columns if col.startswith("z_")] # recalculate lat cols after adding features
