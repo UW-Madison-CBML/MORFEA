@@ -143,7 +143,7 @@ def main(model_name, features):
     for embryo in ["PH664-7","JV227-2","LLN873-1","LA367-4","RA580-2","MC373-5","DV210-4"]: # add a bunch of C's
         VAL_EMBRYOS.append(embryo)
     for embryo in VAL_EMBRYOS:
-        print(f"{embryo}: {grades_df[grades_df['embryo_id'] == embryo].iloc[0]['TE']}")
+        print(f"{embryo}: {latents_df[latents_df['embryo_id'] == embryo].iloc[0]['TE']}")
     mask = latents_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = latents_df[mask]
     print(f"val_ratio={val_ratio}, actual val ratio: {len(val_df)/len(latents_df)}")
