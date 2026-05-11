@@ -1,1 +1,1 @@
---name control-2026-03-12 --path-signatures --cebra-latents
+--name control-2026-03-12 --cebra-latents
