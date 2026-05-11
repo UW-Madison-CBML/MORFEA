@@ -39,7 +39,7 @@ def add_annotations(group_name, group, features):
         group['z_vel'] = get_vel(trajectory)
     cebra_traj = group[["cebra_0","cebra_1","cebra_2"]].to_numpy()
     if(features['path_signatures']):
-        path_sigs = get_path_sigs(cebra_traj)
+        path_sigs = get_path_sigs(cebra_traj, 3)
         path_sigs_df = pd.DataFrame(path_sigs, columns=[f"z_path_sig_{i}" for i in range(path_sigs.shape[1])], index=group.index)
         group = pd.concat([group, path_sigs_df], axis=1)
     if(features['cebra_latents']):
