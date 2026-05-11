@@ -1,10 +1,8 @@
 #!/bin/bash
-echo "Installing dependencies..."
-pip install safetensors wandb
 
-# Extract dataset
-echo "Extracting dataset..."
 tar -zxf latents.tar.gz
+tar -zxf cebra_latents.tar.gz
+
 # Set HuggingFace token from api_keys.txt
 if [ -f "api_keys.txt" ]; then
     WB_KEY=$(tail -n 1 api_keys.txt)

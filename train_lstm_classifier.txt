@@ -1,1 +1,1 @@
---name control-2026-03-12 --distance-mat --curvature --acceleration --velocity
+--name control-2026-03-12 --path-signatures --cebra-latents
