@@ -8,13 +8,15 @@ def get_path_sig(trajectory, depth):
     s_info = iisignature.prepare(trajectory.shape[1], depth)
     return iisignature.logsig(trajectory, s_info)
 
-def get_path_sigs(trajectory, depth):
+def get_path_sigs(trajectory, depth, return_feature_labels=False):
     s_info = iisignature.prepare(trajectory.shape[1], depth)
     signature = []
     for i in range(len(trajectory)):
         signature.append(iisignature.logsig(trajectory[:i+1], s_info))
-    
-    return np.array(signature)
+    if(return_feature_labels):
+        return np.array(signature),  iisignature.basis(s_info)
+    else:
+        return np.array(signature)
 def fit_circle_curvature(points, how=""):
     if(how == "triangle"):
     

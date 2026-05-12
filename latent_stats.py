@@ -7,21 +7,23 @@ from scipy.stats import ttest_ind
 def add_geo_features(group, latent_cols):
     trajectory = group[latent_cols].to_numpy()
     cebra_traj = group[["cebra_0","cebra_1", "cebra_2"]].to_numpy()
-    path_sigs = get_path_sigs(cebra_traj, 3)
+    path_sigs, basis = get_path_sigs(cebra_traj, 3, return_signature_names = True)
+    
     curv_5 = calculate_curvatures(trajectory, offset=5, how="triangle")
     curv_10 = calculate_curvatures(trajectory, offset=10, how="triangle")
     curv_20 = calculate_curvatures(trajectory, offset=20, how="triangle")
     vel = get_vel(trajectory)
     acc = get_acc(trajectory)
-    displacement = distance_matrix(cebra_trajectory, [cebra_trajectory[0]]).flatten() # distance mat's shape is (M,1)
-    cebra_curv_5 = calculate_curvatures(cebra_trajectory, offset=5, how="triangle")
-    cebra_curv_10 = calculate_curvatures(cebra_trajectory, offset=10, how="triangle")
-    cebra_curv_20 = calculate_curvatures(cebra_trajectory, offset=20, how="triangle")
-    cebra_vel = get_vel(cebra_trajectory)
-    cebra_acc = get_acc(cebra_trajectory)
-    cebra_displacement = distance_matrix(cebra_trajectory, [cebra_trajectory[0]]).flatten() # distance mat's shape is (M,1)
+    displacement = distance_matrix(trajectory, [trajectory[0]]).flatten() # distance mat's shape is (M,1)
+    #-------------------------------------------------------
+    cebra_curv_5 = calculate_curvatures(cebra_traj, offset=5, how="triangle")
+    cebra_curv_10 = calculate_curvatures(cebra_traj, offset=10, how="triangle")
+    cebra_curv_20 = calculate_curvatures(cebra_traj, offset=20, how="triangle")
+    cebra_vel = get_vel(cebra_traj)
+    cebra_acc = get_acc(cebra_traj)
+    cebra_displacement = distance_matrix(cebra_traj, [cebra_traj[0]]).flatten() # distance mat's shape is (M,1)
 
-    path_sigs_df = pd.DataFrame(path_sigs, columns=[f"path_sig_{i}" for i in range(path_sigs.shape[1])], index = group.index)
+    path_sigs_df = pd.DataFrame(path_sigs, columns=[f"ps_{basis[i]}" for i in range(path_sigs.shape[1])], index = group.index)
     cebra_features_df = pd.DataFrame({
         "cebra_curv_5":cebra_curv_5, 
         "cebra_curv_10":cebra_curv_10, 
@@ -73,8 +75,7 @@ def main(model_name, grade):
     # ----------------------------------------------------------------------------------
     # do some formatting for latex and run t-test
     
-    column = "acc"
-    features = ["vel", "acc"]
+    features = [col for col in df.columns if col.startswith("ps")]
     grade_phase_feature_groups = grade_phase_groups[features]
     grade_phase_df = pd.concat([
             grade_phase_feature_groups.mean().reindex(PHASES, level="phase"), 
@@ -82,23 +83,30 @@ def main(model_name, grade):
             pd.DataFrame(grade_phase_groups[["time_step"]].size().reindex(PHASES, level="phase"), columns=["count"])
         ],axis=1)    
     grade_phase_df = grade_phase_df.reindex(sorted(grade_phase_df.columns), axis=1)
-    styled_df = grade_phase_df.loc[pd.IndexSlice[:,"t9+":], :].style
+    styled_df = grade_phase_df.style #.loc[pd.IndexSlice[:,"t9+":], :].style
     styled_df = styled_df.format_index(formatter= lambda s:s.replace("_",r"\_"),axis=1) # format column names
     styled_df = styled_df.format_index(formatter= lambda s:s.replace("_",r"\_"),axis=0) # format index names
 
     #print(styled_df.to_latex(hrules=True))
-    print_next_to([g + " \n" + str(grade_phase_df.loc[g]) for g in ["A","B","C"]])
-    for phase in PHASES:
-        print(phase)
-        a_df = grade_phase_feature_groups.get_group(("A", phase))
-        a_np = a_df[column].to_numpy()
-        bc_df = pd.concat([grade_phase_feature_groups.get_group(("B", phase)), grade_phase_feature_groups.get_group(("C", phase))], axis=0)
-        bc_np = bc_df[column].to_numpy()
+    print(grade_phase_df)
+    grade_phase_df.to_csv(os.path.join(os.getcwd(), "path_sigs_by_phase.csv"))
+    #print_next_to([g + " \n" + str(grade_phase_df.loc[g]) for g in ["A","B","C"]])
+    t_test_series = [] 
+    for column in features:
+        t_s = []
+        for phase in PHASES:
+            a_df = grade_phase_feature_groups.get_group(("A", phase))
+            a_np = a_df[column].to_numpy()
+            bc_df = pd.concat([grade_phase_feature_groups.get_group(("B", phase)), grade_phase_feature_groups.get_group(("C", phase))], axis=0)
+            bc_np = bc_df[column].to_numpy()
+            t = ttest_ind(a_np, bc_np, equal_var=False)
+            t_s.append(t.pvalue)
+        t_test_series.append(pd.Series(t_s, index=PHASES))
+    t_tests_df = pd.DataFrame({features[i]:t_test_series[i] for i in range(len(features))})
+    t_tests_df.to_csv(os.path.join(os.getcwd(), "t_test.csv"))
 
-
-
-        print("welch t-test: ", ttest_ind(a_np, bc_np, equal_var=False))
     # TODO: use ground truth time annotations to compare growth to literature
+
 
 
 
