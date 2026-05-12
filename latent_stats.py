@@ -1,26 +1,45 @@
 import pandas as pd
 import numpy as np
-from geometric_features import get_acc, get_vel, calculate_curvatures
+from geometric_features import get_acc, get_vel, calculate_curvatures, get_path_sigs
 from scipy.spatial import distance_matrix
 import os
 from scipy.stats import ttest_ind
 def add_geo_features(group, latent_cols):
     trajectory = group[latent_cols].to_numpy()
+    cebra_traj = group[["cebra_0","cebra_1", "cebra_2"]].to_numpy()
+    path_sigs = get_path_sigs(cebra_traj, 3)
     curv_5 = calculate_curvatures(trajectory, offset=5, how="triangle")
     curv_10 = calculate_curvatures(trajectory, offset=10, how="triangle")
     curv_20 = calculate_curvatures(trajectory, offset=20, how="triangle")
     vel = get_vel(trajectory)
     acc = get_acc(trajectory)
-    displacements = distance_matrix(trajectory, [trajectory[0]]).flatten() # distance mat's shape is (M,1)
+    displacement = distance_matrix(cebra_trajectory, [cebra_trajectory[0]]).flatten() # distance mat's shape is (M,1)
+    cebra_curv_5 = calculate_curvatures(cebra_trajectory, offset=5, how="triangle")
+    cebra_curv_10 = calculate_curvatures(cebra_trajectory, offset=10, how="triangle")
+    cebra_curv_20 = calculate_curvatures(cebra_trajectory, offset=20, how="triangle")
+    cebra_vel = get_vel(cebra_trajectory)
+    cebra_acc = get_acc(cebra_trajectory)
+    cebra_displacement = distance_matrix(cebra_trajectory, [cebra_trajectory[0]]).flatten() # distance mat's shape is (M,1)
+
+    path_sigs_df = pd.DataFrame(path_sigs, columns=[f"path_sig_{i}" for i in range(path_sigs.shape[1])], index = group.index)
+    cebra_features_df = pd.DataFrame({
+        "cebra_curv_5":cebra_curv_5, 
+        "cebra_curv_10":cebra_curv_10, 
+        "cebra_curv_20":cebra_curv_20, 
+        "cebra_vel":cebra_vel,
+        "cebra_acc":cebra_acc,
+        "cebra_displacement":cebra_displacement
+                                }, index=group.index)
+
     features_df = pd.DataFrame({
         "curv_5":curv_5, 
         "curv_10":curv_10, 
         "curv_20":curv_20, 
         "vel":vel,
         "acc":acc,
-        "displacements":displacements
+        "displacement":displacement
                                 }, index=group.index)
-    return pd.concat([group, features_df], axis=1)
+    return pd.concat([group, features_df, cebra_features_df, path_sigs_df], axis=1)
 
 PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'post_phase']
 
@@ -38,7 +57,9 @@ def main(model_name, grade):
         latents_np = np.load(os.path.join("latents", f"{model_name}.npy"))
         latent_cols = [f"z_{i}" for i in range(latents_np.shape[1])]
         latents_df = pd.DataFrame(latents_np, columns = latent_cols, index=metadata_df.index)
-        df = pd.concat([metadata_df, latents_df], axis=1)
+        cebra_np = np.load(os.path.join("cebra_latents", f"{model_name}.npy"))
+        cebra_df = pd.DataFrame(cebra_np, columns=["cebra_0", "cebra_1", "cebra_2"], index=metadata_df.index)
+        df = pd.concat([metadata_df, latents_df,cebra_df], axis=1)
         df = df.groupby("embryo_id").apply(lambda group:add_geo_features(group,latent_cols), include_groups=False).reset_index()
         df = df[~(df[grade] == "NA")]
         df.to_csv(os.path.join(os.getcwd(), "latent_stats.csv"))
