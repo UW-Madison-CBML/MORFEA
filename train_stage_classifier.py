@@ -30,7 +30,6 @@ class RunningStats:
         self.m2 = 0.0
  
     def push(self, x):
-        """Add a new value and update statistics."""
         self.n += 1
         delta = x - self.mean
         self.mean += delta / self.n
@@ -39,12 +38,10 @@ class RunningStats:
  
     @property
     def variance(self):
-        """Returns sample variance (unbiased). Use self.m2 / self.n for population."""
         return self.m2 / (self.n - 1) if self.n > 1 else 0.0
  
     @property
     def std_dev(self):
-        """Returns sample standard deviation."""
         return math.sqrt(self.variance)
  
 VAL_EMBRYOS =[
@@ -100,7 +97,7 @@ VAL_EMBRYOS =[
         for _, phase_row in annotations_df.iterrows():
             stage_id_freq[phase_row["stage_id"]] += max(0,phase_row["stage_end"] - phase_row["stage_begin"])
     out_tensor = torch.tensor([stage_id_freq[phase] for phase in phases])
-    return out_tensor / out_tensor.sum()"""
+    return out_tensor / out_tensor.sum()
 
 def monotonicity_loss(batched_logits_seq, temp=8.0):
     B, T, C = batched_logits_seq.shape
@@ -129,13 +126,15 @@ def main(model_name, features):
     )
  
     learning_rate = 0.001
-    lat_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv")).rename(columns={"cell_id":"embryo_id"})
-    lat_np = np.load(os.path.abspath(f"latents/{model_name}.npy"))
+    lat_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv")).rename(columns={"cell_id":"embryo_id"}) # metadata
+    lat_np = np.load(os.path.join("latents",f"{model_name}.npy"))
+    cebra_np = np.load(os.path.join("cebra_latents",f"{model_name}.npy"))
     if(len(lat_df) != lat_np.shape[0]):
         raise ValueError("keys and values sizes do not match")
     lat_columns = [f"z_{i}" for i in range(lat_np.shape[1])]
-    values_df = pd.DataFrame(lat_np, columns=lat_columns)
-    df = pd.concat([lat_df, values_df], axis = 1)
+    values_df = pd.DataFrame(lat_np, columns=lat_columns, index=lat_df.index)
+    cebra_df = pd.DataFrame(cebra_np, columns=["cebra_0", "cebra_1", "cebra_2"], index=lat_df.index)
+    df = pd.concat([lat_df, values_df, cebra_df], axis = 1)
     mask = df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = df[mask]
     df = df[~mask]
@@ -291,16 +290,17 @@ def main(model_name, features):
  
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="A simple script using argparse to greet a user.")
+    parser = argparse.ArgumentParser(description="Train a stage classifier using latents and their morphodynamic features.")
  
  
-    parser.add_argument("--name", help="Model name. Must have already exported latents")
+    parser.add_argument("--name", help="Model name. Must have already exported latents and cebra latents")
     parser.add_argument("--curvature",action="store_true", help="Use to include curvature")
     parser.add_argument("--latents",action="store_true", help="Use to include latents")
-    parser.add_argument("--path-signatures",action="store_true", help="Use to include path signatures")
+    parser.add_argument("--path-signatures",action="store_true", help="Use to include path signatures from cebra latents")
     parser.add_argument("--velocity",action="store_true", help="Use to include velocity")
     parser.add_argument("--acceleration", action="store_true", help="Use to include acceleration")
     parser.add_argument("--distance-mat", action="store_true", help="Use to include distance to first frame")
+    parser.add_argument("--cebra", action="store_true", help="Use to derive features from cebra latents")
   
     args = parser.parse_args()
  

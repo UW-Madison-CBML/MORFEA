@@ -31,14 +31,12 @@ def get_annotations_col(group_name, group_len, annotations_dir):
     return new_column
  
 def add_annotations(group_name, group, annotations_dir, features):
-   
-    lat_cols = [column for column in group.columns if column.startswith("z_")]
+    cebra_cols = ["cebra_0", "cebra_1", "cebra_2"] 
+    lat_cols = cebra_cols if features["cebra"] else [column for column in group.columns if column.startswith("z_")] 
     new_column = get_annotations_col(group_name, len(group), annotations_dir)
     group["phase"] = new_column
 
     trajectory = group[lat_cols].to_numpy()
-    pca_cols = [column for column in group.columns if column.startswith("pca_")]
-    pca_trajectory = group[pca_cols].to_numpy()
 
     if (features['curvature']):
         
@@ -55,9 +53,10 @@ def add_annotations(group_name, group, annotations_dir, features):
 
 
     if (features['path_signatures']):
-        sigs = get_path_sigs(pca_trajectory, 2)
-        sigs_df = pd.DataFrame(sigs, columns = [f"z_sig_{feature}" for feature in range(sigs.shape[1])])
-        sigs_df.index = group.index
+        
+        cebra_trajectory = group[cebra_cols]
+        sigs = get_path_sigs(cebra_trajectory, 2)
+        sigs_df = pd.DataFrame(sigs, columns = [f"z_sig_{feature}" for feature in range(sigs.shape[1])], index=group.index)
         group = pd.concat([group, sigs_df], axis=1)
     if(features['distance_mat']):
         mat = distance_matrix(np.array([trajectory[0]]), trajectory).flatten()
