@@ -14,7 +14,7 @@ cebra_latent_cols =  ["cebra_0","cebra_1", "cebra_2"]
 def add_geo_features(group, latent_cols):
     trajectory = group[latent_cols].to_numpy()
     cebra_traj = group[cebra_latent_cols].to_numpy()
-    path_sigs, basis = get_path_sigs(cebra_traj, 2, return_feature_labels = True)
+    path_sigs, basis = get_path_sigs(cebra_traj, 3, return_feature_labels = True)
     
     curv_5 = calculate_curvatures(trajectory, offset=5, how="triangle")
     curv_10 = calculate_curvatures(trajectory, offset=10, how="triangle")
@@ -79,11 +79,12 @@ def main(model_name, grade):
     # get curvature by grade
     #grade_curv_groups = df.groupby(grade)[["curv_5", "curv_10", "curv_20"]]
     #print(grade_curve_groups.mean(),"\n", grade_curv_groups.std())
-    grade_phase_groups = df.groupby([grade, "phase"])
+    
+    features = [col for col in df.columns if col.startswith("ps")]
+    """grade_phase_groups = df.groupby([grade, "phase"])
     # ----------------------------------------------------------------------------------
     # do some formatting for latex and run t-test
     
-    features = [col for col in df.columns if col.startswith("ps")]
     grade_phase_feature_groups = grade_phase_groups[features]
     grade_phase_df = pd.concat([
             grade_phase_feature_groups.mean().reindex(PHASES, level="phase"), 
@@ -111,14 +112,14 @@ def main(model_name, grade):
             t_s.append(t.pvalue)
         t_test_series.append(pd.Series(t_s, index=PHASES))
     t_tests_df = pd.DataFrame({features[i]:t_test_series[i] for i in range(len(features))})
-    t_tests_df.to_csv(os.path.join(os.getcwd(), "t_test.csv"))
+    t_tests_df.to_csv(os.path.join(os.getcwd(), "t_test.csv"))"""
     
     # turn each graded embryo into a single path signature feature, by picking along tSB to tEB (each path sig is from just those latents)
     def group_to_path_sig(group):
-        ps_group = pd.DataFrame([get_path_sig(group[cebra_latent_cols],2)], columns=features)
+        ps_group = pd.DataFrame([get_path_sig(group[cebra_latent_cols],3)], columns=features)
         ps_group[grade] = group.iloc[0][grade]
         return ps_group
-    blastocyst_cebra_df = df[(df['phase'].str.contains('tSB|tB|tEB', regex=True))][cebra_latent_cols + [grade, "embryo_id"]]
+    blastocyst_cebra_df = df[(df['phase'].str.contains('tEB', regex=True))][cebra_latent_cols + [grade, "embryo_id"]]
     
     cebra_path_sigs_df = blastocyst_cebra_df.groupby("embryo_id").apply(group_to_path_sig, include_groups=False).reset_index()#
     
@@ -133,11 +134,12 @@ def main(model_name, grade):
     cebra_path_sigs_df.to_csv(os.path.join(os.getcwd(), "path_sigs_by_embryo.csv"))
     blastocyst_cebra_df = blastocyst_cebra_df.merge(cebra_path_sigs_df, how="left", left_on="embryo_id", right_on="embryo_id")
     
+    print(cebra_path_sigs_df.groupby([grade, 'cluster']).size())
     
-    plot_sequences([group[cebra_latent_cols].to_numpy() for _, group in blastocyst_cebra_df.groupby("embryo_id")], "path_sig_clusters", cmap="phase", c=[group["cluster"].to_numpy() for _, group in blastocyst_cebra_df.groupby("embryo_id")])
+    plot_sequences([group[cebra_latent_cols].to_numpy() for _, group in blastocyst_cebra_df.groupby("embryo_id")], "path_sig_clusters", cmap="phase", c=[(group["cluster"].to_numpy() * 71) % 17 for _, group in blastocyst_cebra_df.groupby("embryo_id")])
     for cluster in range(8):
         cluster_df = blastocyst_cebra_df[blastocyst_cebra_df["cluster"] == cluster] 
-        plot_sequences([group[cebra_latent_cols].to_numpy() for _, group in cluster_df.groupby("embryo_id")], f"path_sig_clusters_{cluster}", cmap="phase", c=[group["cluster"].to_numpy() for _, group in cluster_df.groupby("embryo_id")])
+        plot_sequences([group[cebra_latent_cols].to_numpy() for _, group in cluster_df.groupby("embryo_id")], f"path_sig_clusters_{cluster}", cmap="phase", c=[(group["cluster"].to_numpy() * 71) % 17 for _, group in cluster_df.groupby("embryo_id")])
     #umap = UMAP.UMAP(n_components=3) 
     #embedding = umap.fit_transform(cebra_latents_group_df[features].to_numpy())
     #pca = PCA(n_components=3)

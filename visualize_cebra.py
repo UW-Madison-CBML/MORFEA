@@ -143,7 +143,7 @@ def main(model_name, image_name, grade_args, phase_args):
 
     df = df[df['phase'].str.contains("|".join(phase_args),regex=True)]
     print(model_name) 
-    max_imgs = 16
+    max_imgs = 200
     # do one colored by grades
     seqs = []
     c = []
