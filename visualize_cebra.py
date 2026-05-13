@@ -48,7 +48,7 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
     y_lim = (min(y_list),max(y_list))
     z_lim = (min(z_list),max(z_list))
 
-    least_greater_square = int(math.sqrt(len(seqs)) + 0.5)
+    least_greater_square = max(2, int(math.sqrt(len(seqs)) + 1))
     grid_fig, grid_axes = plt.subplots(least_greater_square, least_greater_square,figsize=(5*least_greater_square, 5*least_greater_square), subplot_kw={'projection': '3d'})
     grid_axes = grid_axes.ravel()
     grid_im = None
