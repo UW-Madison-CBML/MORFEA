@@ -8,11 +8,13 @@ import matplotlib.pyplot as plt
 import umap as UMAP
 from sklearn.decomposition import PCA
 from sklearn.decomposition import FastICA 
+from sklearn.cluster import KMeans 
+from visualize_cebra import plot_sequences
 cebra_latent_cols =  ["cebra_0","cebra_1", "cebra_2"]
 def add_geo_features(group, latent_cols):
     trajectory = group[latent_cols].to_numpy()
     cebra_traj = group[cebra_latent_cols].to_numpy()
-    path_sigs, basis = get_path_sigs(cebra_traj, 3, return_feature_labels = True)
+    path_sigs, basis = get_path_sigs(cebra_traj, 2, return_feature_labels = True)
     
     curv_5 = calculate_curvatures(trajectory, offset=5, how="triangle")
     curv_10 = calculate_curvatures(trajectory, offset=10, how="triangle")
@@ -113,26 +115,40 @@ def main(model_name, grade):
     
     # turn each graded embryo into a single path signature feature, by picking along tSB to tEB (each path sig is from just those latents)
     def group_to_path_sig(group):
-        ps_group = pd.DataFrame([get_path_sig(group[cebra_latent_cols],3)], columns=features)
+        ps_group = pd.DataFrame([get_path_sig(group[cebra_latent_cols],2)], columns=features)
         ps_group[grade] = group.iloc[0][grade]
         return ps_group
-    cebra_latents_group_df = df[(df['phase'].str.contains('tSB|tB|tEB', regex=True))][cebra_latent_cols + [grade, "embryo_id"]].groupby("embryo_id").apply(group_to_path_sig, include_groups=False).reset_index()#
+    blastocyst_cebra_df = df[(df['phase'].str.contains('tSB|tB|tEB', regex=True))][cebra_latent_cols + [grade, "embryo_id"]]
+    
+    cebra_path_sigs_df = blastocyst_cebra_df.groupby("embryo_id").apply(group_to_path_sig, include_groups=False).reset_index()#
+    
 
-    print(cebra_latents_group_df)
-    cebra_latents_group_df.to_csv(os.path.join(os.getcwd(), "path_sigs_by_embryo.csv"))
     colors = ["#FF0000", "#FFFF00", '#00FF00']
     grades = ["C", "B", "A"]
-    umap = UMAP.UMAP(n_components=3) 
-    embedding = umap.fit_transform(cebra_latents_group_df[features].to_numpy())
+    
+    kmeans = KMeans(n_clusters=8, random_state=0, n_init="auto").fit(cebra_path_sigs_df[features].to_numpy())
+    cebra_path_sigs_df["cluster"] = kmeans.labels_
+    
+    print(cebra_path_sigs_df)
+    cebra_path_sigs_df.to_csv(os.path.join(os.getcwd(), "path_sigs_by_embryo.csv"))
+    blastocyst_cebra_df = blastocyst_cebra_df.merge(cebra_path_sigs_df, how="left", left_on="embryo_id", right_on="embryo_id")
+    
+    
+    plot_sequences([group[cebra_latent_cols].to_numpy() for _, group in blastocyst_cebra_df.groupby("embryo_id")], "path_sig_clusters", cmap="phase", c=[group["cluster"].to_numpy() for _, group in blastocyst_cebra_df.groupby("embryo_id")])
+    for cluster in range(8):
+        cluster_df = blastocyst_cebra_df[blastocyst_cebra_df["cluster"] == cluster] 
+        plot_sequences([group[cebra_latent_cols].to_numpy() for _, group in cluster_df.groupby("embryo_id")], f"path_sig_clusters_{cluster}", cmap="phase", c=[group["cluster"].to_numpy() for _, group in cluster_df.groupby("embryo_id")])
+    #umap = UMAP.UMAP(n_components=3) 
+    #embedding = umap.fit_transform(cebra_latents_group_df[features].to_numpy())
     #pca = PCA(n_components=3)
     #embedding = pca.fit_transform(cebra_latents_group_df[features].to_numpy())
     #ica = FastICA(n_components=3)
     #embedding = ica.fit_transform(cebra_latents_group_df[features].to_numpy())
     #embedding = cebra_latents_group_df[["ps_1","ps_2","ps_[2,3]"]].to_numpy()
-    fig, ax = plt.subplots(subplot_kw={'projection':'3d'})
-    ax.scatter(embedding[:, 0], embedding[:,1], embedding[:,2], c=[colors[grades.index(g)] for g in cebra_latents_group_df[grade].to_list()])
-    fig.savefig(os.path.join(os.getcwd(), "path_sigs.jpg"))
-    plt.close(fig)
+    #fig, ax = plt.subplots(subplot_kw={'projection':'3d'})
+    #ax.scatter(embedding[:, 0], embedding[:,1], embedding[:,2], c=[colors[grades.index(g)] for g in cebra_latents_group_df[grade].to_list()])
+    #fig.savefig(os.path.join(os.getcwd(), "path_sigs.jpg"))
+    #plt.close(fig)
     
     
     # TODO: use ground truth time annotations to compare growth to literature
