@@ -4,6 +4,7 @@ echo "Installing dependencies..."
 # Extract dataset
 echo "Extracting dataset..."
 tar -zxf latents.tar.gz
+tar -zxf cebra_latents.tar.gz
 tar -zxf embryo_dataset_annotations.tar.gz
 pip install torbi
 # Set HuggingFace token from api_keys.txt

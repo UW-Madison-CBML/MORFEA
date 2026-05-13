@@ -122,7 +122,7 @@ def main(model_name, features):
     KEEP_NA = False
     
     grade_options = ["A", "B", "C", "NA"] if KEEP_NA else ["A","B","C"]
-    learning_rate = 0.000001
+    learning_rate = 0.00001
     metadata_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv"), keep_default_na=(not KEEP_NA))
     latents = np.load(os.path.join("latents",f"{model_name}.npy"))
     lat_cols = [f"z_{i}" for i in range(latents.shape[1])]
@@ -132,6 +132,7 @@ def main(model_name, features):
     lat_std_dev = np.std(latents, axis=0) + 1e-8
     latents = (latents - lat_mean) / lat_std_dev
     latents_df = pd.concat([metadata_df, pd.DataFrame(latents, columns=lat_cols, index=metadata_df.index), pd.DataFrame(cebra_latents, columns=["cebra_0", "cebra_1", "cebra_2"], index=metadata_df.index)], axis=1)
+    latents_df = latents_df[latents_df['phase'].str.contains("tM|tSB|tB|tEB")] # just classify around the blastocyst stage
     
     te_graded = latents_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
     np.random.shuffle(te_graded)
@@ -153,14 +154,14 @@ def main(model_name, features):
     dataset_icm = GradeLSTMDataset(latents_df, "ICM", features, keep_na=KEEP_NA)
     dataset_te_val = GradeLSTMDataset(val_df, "TE", features, keep_na=KEEP_NA, return_whole_seqs=True) 
     dataset_icm_val = GradeLSTMDataset(val_df, "ICM", features, keep_na=KEEP_NA, return_whole_seqs=True)
-    crit_te = torch.nn.CrossEntropyLoss() #weight= torch.tensor([0.6,0.3,0.2], device=DEVICE))
-    crit_icm = torch.nn.CrossEntropyLoss() #weight= torch.tensor([0.6,0.3,0.2], device=DEVICE))
+    crit_te = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.2,0.4,0.4], device=DEVICE))
+    crit_icm = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.2,0.4,0.4], device=DEVICE))
     model_te = GradeLSTMClassifier(len(dataset_te.lat_cols), keep_na=KEEP_NA)
     model_te = model_te.to(DEVICE)
     model_icm = GradeLSTMClassifier(len(dataset_icm.lat_cols), keep_na=KEEP_NA)
     model_icm = model_icm.to(DEVICE)
-    optimizer_te = torch.optim.Adam(model_te.parameters(), lr=learning_rate, weight_decay=1e-5)
-    optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=learning_rate, weight_decay=1e-5)
+    optimizer_te = torch.optim.Adam(model_te.parameters(), lr=learning_rate, weight_decay=1e-3)
+    optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=learning_rate, weight_decay=1e-3)
 
 
     loader_te = DataLoader(
