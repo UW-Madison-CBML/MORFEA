@@ -88,27 +88,7 @@ VAL_EMBRYOS =[
     "AM918-2-5",
     "LNA592-9",
     ]
-"""def get_class_weights(annotations_dir, lat_group_sizes, phases):
-    stage_id_freq = {phase: 0 for phase in phases}
-    for i, row in lat_group_sizes.iterrows():
-        annotations_df = pd.read_csv(os.path.join(annotations_dir, f"{row['embryo_id']}_phases.csv"), header=None, names=["stage_id","stage_begin", "stage_end"])
-        stage_id_freq["pre_phase"] += max(0,annotations_df.iloc[0]["stage_begin"] - 1)
-        stage_id_freq["post_phase"] += max(0, row["counts"] - annotations_df.iloc[-1]["stage_end"])
-        for _, phase_row in annotations_df.iterrows():
-            stage_id_freq[phase_row["stage_id"]] += max(0,phase_row["stage_end"] - phase_row["stage_begin"])
-    out_tensor = torch.tensor([stage_id_freq[phase] for phase in phases])
-    return out_tensor / out_tensor.sum()
 
-def monotonicity_loss(batched_logits_seq, temp=8.0):
-    B, T, C = batched_logits_seq.shape
-    device = batched_logits_seq.device
-    probs = F.softmax(batched_logits_seq * temp, dim=-1) # (B, T, C)
-    indices = torch.arange(C, device=device, dtype=torch.float32) # (C) 
-    soft_indices = (probs * indices).sum(dim=-1) # (B, T) 
-    diffs = soft_indices.diff(dim=-1) # (B, T-1) 
-    monotone_violations = F.leaky_relu(-diffs, negative_slope=0.1) 
-    return monotone_violations.mean()"""
- 
     
     
     

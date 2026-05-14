@@ -55,7 +55,7 @@ def add_annotations(group_name, group, annotations_dir, features):
     if (features['path_signatures']):
         
         cebra_trajectory = group[cebra_cols]
-        sigs = get_path_sigs(cebra_trajectory, 2)
+        sigs = get_path_sigs(cebra_trajectory, 3)
         sigs_df = pd.DataFrame(sigs, columns = [f"z_sig_{feature}" for feature in range(sigs.shape[1])], index=group.index)
         group = pd.concat([group, sigs_df], axis=1)
     if(features['distance_mat']):
@@ -84,11 +84,7 @@ class StageDataset(Dataset):
         scaler = StandardScaler()
         scaled_data = scaler.fit_transform(values)
 
-        pca = umap.UMAP(n_neighbors=10, random_state=42, n_components=8) #PCA(n_components=20) 
-        pca_results = pca.fit_transform(scaled_data)
         
-        self.pca_latents_df = pd.DataFrame(pca_results, columns=[f"pca_{i}" for i in range(pca_results.shape[1])], index=self.latents_df.index)
-        self.latents_df = pd.concat([self.latents_df, self.pca_latents_df], axis=1)
         self.annotations_dir = annotations_dir
         self.return_embryo_id = return_embryo_id
         sizes = self.latents_df.groupby("embryo_id")["time_step"].size()
@@ -101,21 +97,21 @@ class StageDataset(Dataset):
         
 
         self.phases = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
-        self.lat_cols = [column for column in self.df.columns if column.startswith("z_")]
+        self.lat_cols = [column for column in self.df.columns if column.startswith("z_")] # need to recalculate lat cols as the actual features in the training sequences
 
     def __getitem__(self, idx):
         seq_df = None
+        
+        row = self.df.iloc[idx]
         if(self.return_whole_seqs):
             _, seq_df = list(self.groups)[idx]
         else:
-            row = self.df.iloc[idx]
 
             group = self.groups.get_group(row["embryo_id"])
             group_idx = idx - group.index[0]
             seq_df = group.iloc[:max(5, group_idx)]
 
         if (self.return_embryo_id):
-
             return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.phases.index(r["phase"]) for _,r in seq_df.iterrows()], dtype = torch.long), row["embryo_id"]
         else:
             return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.phases.index(r["phase"]) for _,r in seq_df.iterrows()], dtype = torch.long)
