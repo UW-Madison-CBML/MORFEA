@@ -79,7 +79,6 @@ class StageDataset(Dataset):
     def __init__(self, latents_df, annotations_dir, features, return_embryo_id=False, return_whole_seqs=False): # preparing latents_df outside of the class i.e. from .csv .npy in latents/
         self.latents_df = latents_df
         self.return_whole_seqs = return_whole_seqs 
-        print("nan cols just lats", self.latents_df.columns[self.latents_df.isna().any()])
         values = self.latents_df[[i for i in self.latents_df.columns if i.startswith("z_")]].to_numpy()
         scaler = StandardScaler()
         scaled_data = scaler.fit_transform(values)
@@ -93,7 +92,6 @@ class StageDataset(Dataset):
         self.df = self.latents_df.groupby("embryo_id", group_keys = False).apply(lambda group:add_annotations(group.name,group,self.annotations_dir, features)).reset_index()
         self.groups = self.df.groupby("embryo_id")
         self.seqlength = 64
-        print("nan cols", self.latents_df.columns[self.latents_df.isna().any()])
         
 
         self.phases = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
@@ -123,7 +121,6 @@ class StageDataset(Dataset):
     def pad_collate(self, batch):
             
         if(self.return_embryo_id):
-            print(batch) 
             (data, labels, embryo_id) = zip(*batch)
         else:  
             (data, labels) = zip(*batch)
@@ -132,8 +129,10 @@ class StageDataset(Dataset):
         
         labels_padded = pad_sequence(labels, batch_first=True, padding_value=-1)
         mask = torch.zeros(labels_padded.shape, dtype=torch.bool)
-        for i, seq in enumerate(labels):
-            mask[i, :len(seq)] = True
+        for i, seq in enumerate(data):
+            if(self.return_embryo_id):
+                print(seq.shape[0])
+            mask[i, :seq.shape[0]] = True 
         
         if(self.return_embryo_id):
             return data_padded, labels_padded, mask, embryo_id
