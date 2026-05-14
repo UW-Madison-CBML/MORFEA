@@ -8,7 +8,7 @@ universe = docker
 #  commands) and arguments to be passed to jobs.
 #  $(Process) will be a integer number for each job, starting with "0"
 #  and increasing for the relevant number of jobs.
-shell = ./train_stage_classifier.sh $(model)
+shell = ./train_stage_classifier.sh $(args)
  
 # Specify the name of the log, standard error, and standard output (or
 # "screen output") files. Wherever you see $(Cluster), HTCondor will insert the
@@ -33,4 +33,4 @@ request_disk = 80GB
 request_gpus = 1
  
  
-queue model from train_stage_classifier.txt
+queue args from train_stage_classifier.txt

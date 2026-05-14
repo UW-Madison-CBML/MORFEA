@@ -42,4 +42,4 @@ class StageModel(Module):
         else:
             decoded = self.crf.decode(emissions, mask=mask)
             decoded_tensor = torch.tensor(decoded, device = emissions.device)
-            return F.one_hot(decoded_tensor, num_classes=self.num_classes) 
+            return F.one_hot(decoded_tensor, num_classes=self.num_classes) # outputting one-hots seems reasonable
