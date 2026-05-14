@@ -145,7 +145,7 @@ def main(model_name, features):
         num_workers=4,
         pin_memory=True,
         drop_last=False,
-        collate_fn = lambda x: dataset.pad_collate(x)
+        collate_fn = lambda x: dataset_val.pad_collate(x)
     )
 
     epochs = 8

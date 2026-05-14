@@ -121,7 +121,9 @@ class StageDataset(Dataset):
         return len(self.groups) if self.return_whole_seqs else len(self.df)
 
     def pad_collate(self, batch):
+            
         if(self.return_embryo_id):
+            print(batch) 
             (data, labels, embryo_id) = zip(*batch)
         else:  
             (data, labels) = zip(*batch)
@@ -135,4 +137,5 @@ class StageDataset(Dataset):
         
         if(self.return_embryo_id):
             return data_padded, labels_padded, mask, embryo_id
-        return data_padded, labels_padded, mask
+        else:
+            return data_padded, labels_padded, mask
