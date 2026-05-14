@@ -140,7 +140,7 @@ def main(model_name, features):
     )
     loader_val = DataLoader(
         dataset_val,
-        batch_size=32,
+        batch_size=16,
         shuffle=False,
         num_workers=4,
         pin_memory=True,
@@ -172,98 +172,76 @@ def main(model_name, features):
         area_between_curves_stats = RunningStats()
 
         stats_dict = {} 
-
-        with torch.no_grad():
-            for lats, labels, mask, embryo_id in loader_val:
-                B, T, L = lats.shape
-                # labels.shape = B, T 
-                lats = lats.to(DEVICE).float()
-                logits = model(lats, mask) # no mask for single batch
-
-                embryo_id = embryo_id[0]
-                preds = logits.view(B,T,18).detach().cpu().argmax(dim=1) # i think this is the right ordr
-                labels = labels.view(B,T)
-                acc = (preds == labels).sum().item()/labels.shape[0]
-                area_between_curves = torch.abs(preds - labels).sum().item()
-                acc_stats.push(acc)
-                area_between_curves_stats.push(area_between_curves)
-
-                if (embryo_id in stats_dict.keys()):
-                    stats_dict[embryo_id].push(acc)
-                else:
-                    stats_dict[embryo_id] = RunningStats()
-                    stats_dict[embryo_id].push(acc)
-                    
- 
-        run.log({"val_acc":acc_stats.mean, "val_acc_std":acc_stats.std_dev,"area_between_curves_mean":area_between_curves_stats.mean,"area_between_curves_stddev":area_between_curves_stats.std_dev})
-        highest_std = sorted(list(stats_dict.items()), key = lambda x: -1*(x[1].mean))[:10]
         f1_stats = {phase: RunningStats() for phase in dataset_val.phases}
         recall_stats = {phase: RunningStats() for phase in dataset_val.phases}
         precision_stats = {phase: RunningStats() for phase in dataset_val.phases}
-        model.eval()
-        for embryo, _ in highest_std:
-            print(embryo)
-            with open(os.path.join("embryo_dataset_annotations", f"{embryo}_phases.csv"), 'r') as file:
-                print("Ground Truth:\n", file.read())
-            
-            ground_truth_indices = np.array([dataset_val.phases.index(phase) for phase in dataset_val.df[dataset_val.df["embryo_id"] == embryo]["phase"].tolist()])
-            with torch.no_grad():
-                data = dataset_val.df[dataset_val.df["embryo_id"] == embryo][dataset_val.lat_cols].to_numpy()
-                whole_seq = torch.tensor(data, dtype=torch.float32).unsqueeze(0).to(DEVICE)
-                
-                logits = model(whole_seq, None)
-                
-                pred_indices = logits.argmax(dim=-1).squeeze(0).cpu().numpy()
 
-                print("Predicted Phases:")
-                current = ""
-                len_seq = 0
-                current_idx = 0
-                for i, idx in enumerate(pred_indices):
-                    if(i == 0 or pred_indices[i-1] != idx):
-                        print(f"{current} {current_idx}, {current_idx + len_seq} times")
-                        current = dataset_val.phases[idx]
-                        current_idx += len_seq
-                        len_seq = 1
-                    
+        with torch.no_grad():
+            for lats, labels, mask, embryo_ids in loader_val:
+                B, T, L = lats.shape
+                # labels.shape = B, T 
+                lats = lats.to(DEVICE).float()
+                mask = mask.to(DEVICE)
+                logits = model(lats, mask) 
+
+                preds = logits.view(B,T,18).detach().cpu().argmax(dim=1) # logits come out one-hot
+                labels = labels.view(B,T)
+                for pred, label, embryo_id in zip(preds, labels, embryo_ids): # all outer most sizes are B
+                    acc = (pred == label).sum().item()/label.shape[0]
+                    area_between_curves = torch.abs(pred - label).sum().item()
+                    acc_stats.push(acc)
+                    area_between_curves_stats.push(area_between_curves)
+                    # log for individual embryos
+                    if (embryo_id in stats_dict.keys()):
+                        stats_dict[embryo_id].push(acc)
                     else:
-                        len_seq += 1
-                confusion_mat = torch.einsum("ti,tj->ij", F.one_hot(torch.from_numpy(pred_indices), num_classes=18), F.one_hot(torch.from_numpy(ground_truth_indices), num_classes=18))
+                        stats_dict[embryo_id] = RunningStats()
+                        stats_dict[embryo_id].push(acc)
+                    # now draw stop plot comparisons
+                    if(len(pred_indices) != len(ground_truth_indices)):
+                        print("bad index lists") 
+                    else:
+                        fig, ax = plt.subplots()          
+                        cmap = plt.get_cmap('tab20c')  
+                        x = np.arange(len(pred_indices))
+                        for i in range(len(x)-1):
+                            ax.plot([x[i], x[i+1]], [pred_indices[i], pred_indices[i]], color="red", lw=2)
+                            ax.plot([x[i+1], x[i+1]], [pred_indices[i], pred_indices[i+1]], color="red", lw=2)
+                        for i in range(len(x)-1):
+                            color = cmap(ground_truth_indices[i])
+                            
+                            ax.plot([x[i], x[i+1]], [ground_truth_indices[i], ground_truth_indices[i]], color=color, lw=3)
+                            ax.plot([x[i+1], x[i+1]], [ground_truth_indices[i], ground_truth_indices[i+1]], color="black", lw=1)
+                        
+
+
+                        ax.set_ylabel('Phase')
+                        ax.set_xlabel('Timestep')
+                        ax.set_title(model_name + " " + embryo)
+                        legend_elements = [Patch(facecolor=cmap(i), label=phase) for i, phase in enumerate(dataset_val.phases)]
+                        ax.legend(handles=legend_elements, title="Phases") 
+                        run.log({"pred_vs_truth": wandb.Image(fig)}) 
+                        plt.close(fig)
+                # now look at the confusion mat for precision recall calculations
+                confusion_mat = torch.einsum("bti,btj->ij", F.one_hot(torch.from_numpy(preds), num_classes=18), F.one_hot(torch.from_numpy(labels), num_classes=18))
                 for i in range(18):
                     recall, precision, f1 = recall_precision_f1(confusion_mat, i) 
                     f1_stats[dataset_val.phases[i]].push(f1)
                     recall_stats[dataset_val.phases[i]].push(recall)
                     precision_stats[dataset_val.phases[i]].push(precision)
-                 
-                if(len(pred_indices) != len(ground_truth_indices)):
-                    print("bad index lists") 
-                else:
-                    fig, ax = plt.subplots()          
-                    cmap = plt.get_cmap('tab20c')  
-                    x = np.arange(len(pred_indices))
-                    for i in range(len(x)-1):
-                        ax.plot([x[i], x[i+1]], [pred_indices[i], pred_indices[i]], color="red", lw=2)
-                        ax.plot([x[i+1], x[i+1]], [pred_indices[i], pred_indices[i+1]], color="red", lw=2)
-                    for i in range(len(x)-1):
-                        color = cmap(ground_truth_indices[i])
-                        
-                        ax.plot([x[i], x[i+1]], [ground_truth_indices[i], ground_truth_indices[i]], color=color, lw=3)
-                        ax.plot([x[i+1], x[i+1]], [ground_truth_indices[i], ground_truth_indices[i+1]], color="black", lw=1)
-                    
-
-
-                    ax.set_ylabel('Phase')
-                    ax.set_xlabel('Timestep')
-                    ax.set_title(model_name + " " + embryo)
-                    legend_elements = [Patch(facecolor=cmap(i), label=phase) for i, phase in enumerate(dataset_val.phases)]
-                    ax.legend(handles=legend_elements, title="Phases") 
-                    run.log({"pred_vs_truth": wandb.Image(fig)}) 
-                    plt.close(fig)
         for phase in val_dataset.phases:
-            run.log({f"{phase} recall": recall_stats.mean, f"{phase} recall std": recall_stats.std_dev, 
-                f"{phase} f1": f1_stats.mean, f"{phase} f1 std": f1_stats.std_dev, 
-                f"{phase} precision": precision_stats.mean, f"{phase} precision std": precision_stats.std_dev})
+            run.log({f"{phase} recall": recall_stats[phase].mean, f"{phase} recall std": recall_stats[phase].std_dev, 
+                f"{phase} f1": f1_stats[phase].mean, f"{phase} f1 std": f1_stats[phase].std_dev, 
+                f"{phase} precision": precision_stats[phase].mean, f"{phase} precision std": precision_stats[phase].std_dev})
+    
+ 
+        run.log({"val_acc":acc_stats.mean, "val_acc_std":acc_stats.std_dev,"area_between_curves_mean":area_between_curves_stats.mean,"area_between_curves_stddev":area_between_curves_stats.std_dev})
 
+        # ------------------------------------------------
+        #highest_std = sorted(list(stats_dict.items()), key = lambda x: -1*(x[1].mean))[:10]
+        #for embryo, _ in highest_std:
+                       
+                        
 
 
  
