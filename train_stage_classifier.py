@@ -167,7 +167,6 @@ def main(model_name, features):
             optimizer.step()
             scheduler.step()
             run.log({"loss": loss.item(), "lr": scheduler.get_last_lr()[0]})
-        model.eval()
         acc_stats = RunningStats()
         area_between_curves_stats = RunningStats()
 
@@ -178,10 +177,14 @@ def main(model_name, features):
 
         with torch.no_grad():
             for lats, labels, mask, embryo_ids in loader_val:
+            
+                model.eval()
                 B, T, L = lats.shape
                 # labels.shape = B, T 
                 lats = lats.to(DEVICE).float()
+                print(lats.shape)
                 mask = mask.to(DEVICE)
+                print(mask)
                 logits = model(lats, mask) 
 
                 preds = logits.view(B,T,18).detach().cpu().argmax(dim=1) # logits come out one-hot
@@ -197,21 +200,21 @@ def main(model_name, features):
                     else:
                         stats_dict[embryo_id] = RunningStats()
                         stats_dict[embryo_id].push(acc)
-                    # now draw stop plot comparisons
-                    if(len(pred_indices) != len(ground_truth_indices)):
+                    # now draw step plot comparisons
+                    if(preds.shape != labels.shape):
                         print("bad index lists") 
                     else:
                         fig, ax = plt.subplots()          
                         cmap = plt.get_cmap('tab20c')  
-                        x = np.arange(len(pred_indices))
+                        x = np.arange(len(preds))
                         for i in range(len(x)-1):
-                            ax.plot([x[i], x[i+1]], [pred_indices[i], pred_indices[i]], color="red", lw=2)
-                            ax.plot([x[i+1], x[i+1]], [pred_indices[i], pred_indices[i+1]], color="red", lw=2)
+                            ax.plot([x[i], x[i+1]], [preds[i], preds[i]], color="red", lw=2)
+                            ax.plot([x[i+1], x[i+1]], [preds[i], preds[i+1]], color="red", lw=2)
                         for i in range(len(x)-1):
-                            color = cmap(ground_truth_indices[i])
+                            color = cmap(labels[i])
                             
-                            ax.plot([x[i], x[i+1]], [ground_truth_indices[i], ground_truth_indices[i]], color=color, lw=3)
-                            ax.plot([x[i+1], x[i+1]], [ground_truth_indices[i], ground_truth_indices[i+1]], color="black", lw=1)
+                            ax.plot([x[i], x[i+1]], [labels[i], labels[i]], color=color, lw=3)
+                            ax.plot([x[i+1], x[i+1]], [labels[i], labels[i+1]], color="black", lw=1)
                         
 
 
