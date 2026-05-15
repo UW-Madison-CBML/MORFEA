@@ -1,4 +1,4 @@
-# train_model.sub
+# train_ae.sub
    
 docker_image = jenslundsgaard/ivf-training:v1.7
 #docker_image = pytorch/pytorch:2.9.0-cuda12.8-cudnn9-runtime
@@ -8,20 +8,20 @@ universe = docker
 #  commands) and arguments to be passed to jobs. 
 #  $(Process) will be a integer number for each job, starting with "0"
 #  and increasing for the relevant number of jobs.
-shell = ./train_model.sh $(ablation)
+shell = ./train_ae.sh $(ablation)
    		
 # Specify the name of the log, standard error, and standard output (or
 # "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
 #  queue number assigned to this set of jobs at the time of submission.
-log = train_model_$(Cluster)_$(Process).log
-error = train_model_$(Cluster)_$(Process).err
-output = train_model_$(Cluster)_$(Process).out
+log = train_ae_$(Cluster)_$(Process).log
+error = train_ae_$(Cluster)_$(Process).err
+output = train_ae_$(Cluster)_$(Process).out
 should_transfer_files = YES
 when_to_transfer_output = ON_EXIT_OR_EVICT
 Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
-transfer_input_files = train_model.sh, train.py, model.py, api_keys.txt, dataset_ivf.py, embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, build_index.py, raffael_model.py, raffael_conv_lstm.py, raffael_losses.py, ablation.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, dataset_ivf_embryo.py ,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv
+transfer_input_files = train_ae.sh, train_ae.py, model.py, api_keys.txt, dataset_ivf.py, embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, build_index.py, raffael_model.py, raffael_conv_lstm.py, raffael_losses.py, ablation.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, dataset_ivf_embryo.py ,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv
 gpus_minimum_capability = 7.0
 requirements= Machine=="bhaskargpu4000.chtc.wisc.edu"
  
