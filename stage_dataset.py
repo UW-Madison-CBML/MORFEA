@@ -100,11 +100,13 @@ class StageDataset(Dataset):
     def __getitem__(self, idx):
         seq_df = None
         
-        row = self.df.iloc[idx]
+        row = None
         if(self.return_whole_seqs):
             _, seq_df = list(self.groups)[idx]
+            row = seq_df.iloc[0]
         else:
 
+            row = self.df.iloc[idx]
             group = self.groups.get_group(row["embryo_id"])
             group_idx = idx - group.index[0]
             seq_df = group.iloc[:max(5, group_idx)]
