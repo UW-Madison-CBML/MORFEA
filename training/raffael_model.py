@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-#from raffael_conv_lstm import ConvLSTM
 from huggingface_hub import PyTorchModelHubMixin
 import torch.nn.functional as F
 
@@ -16,7 +15,6 @@ class ResidualBlock(nn.Module):
         self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm2d(out_channels)
 
-        # Projection shortcut if channels change or downsampling
         if in_channels != out_channels or downsample:
             self.shortcut = nn.Sequential(
                 nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride),
@@ -77,16 +75,14 @@ class Encoder(nn.Module):
         self.hidden_dim = hidden_dim
         self.latent_size = latent_size
 
-        # Spatial convolution with residual connections: process each frame separately
-        # 128x128 -> 64x64 -> 32x32 -> 16x16
         self.spatial_cnn = nn.Sequential(
-            # Layer 1: 128 -> 64 (with downsampling)
+            # 128 -> 64 
             ResidualBlock(input_channels, 64, downsample=True),
 
-            # Layer 2: 64 -> 32 (with downsampling)
+            # 64 -> 32 
             ResidualBlock(64, 128, downsample=True),
 
-            # Layer 3: 32 -> 16 (with downsampling)
+            # 32 -> 16 
             ResidualBlock(128, 256, downsample=True),
         )
 
@@ -117,12 +113,10 @@ class Encoder(nn.Module):
     def forward(self, x):
         B, T, C, H, W = x.shape
 
-        # Resize to 128x128 if needed
         x = x.view(B * T, C, H, W)  # (B*T, 1, H, W)
         if H != 128 or W != 128:
             x = torch.nn.functional.interpolate(x, size=(128, 128), mode='bilinear', align_corners=True)
 
-        # Spatial compression: process each frame separately
         x = self.spatial_cnn(x)      # (B*T, 256, 16, 16)
         _, C2, H2, W2 = x.shape
         x = x.view(B, T, C2, H2, W2)  # (B, T, 256, 16, 16)
@@ -150,11 +144,6 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    """
-    Decoder: Linear expansion + ConvLSTM temporal decoding + ConvTranspose spatial reconstruction
-    Input: z_seq (B, T, latent_size)
-    Output: x_rec (B, T, 1, 128, 128)
-    """
 
     def __init__(self, seq_len, latent_size=4096, latent_dim=256, hidden_dim=256, num_layers=2, use_convlstm=True):
         super(Decoder, self).__init__()
@@ -162,13 +151,9 @@ class Decoder(nn.Module):
         self.latent_dim = latent_dim
         self.latent_size = latent_size
 
-        # Linear layer to expand compressed latent to spatial dimensions
-        # Input: (B*T, latent_size)
-        # Output: (B*T, latent_dim * 16 * 16)
         self.latent_expand = nn.Linear(latent_size, latent_dim * 16 * 16)
 
         self.use_convlstm = use_convlstm
-        # ConvLSTM decodes temporal dimension
         """if not self.use_convlstm:
             self.convlstm = None 
         else:
@@ -185,34 +170,24 @@ class Decoder(nn.Module):
         else:
             self.lstm_dec = None
 
-        # Spatial decoding with residual connections: 16x16 -> 32x32 -> 64x64 -> 128x128
         self.spatial_decoder = nn.Sequential(
-            # 16 -> 32 (with upsampling)
+            # 16 -> 32 
             ResidualUpBlock(hidden_dim, 128),
 
-            # 32 -> 64 (with upsampling)
+            # 32 -> 64 
             ResidualUpBlock(128, 64),
 
-            # 64 -> 128 (with upsampling)
+            # 64 -> 128 
             ResidualUpBlock(64, 32),
 
-            # Final output layer
             nn.Conv2d(32, 1, kernel_size=3, padding=1),
             nn.Sigmoid()  # Assume pixels normalized to [0,1]
         )
         self.lin1 = nn.Linear(latent_size,latent_size)
 
     def forward(self, z_seq):
-        """
-        Args:
-            z_seq: (B, T, latent_size) - compressed latent sequence from encoder
-
-        Returns:
-            x_rec: (B, T, 1, 128, 128) - reconstructed video sequence
-        """
         B, T, L = z_seq.shape
 
-        # Expand compressed latent to spatial dimensions
         z_flat = z_seq # linear works on bottom most dim
         z_flat = F.relu(self.lin1(z_flat))
         if self.use_convlstm:
@@ -269,7 +244,6 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         self.use_residual = use_residual
         self.use_batchnorm = use_batchnorm
         if(config != None):
-            # Handle config as dict (from HuggingFace) or object
             if isinstance(config, dict):
                 self.seq_len = config.get('seq_len', seq_len)
                 self.use_classifier = config.get('use_classifier', use_classifier)
@@ -291,7 +265,6 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
                 self.use_residual = config.use_residual
                 self.use_batchnorm = config.use_batchnorm
 
-            # Core components
         self.encoder = Encoder(
             latent_size=self.latent_size,
             use_convlstm=self.use_convlstm
@@ -305,22 +278,6 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
 
 
     def forward(self, x, return_all=False, hidden=None):
-        """
-        Args:
-            x: (B, T, 1, H, W) - input video sequence (any size, will be resized internally)
-            return_all: whether to return all intermediate results
-
-        Returns:
-            Tuple of (reconstruction, lat_vec_seq) where:
-                - reconstruction: (B, T, 1, H, W) - reconstructed video (same size as input)
-                - lat_vec_seq: (B, T, latent_size) - compressed latent sequence
-
-            If return_all is True, returns dict with keys:
-                - reconstruction: (B, T, 1, H, W) - reconstructed video
-                - z_seq: (B, T, latent_size) - compressed latent sequence
-                - z_last: (B, latent_size) - last timestep compressed latent
-                - logits: (B, num_classes) - classification logits (if enabled)
-        """
         B, T, C, orig_H, orig_W = x.shape
 
         if return_all:

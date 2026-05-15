@@ -1,5 +1,0 @@
-JOB A export_signatures.sub
-VARS A model="control-2026-03-12"
-JOB B train_tree.sub
-VARS B model="control-2026-03-12"
-PARENT A CHILD B
