@@ -182,6 +182,7 @@ def main(model_name, features):
                 B, T, L = lats.shape
                 # labels.shape = B, T 
                 lats = lats.to(DEVICE).float()
+                print(embryo_ids)
                 print(lats.shape)
                 mask = mask.to(DEVICE)
                 print(mask)
