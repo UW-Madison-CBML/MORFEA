@@ -21,8 +21,8 @@ RUN pip install --no-cache-dir \
 
 RUN pip install --no-cache-dir torbi
 
-COPY train_requirements.txt .
-RUN pip install --no-cache-dir -r train_requirements.txt
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
