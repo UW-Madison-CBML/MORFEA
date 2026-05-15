@@ -8,8 +8,7 @@ from PIL import Image
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 import os
-from model import Model
-from raffael_model import ConvLSTMAutoencoder
+from ae_model import ConvLSTMAutoencoder
 import sys
 import matplotlib.pyplot as plt
 from scipy.spatial import distance_matrix
