@@ -3,7 +3,6 @@ import numpy as np
 from geometric_features import get_acc, get_vel, calculate_curvatures, get_path_sigs,get_path_sig
 from scipy.spatial import distance_matrix
 import os
-from scipy.stats import ttest_ind
 import matplotlib.pyplot as plt
 import umap as UMAP
 from sklearn.decomposition import PCA
@@ -81,38 +80,7 @@ def main(model_name, grade):
     #print(grade_curve_groups.mean(),"\n", grade_curv_groups.std())
     
     features = [col for col in df.columns if col.startswith("ps")]
-    """grade_phase_groups = df.groupby([grade, "phase"])
-    # ----------------------------------------------------------------------------------
-    # do some formatting for latex and run t-test
     
-    grade_phase_feature_groups = grade_phase_groups[features]
-    grade_phase_df = pd.concat([
-            grade_phase_feature_groups.mean().reindex(PHASES, level="phase"), 
-            grade_phase_feature_groups.std().reindex(PHASES, level="phase").rename(mapper=lambda n: n + "_std", axis = 1),
-            pd.DataFrame(grade_phase_groups[["time_step"]].size().reindex(PHASES, level="phase"), columns=["count"])
-        ],axis=1)    
-    grade_phase_df = grade_phase_df.reindex(sorted(grade_phase_df.columns), axis=1)
-    styled_df = grade_phase_df.style #.loc[pd.IndexSlice[:,"t9+":], :].style
-    styled_df = styled_df.format_index(formatter= lambda s:s.replace("_",r"\_"),axis=1) # format column names
-    styled_df = styled_df.format_index(formatter= lambda s:s.replace("_",r"\_"),axis=0) # format index names
-
-    #print(styled_df.to_latex(hrules=True))
-    print(grade_phase_df)
-    grade_phase_df.to_csv(os.path.join(os.getcwd(), "path_sigs_by_phase.csv"))
-    #print_next_to([g + " \n" + str(grade_phase_df.loc[g]) for g in ["A","B","C"]])
-    t_test_series = [] 
-    for column in features:
-        t_s = []
-        for phase in PHASES:
-            a_df = grade_phase_feature_groups.get_group(("A", phase))
-            a_np = a_df[column].to_numpy()
-            bc_df = pd.concat([grade_phase_feature_groups.get_group(("B", phase)), grade_phase_feature_groups.get_group(("C", phase))], axis=0)
-            bc_np = bc_df[column].to_numpy()
-            t = ttest_ind(a_np, bc_np, equal_var=False)
-            t_s.append(t.pvalue)
-        t_test_series.append(pd.Series(t_s, index=PHASES))
-    t_tests_df = pd.DataFrame({features[i]:t_test_series[i] for i in range(len(features))})
-    t_tests_df.to_csv(os.path.join(os.getcwd(), "t_test.csv"))"""
     
     # turn each graded embryo into a single path signature feature, by picking along tSB to tEB (each path sig is from just those latents)
     def group_to_path_sig(group):
