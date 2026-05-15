@@ -8,6 +8,6 @@ pip install huggingface_hub wandb safetensors
 HF_KEY=$(head -n 1 api_keys.txt)
 export HF_TOKEN=$HF_KEY
 echo "$1"
-python get_img.py --name "$1"
+python get_imgs.py --name "$1"
 tar -czvf "$1"_imgs.tar.gz "$1"_imgs
 
