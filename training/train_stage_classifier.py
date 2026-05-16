@@ -105,7 +105,7 @@ def main(model_name, features):
         name=f"{model_name}-phase-{'c' if features['curvature'] else ''}{'v' if features['velocity'] else ''}{'p' if features['path_signatures'] else ''}{'l' if features['latents'] else ''}{'d' if features['distance_mat'] else ''}{'a' if features['acceleration'] else ''}",
     )
  
-    learning_rate = 0.001
+    learning_rate = 0.003
     lat_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv")).rename(columns={"cell_id":"embryo_id"}) # metadata
     lat_np = np.load(os.path.join("latents",f"{model_name}.npy"))
     cebra_np = np.load(os.path.join("cebra_latents",f"{model_name}.npy"))
@@ -154,7 +154,7 @@ def main(model_name, features):
     for epoch in range(epochs):
         print(epoch)
         model.train()
-        for lats, labels,masks in loader:
+        for lats, labels, _, masks in loader:
             lats = lats.to(DEVICE).float()
             labels = labels.to(DEVICE).long()
             masks = masks.to(DEVICE)
@@ -176,20 +176,16 @@ def main(model_name, features):
         precision_stats = {phase: RunningStats() for phase in dataset_val.phases}
 
         with torch.no_grad():
-            for lats, labels, mask, embryo_ids in loader_val:
+            for lats, _, labels, mask, embryo_ids in loader_val:
             
                 model.eval()
                 B, T, L = lats.shape
                 # labels.shape = B, T 
                 lats = lats.to(DEVICE).float()
-                print(embryo_ids)
-                print(lats.shape)
                 mask = mask.to(DEVICE)
-                print(mask)
-                logits = model(lats, mask) 
+                logits = model(lats, mask) # logits is a list of variable length tensor sequences of one hot's
 
-                preds = logits.view(B,T,18).detach().cpu().argmax(dim=1) # logits come out one-hot
-                labels = labels.view(B,T)
+                preds = [logit_seq.detach().cpu().argmax(dim=-1) for logit_seq in logits] # logits come out one-hot
                 for pred, label, embryo_id in zip(preds, labels, embryo_ids): # all outer most sizes are B
                     acc = (pred == label).sum().item()/label.shape[0]
                     area_between_curves = torch.abs(pred - label).sum().item()
@@ -202,20 +198,20 @@ def main(model_name, features):
                         stats_dict[embryo_id] = RunningStats()
                         stats_dict[embryo_id].push(acc)
                     # now draw step plot comparisons
-                    if(preds.shape != labels.shape):
+                    if(len(preds) != len(labels)):
                         print("bad index lists") 
                     else:
                         fig, ax = plt.subplots()          
                         cmap = plt.get_cmap('tab20c')  
                         x = np.arange(len(preds))
                         for i in range(len(x)-1):
-                            ax.plot([x[i], x[i+1]], [preds[i], preds[i]], color="red", lw=2)
-                            ax.plot([x[i+1], x[i+1]], [preds[i], preds[i+1]], color="red", lw=2)
+                            ax.plot([x[i], x[i+1]], [pred[i], pred[i]], color="red", lw=2)
+                            ax.plot([x[i+1], x[i+1]], [pred[i], pred[i+1]], color="red", lw=2)
                         for i in range(len(x)-1):
                             color = cmap(labels[i])
                             
-                            ax.plot([x[i], x[i+1]], [labels[i], labels[i]], color=color, lw=3)
-                            ax.plot([x[i+1], x[i+1]], [labels[i], labels[i+1]], color="black", lw=1)
+                            ax.plot([x[i], x[i+1]], [label[i], label[i]], color=color, lw=3)
+                            ax.plot([x[i+1], x[i+1]], [label[i], label[i+1]], color="black", lw=1)
                         
 
 
@@ -227,8 +223,8 @@ def main(model_name, features):
                         run.log({"pred_vs_truth": wandb.Image(fig)}) 
                         plt.close(fig)
                 # now look at the confusion mat for precision recall calculations
-                confusion_mat = torch.einsum("bti,btj->ij", F.one_hot(torch.from_numpy(preds), num_classes=18), F.one_hot(torch.from_numpy(labels), num_classes=18))
-                for i in range(18):
+                confusion_mat = torch.tensor([torch.einsum("ti,tj->ij", F.one_hot(torch.from_numpy(pred), num_classes=18), F.one_hot(torch.from_numpy(label), num_classes=model.num_classes)) for pred, label in zip(preds, labels)]).sum(dim=0)
+                for i in range(model.num_classes):
                     recall, precision, f1 = recall_precision_f1(confusion_mat, i) 
                     f1_stats[dataset_val.phases[i]].push(f1)
                     recall_stats[dataset_val.phases[i]].push(recall)
