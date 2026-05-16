@@ -79,9 +79,6 @@ class StageDataset(Dataset):
     def __init__(self, latents_df, annotations_dir, features, return_embryo_id=False, return_whole_seqs=False): # preparing latents_df outside of the class i.e. from .csv .npy in latents/
         self.latents_df = latents_df
         self.return_whole_seqs = return_whole_seqs 
-        values = self.latents_df[[i for i in self.latents_df.columns if i.startswith("z_")]].to_numpy()
-        scaler = StandardScaler()
-        scaled_data = scaler.fit_transform(values)
 
         
         self.annotations_dir = annotations_dir
@@ -104,17 +101,19 @@ class StageDataset(Dataset):
         if(self.return_whole_seqs):
             _, seq_df = list(self.groups)[idx]
             row = seq_df.iloc[0]
+            
         else:
-
             row = self.df.iloc[idx]
             group = self.groups.get_group(row["embryo_id"])
-            group_idx = idx - group.index[0]
-            seq_df = group.iloc[:max(5, group_idx)]
+
+            group_idx = group.index.get_loc(row.name)
+    
+            seq_df = group.iloc[:max(16, group_idx + 1)]
 
         if (self.return_embryo_id):
-            return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.phases.index(r["phase"]) for _,r in seq_df.iterrows()], dtype = torch.long), row["embryo_id"]
+            return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.phases.index(r) for r in seq_df['phase'].to_list()], dtype = torch.long), row["embryo_id"]
         else:
-            return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.phases.index(r["phase"]) for _,r in seq_df.iterrows()], dtype = torch.long)
+            return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.phases.index(r) for r in seq_df['phase'].to_list()], dtype = torch.long)
         
 
     def __len__(self):
@@ -123,20 +122,20 @@ class StageDataset(Dataset):
     def pad_collate(self, batch):
             
         if(self.return_embryo_id):
-            (data, labels, embryo_id) = zip(*batch)
+            (data, labels, embryo_ids) = zip(*batch)
         else:  
             (data, labels) = zip(*batch)
-        
+        print("DEBUG: Raw label lengths in batch:", [len(l) for l in labels]) 
+
         data_padded = pad_sequence(data, batch_first=True, padding_value=0)
-        
         labels_padded = pad_sequence(labels, batch_first=True, padding_value=-1)
+
         mask = torch.zeros(labels_padded.shape, dtype=torch.bool)
-        for i, seq in enumerate(data):
-            if(self.return_embryo_id):
-                print(seq.shape[0])
+        for i, seq in enumerate(labels):
             mask[i, :seq.shape[0]] = True 
         
+        print("masks :", mask.sum(dim=1))
         if(self.return_embryo_id):
-            return data_padded, labels_padded, mask, embryo_id
+            return data_padded, labels_padded, labels, mask, embryo_ids
         else:
-            return data_padded, labels_padded, mask
+            return data_padded, labels_padded, labels, mask
