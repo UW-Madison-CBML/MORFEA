@@ -225,13 +225,14 @@ def main(model_name, features):
                         plt.close(fig)
                 # -----------------------------------------------------
                 # now look at the confusion matrix for precision recall calculations
-                confusion_mat = torch.tensor([torch.einsum("ti,tj->ij", F.one_hot(pred.to(torch.int), num_classes=model.num_classes), F.one_hot(label.to(torch.int), num_classes=model.num_classes)) for pred, label in zip(preds, labels)]).sum(dim=0)
+                confusion_vol = torch.stack([torch.einsum("ti,tj->ij", F.one_hot(pred.to(dtype=torch.long), num_classes=model.num_classes), F.one_hot(label.to(dtype=torch.long), num_classes=model.num_classes)) for pred, label in zip(preds, labels)])
+                confusion_mat = confusion_vol.sum(dim=0)
                 for i in range(model.num_classes):
                     recall, precision, f1 = recall_precision_f1(confusion_mat, i) 
                     f1_stats[dataset_val.phases[i]].push(f1)
                     recall_stats[dataset_val.phases[i]].push(recall)
                     precision_stats[dataset_val.phases[i]].push(precision)
-        for phase in val_dataset.phases:
+        for phase in dataset_val.phases:
             run.log({f"{phase} recall": recall_stats[phase].mean, f"{phase} recall std": recall_stats[phase].std_dev, 
                 f"{phase} f1": f1_stats[phase].mean, f"{phase} f1 std": f1_stats[phase].std_dev, 
                 f"{phase} precision": precision_stats[phase].mean, f"{phase} precision std": precision_stats[phase].std_dev})
