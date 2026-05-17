@@ -197,18 +197,19 @@ def main(model_name, features):
                     else:
                         stats_dict[embryo_id] = RunningStats()
                         stats_dict[embryo_id].push(acc)
-                    # now draw step plot comparisons
-                    if(len(preds) != len(labels)):
+                    if(len(pred) != len(label)):
                         print("bad index lists") 
                     else:
+                        # --------------------------------------------
+                        # draw comparison step plots
                         fig, ax = plt.subplots()          
                         cmap = plt.get_cmap('tab20c')  
-                        x = np.arange(len(preds))
+                        x = np.arange(len(pred))
                         for i in range(len(x)-1):
                             ax.plot([x[i], x[i+1]], [pred[i], pred[i]], color="red", lw=2)
                             ax.plot([x[i+1], x[i+1]], [pred[i], pred[i+1]], color="red", lw=2)
                         for i in range(len(x)-1):
-                            color = cmap(labels[i])
+                            color = cmap(label[i])
                             
                             ax.plot([x[i], x[i+1]], [label[i], label[i]], color=color, lw=3)
                             ax.plot([x[i+1], x[i+1]], [label[i], label[i+1]], color="black", lw=1)
@@ -217,13 +218,14 @@ def main(model_name, features):
 
                         ax.set_ylabel('Phase')
                         ax.set_xlabel('Timestep')
-                        ax.set_title(model_name + " " + embryo)
+                        ax.set_title(model_name + " " + embryo_id)
                         legend_elements = [Patch(facecolor=cmap(i), label=phase) for i, phase in enumerate(dataset_val.phases)]
                         ax.legend(handles=legend_elements, title="Phases") 
                         run.log({"pred_vs_truth": wandb.Image(fig)}) 
                         plt.close(fig)
-                # now look at the confusion mat for precision recall calculations
-                confusion_mat = torch.tensor([torch.einsum("ti,tj->ij", F.one_hot(torch.from_numpy(pred), num_classes=18), F.one_hot(torch.from_numpy(label), num_classes=model.num_classes)) for pred, label in zip(preds, labels)]).sum(dim=0)
+                # -----------------------------------------------------
+                # now look at the confusion matrix for precision recall calculations
+                confusion_mat = torch.tensor([torch.einsum("ti,tj->ij", F.one_hot(pred.to(torch.int), num_classes=model.num_classes), F.one_hot(label.to(torch.int), num_classes=model.num_classes)) for pred, label in zip(preds, labels)]).sum(dim=0)
                 for i in range(model.num_classes):
                     recall, precision, f1 = recall_precision_f1(confusion_mat, i) 
                     f1_stats[dataset_val.phases[i]].push(f1)
