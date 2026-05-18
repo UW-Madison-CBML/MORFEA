@@ -52,12 +52,27 @@ def add_annotations(group_name, group, annotations_dir, features):
         group = pd.concat([group,pd.DataFrame({"z_curv12":curv12, "z_curv20":curv20, "curv4":curv4}, index = group.index)], axis=1)
 
 
-    if (features['path_signatures']):
+    if (features['cebra_ps']):
         
         cebra_trajectory = group[cebra_cols]
         sigs = get_path_sigs(cebra_trajectory, 3)
-        sigs_df = pd.DataFrame(sigs, columns = [f"z_sig_{feature}" for feature in range(sigs.shape[1])], index=group.index)
+        sigs_df = pd.DataFrame(sigs, columns = [f"z_cebra_sig_{feature}" for feature in range(sigs.shape[1])], index=group.index)
         group = pd.concat([group, sigs_df], axis=1)
+    if (features['pca_ps']):
+        
+        pca_trajectory = group[[col for col in group.columns if col.startwith("pca")]]
+        sigs = get_path_sigs(pca_trajectory, 3)
+        sigs_df = pd.DataFrame(sigs, columns = [f"z_pca_sig_{feature}" for feature in range(sigs.shape[1])], index=group.index)
+        group = pd.concat([group, sigs_df], axis=1)
+
+    if (features['umap_ps']):
+        
+        umap_trajectory = group[[col for col in group.columns if col.startwith("umap")]]
+        sigs = get_path_sigs(umap_trajectory, 3)
+        sigs_df = pd.DataFrame(sigs, columns = [f"z_umap_sig_{feature}" for feature in range(sigs.shape[1])], index=group.index)
+        group = pd.concat([group, sigs_df], axis=1)
+
+
     if(features['distance_mat']):
         mat = distance_matrix(np.array([trajectory[0]]), trajectory).flatten()
         
@@ -79,8 +94,9 @@ class StageDataset(Dataset):
     def __init__(self, latents_df, annotations_dir, features, return_embryo_id=False, return_whole_seqs=False): # preparing latents_df outside of the class i.e. from .csv .npy in latents/
         self.latents_df = latents_df
         self.return_whole_seqs = return_whole_seqs 
-
         
+        
+         
         self.annotations_dir = annotations_dir
         self.return_embryo_id = return_embryo_id
         sizes = self.latents_df.groupby("embryo_id")["time_step"].size()
