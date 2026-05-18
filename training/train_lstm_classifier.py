@@ -115,20 +115,29 @@ def main(model_name, features):
     te_lr = features['te_lr']
     icm_lr = features['icm_lr']
     run_name = features['run_name']
+    weights = [0.2,0.4,0.4]
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    
+    
+    torch.backends.cudnn.enabled = False
+    KEEP_NA = False
 
     wandb.login(key=os.getenv("WANDB_KEY"))
     run = wandb.init(
         name = run_name,
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
+        config={
+            "weights":weights,
+            "keep_na":KEEP_NA,
+            "te_lr": te_lr,
+            "icm_lr": icm_lr,  
+            "features": features
+            }
     )
-    
-    torch.backends.cudnn.enabled = False
-    KEEP_NA = False
-    
     grade_options = ["A", "B", "C", "NA"] if KEEP_NA else ["A","B","C"]
     learning_rate = 0.00001
     metadata_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv"), keep_default_na=(not KEEP_NA))
@@ -169,8 +178,8 @@ def main(model_name, features):
     dataset_icm = GradeLSTMDataset(latents_df, "ICM", features, keep_na=KEEP_NA)
     dataset_te_val = GradeLSTMDataset(val_df, "TE", features, keep_na=KEEP_NA, return_whole_seqs=True) 
     dataset_icm_val = GradeLSTMDataset(val_df, "ICM", features, keep_na=KEEP_NA, return_whole_seqs=True)
-    crit_te = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.4,0.4,0.2], device=DEVICE))
-    crit_icm = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.4,0.4,0.2], device=DEVICE))
+    crit_te = torch.nn.CrossEntropyLoss(weight= torch.tensor(weights, device=DEVICE))
+    crit_icm = torch.nn.CrossEntropyLoss(weight= torch.tensor(weights, device=DEVICE))
     model_te = GradeLSTMClassifier(len(dataset_te.lat_cols), keep_na=KEEP_NA)
     model_te = model_te.to(DEVICE)
     model_icm = GradeLSTMClassifier(len(dataset_icm.lat_cols), keep_na=KEEP_NA)
@@ -184,7 +193,7 @@ def main(model_name, features):
         dataset_te,
         batch_size=128,
         shuffle=True,
-        num_workers=4,
+        num_workers=16,
         pin_memory=True,
         drop_last=True,
         collate_fn=collate_padd)
@@ -192,13 +201,13 @@ def main(model_name, features):
         dataset_icm,
         batch_size=128,
         shuffle=True,
-        num_workers=4,
+        num_workers=16,
         pin_memory=True,
         drop_last=True, 
         collate_fn=collate_padd)
     loader_te_val = DataLoader(
         dataset_te_val,
-        batch_size=len(VAL_EMBRYOS),
+        batch_size=4,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
@@ -206,7 +215,7 @@ def main(model_name, features):
         collate_fn=collate_padd)
     loader_icm_val = DataLoader(
         dataset_icm_val,
-        batch_size=len(VAL_EMBRYOS),
+        batch_size=4,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
