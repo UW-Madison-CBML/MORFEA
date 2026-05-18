@@ -1,4 +1,1 @@
---name control-2026-03-12 --run-name all --curvature --cebra-ps --pca-ps --umap-ps
---name control-2026-03-12 --run-name cebra --cebra-ps
---name control-2026-03-12 --run-name umap --umap-ps
---name control-2026-03-12 --run-name pca --pca-ps
+--name control-2026-03-12 --run-name all --pca-ps --curvature
