@@ -12,8 +12,9 @@ import torch.nn.functional as F
 from umap import UMAP
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
-def collate_fn_padd(batch):
+def collate_padd(batch):
     signals = [item[0] for item in batch]
     targets = [item[1] for item in batch]
     
@@ -118,7 +119,7 @@ def main(model_name, features):
 
     wandb.login(key=os.getenv("WANDB_KEY"))
     run = wandb.init(
-        project = run_name,
+        name = run_name,
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
     )
@@ -133,18 +134,18 @@ def main(model_name, features):
     lat_cols = [f"z_{i}" for i in range(latents.shape[1])]
     cebra_latents = np.load(os.path.join("cebra_latents", f"{model_name}.npy"))
     #normalize latents here
-    lat_mean = latents.mean(axis=0)
-    lat_std_dev = np.std(latents, axis=0) + 1e-8
-    latents = (latents - lat_mean) / lat_std_dev
+    #lat_mean = latents.mean(axis=0)
+    #lat_std_dev = np.std(latents, axis=0) + 1e-8
+    #latents =  (latents - lat_mean) / lat_std_dev
 
     umap = UMAP(n_components=8)
     pca = PCA(n_components=8)
     std_scaler = StandardScaler()
-    umap_df = pd.DataFrame(umap.fit_transform(lat_np), columns=[f"umap_{i}" for i in range(8)], index=metadata_df.index)
-    pca_df = pd.DataFrame(pca.fit_transform(std_scaler.fit_transform(lat_np)), columns=[f"pca_{i}" for i in range(8)], index=metadata_df.index)
+    umap_df = pd.DataFrame(umap.fit_transform(latents), columns=[f"umap_{i}" for i in range(8)], index=metadata_df.index)
+    pca_df = pd.DataFrame(pca.fit_transform(std_scaler.fit_transform(latents)), columns=[f"pca_{i}" for i in range(8)], index=metadata_df.index)
 
     latents_df = pd.concat([metadata_df, pd.DataFrame(latents, columns=lat_cols, index=metadata_df.index), pd.DataFrame(cebra_latents, columns=["cebra_0", "cebra_1", "cebra_2"], index=metadata_df.index), umap_df, pca_df], axis=1)
-    latents_df = latents_df[latents_df['phase'].str.contains("tM|tSB|tB|tEB")] # just classify around the blastocyst stage
+    #latents_df = latents_df[latents_df['phase'].str.contains("tM|tSB|tB|tEB")] # just classify around the blastocyst stage
     
     te_graded = latents_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
     np.random.shuffle(te_graded)
@@ -161,7 +162,7 @@ def main(model_name, features):
     val_df = latents_df[mask]
     print(f"val_ratio={val_ratio}, actual val ratio: {len(val_df)/len(latents_df)}")
     latents_df = latents_df[~mask]
-    # latents df will have the grade columns alread 
+    # latents df will have the grade columns already
     dataset_te = GradeLSTMDataset(latents_df, "TE", features, keep_na=KEEP_NA) 
     dataset_icm = GradeLSTMDataset(latents_df, "ICM", features, keep_na=KEEP_NA)
     dataset_te_val = GradeLSTMDataset(val_df, "TE", features, keep_na=KEEP_NA, return_whole_seqs=True) 
@@ -172,8 +173,9 @@ def main(model_name, features):
     model_te = model_te.to(DEVICE)
     model_icm = GradeLSTMClassifier(len(dataset_icm.lat_cols), keep_na=KEEP_NA)
     model_icm = model_icm.to(DEVICE)
-    optimizer_te = torch.optim.Adam(model_te.parameters(), lr=learning_rate, weight_decay=1e-3)
-    optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=learning_rate, weight_decay=1e-3)
+    epochs = 8 
+    optimizer_te = torch.optim.Adam(model_te.parameters(), lr=learning_rate, weight_decay=1e-4)
+    optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=learning_rate, weight_decay=1e-4)
 
 
     loader_te = DataLoader(
@@ -183,14 +185,15 @@ def main(model_name, features):
         num_workers=4,
         pin_memory=True,
         drop_last=True,
-        collate_fn=collate_fn_padd)
+        collate_fn=collate_padd)
     loader_icm = DataLoader(
         dataset_icm,
         batch_size=128,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
-        drop_last=True, collate_fn=collate_fn_padd)
+        drop_last=True, 
+        collate_fn=collate_padd)
     loader_te_val = DataLoader(
         dataset_te_val,
         batch_size=len(VAL_EMBRYOS),
@@ -198,7 +201,7 @@ def main(model_name, features):
         num_workers=4,
         pin_memory=True,
         drop_last=False,
-        collate_fn=collate_fn_padd)
+        collate_fn=collate_padd)
     loader_icm_val = DataLoader(
         dataset_icm_val,
         batch_size=len(VAL_EMBRYOS),
@@ -206,30 +209,37 @@ def main(model_name, features):
         num_workers=4,
         pin_memory=True,
         drop_last=False,
-        collate_fn=collate_fn_padd)
-    for epoch in range(8):
+        collate_fn=collate_padd)
+    scheduler_te = CosineAnnealingLR(optimizer_te, len(loader_te) * epochs)
+    scheduler_icm = CosineAnnealingLR(optimizer_icm, len(loader_icm) * epochs)
+
+    for epoch in range(epochs):
         model_te.train(); model_icm.train()
-        for sig, te, lengths in loader_te:
-            sig = sig.to(DEVICE)
-            te = te.to(DEVICE).long()
-            label = model_te(sig, lengths)
-            loss = crit_te(label, te)
+        # TE grades
+        for features, targets, lengths in loader_te:
+            features = features.to(DEVICE)
+            target = targets.to(DEVICE).long()
+            label = model_te(features, lengths)
+            loss = crit_te(label, targets)
 
             optimizer_te.zero_grad() 
             loss.backward() 
             optimizer_te.step()
-            run.log({"te": loss.item()})
 
-        for sig, icm, lengths in loader_icm:
-            sig = sig.to(DEVICE)
-            icm = icm.to(DEVICE).long()
+            scheduler_te.step()
+            run.log({"te": loss.item()})
+        # ICM grades
+        for features, targets, lengths in loader_icm:
+            features = features.to(DEVICE)
+            targets = targets.to(DEVICE).long()
             
-            label = model_icm(sig, lengths)
-            loss = crit_icm(label, icm)
+            label = model_icm(features, lengths)
+            loss = crit_icm(label, targets)
 
             optimizer_icm.zero_grad() 
             loss.backward() 
             optimizer_icm.step()
+            scheduler_icm.step()
             run.log({"icm": loss.item()})
     
         te_acc_stats = RunningStats()
@@ -239,37 +249,37 @@ def main(model_name, features):
         te_confusion_mat = torch.zeros((3,3))
         icm_confusion_mat = torch.zeros((3,3))
         with torch.no_grad():
-            for sig, te, lengths in loader_te_val:
+            for features, targets, lengths in loader_te_val:
                 
-                print(f"te shape: {te.shape}")
+                print(f"targets shape: {targets.shape}")
 
-                print(f"sig shape: {sig.shape}")
+                print(f"features shape: {features.shape}")
 
-                sig = sig.to(DEVICE)
-                logits = model_te(sig, lengths)
+                features = features.to(DEVICE)
+                logits = model_te(features, lengths)
                 
                 preds = logits.cpu().argmax(dim=-1)
                 
-                te_acc_stats.push((preds == te).sum().item()/te.shape[0]) 
+                te_acc_stats.push((preds == targets).sum().item()/targets.shape[0]) 
                 
-                te = F.one_hot(te, num_classes=3)
+                targets = F.one_hot(targets, num_classes=3)
                 preds = F.one_hot(preds, num_classes=3)
 
 
-                te_confusion_mat += torch.einsum('ti,tj->ij', preds, te) # this einsum calculates confusion mats
+                te_confusion_mat += torch.einsum('ti,tj->ij', preds, targets) # this einsum calculates confusion mats
 
 
-            for sig, icm, lengths in loader_icm_val:
-                sig = sig.to(DEVICE)
-                logits = model_icm(sig, lengths)
+            for features, targets, lengths in loader_icm_val:
+                features = features.to(DEVICE)
+                logits = model_icm(features, lengths)
 
                 preds = logits.cpu().argmax(dim=-1) 
 
-                icm_acc_stats.push((preds == icm).sum().item()/icm.shape[0])
-                icm = F.one_hot(icm, num_classes=3)
+                icm_acc_stats.push((preds == targets).sum().item()/targets.shape[0])
+                targets = F.one_hot(targets, num_classes=3)
                 preds = F.one_hot(preds, num_classes=3)
 
-                icm_confusion_mat += torch.einsum('ti,tj->ij', preds, icm)
+                icm_confusion_mat += torch.einsum('ti,tj->ij', preds, targets)
                 
         
         for i, g in enumerate(grade_options):

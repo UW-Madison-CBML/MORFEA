@@ -108,7 +108,7 @@ def main(model_name, features):
         name=f"{model_name}-phase-{'c' if features['curvature'] else ''}{'v' if features['velocity'] else ''}{'p' if features['cebra_ps'] else ''}{'l' if features['latents'] else ''}{'d' if features['distance_mat'] else ''}{'a' if features['acceleration'] else ''}{'x' if features['pca_ps'] else ''}{'u' if features['umap_ps'] else ''}",
     )
  
-    learning_rate = 0.003
+    learning_rate = 0.0007
     lat_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv")).rename(columns={"cell_id":"embryo_id"}) # metadata
     lat_np = np.load(os.path.join("latents",f"{model_name}.npy"))
     cebra_np = np.load(os.path.join("cebra_latents",f"{model_name}.npy"))
