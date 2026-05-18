@@ -5,16 +5,15 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 matplotlib.use('Agg') 
+from utils.geometric_features import calculate_curvatures, get_acc, get_vel
 import numpy as np
 import pandas as pd
 import os
 from huggingface_hub import login
 from torch.utils.data import DataLoader
-from dataset_ivf_embryo import IVFEmbryoDataset
 from matplotlib.patches import Patch
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from geometric_features import calculate_curvatures, get_acc, get_vel
 import math
 
 PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
