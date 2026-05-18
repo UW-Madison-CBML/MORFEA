@@ -300,18 +300,21 @@ if __name__ == "__main__":
  
  
     parser.add_argument("--name", help="Model name. Must have already exported latents")
-    parser.add_argument("--run-name", help="Model name. Must have already exported latents")
-    parser.add_argument("--curvature",action="store_true", help="Use to include curvature")
+    parser.add_argument("--run-name", help="Wandb run name")
+
     parser.add_argument("--latents",action="store_true", help="Use to include latents")
+    parser.add_argument("--cebra-latents", action="store_true", help="Use to include distance to first frame")
+
+    parser.add_argument("--curvature",action="store_true", help="Use to include curvature")
     parser.add_argument("--velocity",action="store_true", help="Use to include velocity")
     parser.add_argument("--acceleration", action="store_true", help="Use to include acceleration")
     parser.add_argument("--distance-mat", action="store_true", help="Use to include distance to first frame")
 
     parser.add_argument("--cebra-ps", action="store_true", help="Use to include distance to first frame")
-    
     parser.add_argument("--umap-ps", action="store_true", help="Use to include distance to first frame")
     parser.add_argument("--pca-ps", action="store_true", help="Use to include distance to first frame")
-    parser.add_argument("--cebra-latents", action="store_true", help="Use to include distance to first frame")
+
+    parser.add_argument("--lr", action="store_true", help="Use to include distance to first frame")
   
     args = parser.parse_args()
  

@@ -95,12 +95,12 @@ class GradeLSTMDataset(Dataset):
         rows = None
         if self.return_whole_seqs:
             _, rows = list(self.groups)[idx]
-            print(f"embryo_id: {rows.iloc[-1]['embryo_id']}, grade: {rows.iloc[-1][self.grade]}")
         else:
             row = self.df.iloc[idx]
             embryo_id = row["embryo_id"]
             group = self.groups.get_group(embryo_id)
-            rows = group.loc[:max(idx + 8, group.index[8])]
+            iloc_idx = group.index.get_loc(row.name)
+            rows = group.iloc[:max(8, iloc_idx)]
 
         lat_seq = rows[self.lat_cols].to_numpy(dtype=np.float32)
         grade_index = self.grade_options.index(rows.iloc[-1][self.grade])
