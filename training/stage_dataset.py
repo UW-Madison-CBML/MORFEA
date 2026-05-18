@@ -60,14 +60,14 @@ def add_annotations(group_name, group, annotations_dir, features):
         group = pd.concat([group, sigs_df], axis=1)
     if (features['pca_ps']):
         
-        pca_trajectory = group[[col for col in group.columns if col.startwith("pca")]]
+        pca_trajectory = group[[col for col in group.columns if col.startswith("pca")]]
         sigs = get_path_sigs(pca_trajectory, 3)
         sigs_df = pd.DataFrame(sigs, columns = [f"z_pca_sig_{feature}" for feature in range(sigs.shape[1])], index=group.index)
         group = pd.concat([group, sigs_df], axis=1)
 
     if (features['umap_ps']):
         
-        umap_trajectory = group[[col for col in group.columns if col.startwith("umap")]]
+        umap_trajectory = group[[col for col in group.columns if col.startswith("umap")]]
         sigs = get_path_sigs(umap_trajectory, 3)
         sigs_df = pd.DataFrame(sigs, columns = [f"z_umap_sig_{feature}" for feature in range(sigs.shape[1])], index=group.index)
         group = pd.concat([group, sigs_df], axis=1)
