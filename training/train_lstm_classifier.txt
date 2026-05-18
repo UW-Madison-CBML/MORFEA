@@ -1,2 +1,2 @@
---name control-2026-03-12 --run-name pc --pca-ps --curvature --icm-lr 0.00001  --te-lr 0.00001
---name control-2026-03-12 --run-name p --pca-ps --icm-lr 0.000001 --te-lr 0.000001
+--name control-2026-03-12 --run-name pc2 --pca-ps --curvature --icm-lr 0.000001  --te-lr 0.000001 --ps-depth 2
+--name control-2026-03-12 --run-name p2 --pca-ps --icm-lr 0.000001 --te-lr 0.000001 --ps-depth 2
