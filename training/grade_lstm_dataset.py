@@ -12,6 +12,7 @@ def add_annotations(group_name, group, features):
    
     lat_cols = [column for column in group.columns if column.startswith("z_")]
     trajectory = group[lat_cols].to_numpy()
+    cebra_cols = ["cebra_0", "cebra_1", "cebra_2"]
 
     if (features['curvature']):
         
@@ -25,6 +26,27 @@ def add_annotations(group_name, group, features):
         curv4 = np.nan_to_num(curv4, nan=0.0, posinf=0.0, neginf=0.0)
         curv4 *= (1 / (np.std(curv4) + 0.0001))
         group = pd.concat([group,pd.DataFrame({"z_curv12":curv12, "z_curv20":curv20, "curv4":curv4}, index = group.index)], axis=1)
+
+    if (features['cebra_ps']):
+        
+        cebra_trajectory = group[cebra_cols]
+        sigs = get_path_sigs(cebra_trajectory, 3)
+        sigs_df = pd.DataFrame(sigs, columns = [f"z_cebra_sig_{feature}" for feature in range(sigs.shape[1])], index=group.index)
+        group = pd.concat([group, sigs_df], axis=1)
+    if (features['pca_ps']):
+        
+        pca_trajectory = group[[col for col in group.columns if col.startswith("pca")]]
+        sigs = get_path_sigs(pca_trajectory, 3)
+        sigs_df = pd.DataFrame(sigs, columns = [f"z_pca_sig_{feature}" for feature in range(sigs.shape[1])], index=group.index)
+        group = pd.concat([group, sigs_df], axis=1)
+
+    if (features['umap_ps']):
+        
+        umap_trajectory = group[[col for col in group.columns if col.startswith("umap")]]
+        sigs = get_path_sigs(umap_trajectory, 3)
+        sigs_df = pd.DataFrame(sigs, columns = [f"z_umap_sig_{feature}" for feature in range(sigs.shape[1])], index=group.index)
+        group = pd.concat([group, sigs_df], axis=1)
+
 
 
     if(features['distance_mat']):

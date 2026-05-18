@@ -9,6 +9,9 @@ import numpy as np
 import math
 from torch.nn.utils.rnn import pad_sequence
 import torch.nn.functional as F
+from umap import UMAP
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 def collate_fn_padd(batch):
     signals = [item[0] for item in batch]
@@ -108,12 +111,14 @@ class RunningStats:
 
 
 def main(model_name, features):
+    run_name = features['run_name']
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     wandb.login(key=os.getenv("WANDB_KEY"))
     run = wandb.init(
+        project = run_name,
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
     )
@@ -131,7 +136,14 @@ def main(model_name, features):
     lat_mean = latents.mean(axis=0)
     lat_std_dev = np.std(latents, axis=0) + 1e-8
     latents = (latents - lat_mean) / lat_std_dev
-    latents_df = pd.concat([metadata_df, pd.DataFrame(latents, columns=lat_cols, index=metadata_df.index), pd.DataFrame(cebra_latents, columns=["cebra_0", "cebra_1", "cebra_2"], index=metadata_df.index)], axis=1)
+
+    umap = UMAP(n_components=8)
+    pca = PCA(n_components=8)
+    std_scaler = StandardScaler()
+    umap_df = pd.DataFrame(umap.fit_transform(lat_np), columns=[f"umap_{i}" for i in range(8)], index=metadata_df.index)
+    pca_df = pd.DataFrame(pca.fit_transform(std_scaler.fit_transform(lat_np)), columns=[f"pca_{i}" for i in range(8)], index=metadata_df.index)
+
+    latents_df = pd.concat([metadata_df, pd.DataFrame(latents, columns=lat_cols, index=metadata_df.index), pd.DataFrame(cebra_latents, columns=["cebra_0", "cebra_1", "cebra_2"], index=metadata_df.index), umap_df, pca_df], axis=1)
     latents_df = latents_df[latents_df['phase'].str.contains("tM|tSB|tB|tEB")] # just classify around the blastocyst stage
     
     te_graded = latents_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
@@ -278,13 +290,17 @@ if __name__ == "__main__":
  
  
     parser.add_argument("--name", help="Model name. Must have already exported latents")
+    parser.add_argument("--run-name", help="Model name. Must have already exported latents")
     parser.add_argument("--curvature",action="store_true", help="Use to include curvature")
     parser.add_argument("--latents",action="store_true", help="Use to include latents")
     parser.add_argument("--velocity",action="store_true", help="Use to include velocity")
     parser.add_argument("--acceleration", action="store_true", help="Use to include acceleration")
     parser.add_argument("--distance-mat", action="store_true", help="Use to include distance to first frame")
 
-    parser.add_argument("--path-signatures", action="store_true", help="Use to include distance to first frame")
+    parser.add_argument("--cebra-ps", action="store_true", help="Use to include distance to first frame")
+    
+    parser.add_argument("--umap-ps", action="store_true", help="Use to include distance to first frame")
+    parser.add_argument("--pca-ps", action="store_true", help="Use to include distance to first frame")
     parser.add_argument("--cebra-latents", action="store_true", help="Use to include distance to first frame")
   
     args = parser.parse_args()
