@@ -12,6 +12,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.patches import Patch
+from umap import UMAP
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 from torch.optim.lr_scheduler import CosineAnnealingLR, CosineAnnealingWarmRestarts
 def recall_precision_f1(confusion_mat, i):
@@ -102,7 +105,7 @@ def main(model_name, features):
     run = wandb.init(
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
-        name=f"{model_name}-phase-{'c' if features['curvature'] else ''}{'v' if features['velocity'] else ''}{'p' if features['path_signatures'] else ''}{'l' if features['latents'] else ''}{'d' if features['distance_mat'] else ''}{'a' if features['acceleration'] else ''}",
+        name=f"{model_name}-phase-{'c' if features['curvature'] else ''}{'v' if features['velocity'] else ''}{'p' if features['cebra_ps'] else ''}{'l' if features['latents'] else ''}{'d' if features['distance_mat'] else ''}{'a' if features['acceleration'] else ''}{'x' if features['pca_ps'] else ''}{'u' if features['umap_ps'] else ''}",
     )
  
     learning_rate = 0.003
@@ -114,7 +117,15 @@ def main(model_name, features):
     lat_columns = [f"z_{i}" for i in range(lat_np.shape[1])]
     values_df = pd.DataFrame(lat_np, columns=lat_columns, index=lat_df.index)
     cebra_df = pd.DataFrame(cebra_np, columns=["cebra_0", "cebra_1", "cebra_2"], index=lat_df.index)
-    df = pd.concat([lat_df, values_df, cebra_df], axis = 1)
+   
+    # for validation splits reasons, need to prepare these outside of stage dataset 
+    umap = UMAP(n_components=8)
+    pca = PCA(n_components=8)
+    std_scaler = StandardScaler()
+    umap_df = pd.DataFrame(umap.fit_transform(lat_np), columns=[f"umap_{i}" for i in range(8)], index=lat_df.index)
+    pca_df = pd.DataFrame(pca.fit_transform(std_scaler.fit_transform(lat_np)), columns=[f"pca_{i}" for i in range(8)], index=lat_df.index)
+    
+    df = pd.concat([lat_df, values_df, cebra_df, umap_df, pca_df], axis = 1)
     mask = df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = df[mask]
     df = df[~mask]
@@ -255,13 +266,18 @@ if __name__ == "__main__":
  
  
     parser.add_argument("--name", help="Model name. Must have already exported latents and cebra latents")
-    parser.add_argument("--curvature",action="store_true", help="Use to include curvature")
     parser.add_argument("--latents",action="store_true", help="Use to include latents")
-    parser.add_argument("--path-signatures",action="store_true", help="Use to include path signatures from cebra latents")
+    parser.add_argument("--cebra", action="store_true", help="Use to derive features from cebra latents")
+
+    parser.add_argument("--cebra-ps",action="store_true", help="Use to include path signatures from cebra latents")
+    parser.add_argument("--umap-ps",action="store_true", help="Use to include path signatures from UMAP latents")
+    parser.add_argument("--pca-ps",action="store_true", help="Use to include path signatures from PCA latents")
+
+    parser.add_argument("--curvature",action="store_true", help="Use to include curvature")
     parser.add_argument("--velocity",action="store_true", help="Use to include velocity")
     parser.add_argument("--acceleration", action="store_true", help="Use to include acceleration")
     parser.add_argument("--distance-mat", action="store_true", help="Use to include distance to first frame")
-    parser.add_argument("--cebra", action="store_true", help="Use to derive features from cebra latents")
+
   
     args = parser.parse_args()
  

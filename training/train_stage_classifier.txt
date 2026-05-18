@@ -1,2 +1,2 @@
-train_stage_classifier.py --name control-2026-03-12 --distance-mat --curvature --acceleration --velocity --cebra
-train_stage_classifier.py --name control-2026-03-12 --path-signatures
+train_stage_classifier.py --name control-2026-03-12 --umap-ps
+train_stage_classifier.py --name control-2026-03-12 --pca-ps
