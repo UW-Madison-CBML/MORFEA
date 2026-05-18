@@ -1,1 +1,4 @@
---name control-2026-03-12 --run-name all --pca-ps --curvature
+--name control-2026-03-12 --run-name pch --pca-ps --curvature --icm-lr 0.00003  --te-lr 0.00003
+--name control-2026-03-12 --run-name pcl --pca-ps --curvature --icm-lr 0.000001 --te-lr 0.000001
+--name control-2026-03-12 --run-name ph --pca-ps --icm-lr 0.00003  --te-lr 0.00003
+--name control-2026-03-12 --run-name pl --pca-ps --icm-lr 0.000001 --te-lr 0.000001
