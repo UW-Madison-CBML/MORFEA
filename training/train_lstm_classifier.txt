@@ -1,2 +1,3 @@
 --name control-2026-03-12 --run-name pca --pca-ps --icm-lr 0.00001 --te-lr 0.00001 --ps-depth 2
 --name control-2026-03-12 --run-name pdcvl --distance-mat --curvature --velocity --acceleration --icm-lr 0.00001 --te-lr 0.00001 --ps-depth 2
+--name control-2026-03-12 --run-name l --latents --icm-lr 0.00001 --te-lr 0.00001 --ps-depth 2
