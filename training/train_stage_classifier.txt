@@ -1,2 +1,1 @@
-train_stage_classifier.py --name control-2026-03-12 --umap-ps
-train_stage_classifier.py --name control-2026-03-12 --pca-ps
+train_stage_classifier.py --name control-2026-03-12 --cebra-ps
