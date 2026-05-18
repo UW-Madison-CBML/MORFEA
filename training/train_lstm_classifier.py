@@ -112,6 +112,8 @@ class RunningStats:
 
 
 def main(model_name, features):
+    te_lr = features['te_lr']
+    icm_lr = features['icm_lr']
     run_name = features['run_name']
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
@@ -167,15 +169,15 @@ def main(model_name, features):
     dataset_icm = GradeLSTMDataset(latents_df, "ICM", features, keep_na=KEEP_NA)
     dataset_te_val = GradeLSTMDataset(val_df, "TE", features, keep_na=KEEP_NA, return_whole_seqs=True) 
     dataset_icm_val = GradeLSTMDataset(val_df, "ICM", features, keep_na=KEEP_NA, return_whole_seqs=True)
-    crit_te = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.2,0.4,0.4], device=DEVICE))
-    crit_icm = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.2,0.4,0.4], device=DEVICE))
+    crit_te = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.4,0.4,0.2], device=DEVICE))
+    crit_icm = torch.nn.CrossEntropyLoss(weight= torch.tensor([0.4,0.4,0.2], device=DEVICE))
     model_te = GradeLSTMClassifier(len(dataset_te.lat_cols), keep_na=KEEP_NA)
     model_te = model_te.to(DEVICE)
     model_icm = GradeLSTMClassifier(len(dataset_icm.lat_cols), keep_na=KEEP_NA)
     model_icm = model_icm.to(DEVICE)
     epochs = 8 
-    optimizer_te = torch.optim.Adam(model_te.parameters(), lr=learning_rate, weight_decay=1e-4)
-    optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=learning_rate, weight_decay=1e-4)
+    optimizer_te = torch.optim.Adam(model_te.parameters(), lr=te_lr, weight_decay=1e-4)
+    optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=icm_lr, weight_decay=1e-4)
 
 
     loader_te = DataLoader(
@@ -218,7 +220,7 @@ def main(model_name, features):
         # TE grades
         for features, targets, lengths in loader_te:
             features = features.to(DEVICE)
-            target = targets.to(DEVICE).long()
+            targets = targets.to(DEVICE).long()
             label = model_te(features, lengths)
             loss = crit_te(label, targets)
 
@@ -314,7 +316,8 @@ if __name__ == "__main__":
     parser.add_argument("--umap-ps", action="store_true", help="Use to include distance to first frame")
     parser.add_argument("--pca-ps", action="store_true", help="Use to include distance to first frame")
 
-    parser.add_argument("--lr", action="store_true", help="Use to include distance to first frame")
+    parser.add_argument("--te-lr", type=float, default=0.0001, help="TE Learning rate")
+    parser.add_argument("--icm-lr", type=float, default=0.0001,help="ICM Learning rate")
   
     args = parser.parse_args()
  
