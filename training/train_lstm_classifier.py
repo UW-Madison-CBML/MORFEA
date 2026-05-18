@@ -126,6 +126,9 @@ def main(model_name, features):
     KEEP_NA = False
 
     wandb.login(key=os.getenv("WANDB_KEY"))
+    
+    weight_decay = 1e-4
+    val_ratio = 0.4
     run = wandb.init(
         name = run_name,
         entity="jenslundsgaard7-uw-madison",
@@ -135,7 +138,9 @@ def main(model_name, features):
             "keep_na":KEEP_NA,
             "te_lr": te_lr,
             "icm_lr": icm_lr,  
-            "features": features
+            "features": features,
+            "val_ratio": val_ratio,
+            "weight_decay": weight_decay,
             }
     )
     grade_options = ["A", "B", "C", "NA"] if KEEP_NA else ["A","B","C"]
@@ -160,13 +165,12 @@ def main(model_name, features):
     
     te_graded = latents_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
     np.random.shuffle(te_graded)
-    val_ratio = 0.15
     VAL_EMBRYOS = te_graded[:int(val_ratio * len(te_graded))] 
-    for embryo in ["RS363-7","JE021-4","ZS435-6","QC211-2","GE1055-6","LBS371-1-8","CAV074-1","RA803-4",]: # remove a bunch of C's
-        if embryo in VAL_EMBRYOS:
-            VAL_EMBRYOS.remove(embryo)
-    for embryo in ["PH664-7","JV227-2","LLN873-1","LA367-4","RA580-2","MC373-5","DV210-4"]: # add a bunch of C's
-        VAL_EMBRYOS.append(embryo)
+    #for embryo in ["RS363-7","JE021-4","ZS435-6","QC211-2","GE1055-6","LBS371-1-8","CAV074-1","RA803-4",]: # remove a bunch of C's
+    #    if embryo in VAL_EMBRYOS:
+    #        VAL_EMBRYOS.remove(embryo)
+    #for embryo in ["PH664-7","JV227-2","LLN873-1","LA367-4","RA580-2","MC373-5","DV210-4"]: # add a bunch of C's
+    #    VAL_EMBRYOS.append(embryo)
     for embryo in VAL_EMBRYOS:
         print(f"{embryo}: {latents_df[latents_df['embryo_id'] == embryo].iloc[0]['TE']}")
     mask = latents_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
@@ -185,8 +189,8 @@ def main(model_name, features):
     model_icm = GradeLSTMClassifier(len(dataset_icm.lat_cols), keep_na=KEEP_NA)
     model_icm = model_icm.to(DEVICE)
     epochs = 8 
-    optimizer_te = torch.optim.Adam(model_te.parameters(), lr=te_lr, weight_decay=1e-4)
-    optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=icm_lr, weight_decay=1e-4)
+    optimizer_te = torch.optim.Adam(model_te.parameters(), lr=te_lr, weight_decay=weight_decay)
+    optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=icm_lr, weight_decay=weight_decay)
 
 
     loader_te = DataLoader(
@@ -324,6 +328,8 @@ if __name__ == "__main__":
     parser.add_argument("--cebra-ps", action="store_true", help="Use to include distance to first frame")
     parser.add_argument("--umap-ps", action="store_true", help="Use to include distance to first frame")
     parser.add_argument("--pca-ps", action="store_true", help="Use to include distance to first frame")
+    parser.add_argument("--ps-depth", type=int, default=3, help="path sig depth")
+    
 
     parser.add_argument("--te-lr", type=float, default=0.0001, help="TE Learning rate")
     parser.add_argument("--icm-lr", type=float, default=0.0001,help="ICM Learning rate")
