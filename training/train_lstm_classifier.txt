@@ -1,1 +1,1 @@
---name control-2026-03-12 --run-name l --latents --icm-lr 0.000001 --te-lr 0.000001
+--name control-2026-03-12 --run-name pc19 --pca-ps --curvature --icm-lr 0.00001 --te-lr 0.00001

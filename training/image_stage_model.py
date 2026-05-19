@@ -2,7 +2,7 @@ import torch
 from torch.nn import Module
 import torch.nn.functional as F
 from torchcrf import CRF
-from raffael_model import ResidualBlock
+from ae_model import ResidualBlock
 class ImageStageModel(Module):
 
     def __init__(self, num_classes=18):

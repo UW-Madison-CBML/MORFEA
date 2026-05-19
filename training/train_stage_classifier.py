@@ -159,6 +159,7 @@ def main(model_name, features):
         collate_fn = lambda x: dataset_val.pad_collate(x)
     )
 
+    precision_recall_df = pd.DataFrame()
     epochs = 8
     scheduler = CosineAnnealingLR(optimizer, len(loader) * epochs)
     print(len(loader))
@@ -243,6 +244,21 @@ def main(model_name, features):
                     f1_stats[dataset_val.phases[i]].push(f1)
                     recall_stats[dataset_val.phases[i]].push(recall)
                     precision_stats[dataset_val.phases[i]].push(precision)
+        f1_stats = {key: (value.mean, value.std_dev) for key,value in f1_stats.items()}
+        precision_stats = {key: (value.mean, value.std_dev) for key,value in f1_stats.items()}
+        recall_stats = {key: (value.mean, value.std_dev) for key,value in recall_stats.items()}
+
+        precision_recall_df = pd.concat(
+            [
+            pd.DataFrame(f1_stats.values(), index=f1_stats.keys(), columns=["f1","f1_std"]),    
+            pd.DataFrame(precision_stats.values(), index=precision_stats.keys(), columns=["precision","precision_std"]),    
+            pd.DataFrame(precision_stats.values(), index=recall_stats.keys(), columns=["recall","recall_std"])
+            ], axis=1)
+        for stat in ["precision","recall", "f1"]:
+            precision_recall_df[stat] = precision_recall_df[stat].str + " \\pm " + precision_recall_df[f"{stat}_std"].str
+        precision_recall_df = precision_recall_df.drop([col for col in precision_recall_df.columns if col.contains("std")])
+        prf_style = precision_recall_df.style
+        print(prf_style.to_latex())
         for phase in dataset_val.phases:
             run.log({f"{phase} recall": recall_stats[phase].mean, f"{phase} recall std": recall_stats[phase].std_dev, 
                 f"{phase} f1": f1_stats[phase].mean, f"{phase} f1 std": f1_stats[phase].std_dev, 

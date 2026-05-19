@@ -1,1 +1,1 @@
-train_stage_classifier.py --name control-2026-03-12 --cebra-ps
+train_stage_classifier.py --name control-2026-03-12 --curvature --acceleration --velocity --distance-mat
