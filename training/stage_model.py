@@ -14,6 +14,7 @@ class StageModel(Module):
         self.lstm = torch.nn.LSTM(128, 128, batch_first = True)
         self.lin3 = torch.nn.Linear(128, num_classes)
         
+        self.dropout = torch.nn.Dropout(0.3)
         self.crf = CRF(num_classes, batch_first=True)
         with torch.no_grad():
             self.crf.start_transitions.fill_(-10000.0)
@@ -24,6 +25,7 @@ class StageModel(Module):
     def forward(self, x, mask, tags=None):
         B,T, L = x.shape 
         x = F.relu(self.lin1(x))
+        x = self.dropout(x)
         x = F.relu(self.lin2(x))
         x, _ = self.lstm(x)
         emissions = self.lin3(x)

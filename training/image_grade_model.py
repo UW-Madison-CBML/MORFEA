@@ -5,7 +5,7 @@ from ae_model import ResidualBlock
 from torch.nn.utils.rnn import pack_padded_sequence
 class ImageGradeModel(Module):
 
-    def __init__(self, num_classes=18):
+    def __init__(self, num_classes=3):
         super().__init__()
         self.num_classes = num_classes
         self.cnn = torch.nn.Sequential(
@@ -30,7 +30,7 @@ class ImageGradeModel(Module):
         x = x.view(B,T,-1) # last dim should be 2048
         x = F.relu(self.lin1(x))
         x = F.relu(self.lin2(x))
-        x = pack_padded_sequences(x, lengths.cpu(), batch_first=True, enforce_sorted=False)
+        x = pack_padded_sequence(x, lengths.cpu(), batch_first=True, enforce_sorted=False)
         _, (hs, _) = self.lstm(x)
         hs = hs.squeeze(0) # single layer single direction LSTM
         x = self.lin3(hs)

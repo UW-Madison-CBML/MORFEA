@@ -8,13 +8,16 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class ImageGradeDataset(Dataset):
-    def __init__(self, df, grade, resize=128, norm="minmax01", max_frames=None, return_whole_seqs=True):
+    def __init__(self, df, grade, resize=128, norm="minmax01", max_frames=None, return_whole_seqs=False):
+        df = df.dropna(subset=[grade])
         self.df = pd.concat([pd.DataFrame({"embryo_id":row["embryo_id"], "image_path":row["embryo_paths"].split("|"), grade:row[grade]}) for _, row in df.iterrows()], axis=0, ignore_index=True)
         self.groups = self.df.groupby("embryo_id")
         self.resize = resize
         self.norm = norm
         self.GRADES = ["A", "B", "C"]
+        self.return_whole_seqs = return_whole_seqs
         
+        self.grade = grade
 
     def _read_gray(self, path):
         img = Image.open(path)
@@ -74,4 +77,4 @@ class ImageGradeDataset(Dataset):
     
         targets = torch.tensor(targets)
     
-        return vols_padded, targets, lengths 
+        return signals_padded, targets, lengths 
