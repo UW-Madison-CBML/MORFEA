@@ -99,6 +99,7 @@ def main(model_name, grade):
     cebra_path_sigs_df["cluster"] = kmeans.labels_
     
     print(cebra_path_sigs_df)
+    print(cebra_path_sigs_df.style.to_latex())
     cebra_path_sigs_df.to_csv(os.path.join(os.getcwd(), "path_sigs_by_embryo.csv"))
     blastocyst_cebra_df = blastocyst_cebra_df.merge(cebra_path_sigs_df, how="left", left_on="embryo_id", right_on="embryo_id")
     
