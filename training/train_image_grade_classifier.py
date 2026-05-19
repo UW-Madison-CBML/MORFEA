@@ -146,7 +146,7 @@ def main():
 
     loader_te = DataLoader(
         dataset_te,
-        batch_size=32,
+        batch_size=16,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
@@ -154,7 +154,7 @@ def main():
         collate_fn=lambda x:dataset_te.pad_collate(x))
     loader_icm = DataLoader(
         dataset_icm,
-        batch_size=32,
+        batch_size=16,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
