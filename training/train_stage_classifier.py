@@ -244,6 +244,11 @@ def main(model_name, features):
                     f1_stats[dataset_val.phases[i]].push(f1)
                     recall_stats[dataset_val.phases[i]].push(recall)
                     precision_stats[dataset_val.phases[i]].push(precision)
+        for phase in dataset_val.phases:
+            run.log({f"{phase} recall": recall_stats[phase].mean, f"{phase} recall std": recall_stats[phase].std_dev, 
+                f"{phase} f1": f1_stats[phase].mean, f"{phase} f1 std": f1_stats[phase].std_dev, 
+                f"{phase} precision": precision_stats[phase].mean, f"{phase} precision std": precision_stats[phase].std_dev})
+
         f1_stats = {key: (value.mean, value.std_dev) for key,value in f1_stats.items()}
         precision_stats = {key: (value.mean, value.std_dev) for key,value in precision_stats.items()}
         recall_stats = {key: (value.mean, value.std_dev) for key,value in recall_stats.items()}
@@ -256,15 +261,11 @@ def main(model_name, features):
             ], axis=1)
         print(precision_recall_df)
         for stat in ["precision","recall", "f1"]:
-            precision_recall_df[stat] = [f"\\num{{{mean}}} \\pm \\num{{{std}}}" for mean, std in zip(precision_recall_df[stat], precision_recall_df[f"{stat}_std"])]
-        precision_recall_df = precision_recall_df.drop([col for col in precision_recall_df.columns if "std" in col])
+            precision_recall_df[stat] = [f"$\\num{{{mean}}} \\pm \\num{{{std}}}$" for mean, std in zip(precision_recall_df[stat], precision_recall_df[f"{stat}_std"])]
+        precision_recall_df = precision_recall_df.drop(columns = [col for col in precision_recall_df.columns if "std" in col])
         prf_style = precision_recall_df.style
         print(prf_style.to_latex())
-        for phase in dataset_val.phases:
-            run.log({f"{phase} recall": recall_stats[phase].mean, f"{phase} recall std": recall_stats[phase].std_dev, 
-                f"{phase} f1": f1_stats[phase].mean, f"{phase} f1 std": f1_stats[phase].std_dev, 
-                f"{phase} precision": precision_stats[phase].mean, f"{phase} precision std": precision_stats[phase].std_dev})
-    
+            
  
         run.log({"val_acc":acc_stats.mean, "val_acc_std":acc_stats.std_dev,"area_between_curves_mean":area_between_curves_stats.mean,"area_between_curves_stddev":area_between_curves_stats.std_dev})
 
