@@ -153,7 +153,7 @@ def main(model_name, features):
         dataset_val,
         batch_size=16,
         shuffle=False,
-        num_workers=4,
+        num_workers=16,
         pin_memory=True,
         drop_last=False,
         collate_fn = lambda x: dataset_val.pad_collate(x)
@@ -245,18 +245,19 @@ def main(model_name, features):
                     recall_stats[dataset_val.phases[i]].push(recall)
                     precision_stats[dataset_val.phases[i]].push(precision)
         f1_stats = {key: (value.mean, value.std_dev) for key,value in f1_stats.items()}
-        precision_stats = {key: (value.mean, value.std_dev) for key,value in f1_stats.items()}
+        precision_stats = {key: (value.mean, value.std_dev) for key,value in precision_stats.items()}
         recall_stats = {key: (value.mean, value.std_dev) for key,value in recall_stats.items()}
 
         precision_recall_df = pd.concat(
             [
             pd.DataFrame(f1_stats.values(), index=f1_stats.keys(), columns=["f1","f1_std"]),    
             pd.DataFrame(precision_stats.values(), index=precision_stats.keys(), columns=["precision","precision_std"]),    
-            pd.DataFrame(precision_stats.values(), index=recall_stats.keys(), columns=["recall","recall_std"])
+            pd.DataFrame(recall_stats.values(), index=recall_stats.keys(), columns=["recall","recall_std"])
             ], axis=1)
+        print(precision_recall_df)
         for stat in ["precision","recall", "f1"]:
-            precision_recall_df[stat] = precision_recall_df[stat].str + " \\pm " + precision_recall_df[f"{stat}_std"].str
-        precision_recall_df = precision_recall_df.drop([col for col in precision_recall_df.columns if col.contains("std")])
+            precision_recall_df[stat] = [f"\\num{{{mean}}} \\pm \\num{{{std}}}" for mean, std in zip(precision_recall_df[stat], precision_recall_df[f"{stat}_std"])]
+        precision_recall_df = precision_recall_df.drop([col for col in precision_recall_df.columns if "std" in col])
         prf_style = precision_recall_df.style
         print(prf_style.to_latex())
         for phase in dataset_val.phases:

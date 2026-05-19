@@ -21,7 +21,7 @@ when_to_transfer_output = ON_EXIT_OR_EVICT
 Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
-transfer_input_files = train_image_grade_classifier.sh, train_image_grade_classifier.py, image_grade_model.py, ../api_keys.txt, image_grade_dataset.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, ../utils/geometric_features.py,file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz
+transfer_input_files = train_image_grade_classifier.sh, train_image_grade_classifier.py, image_grade_model.py, ../api_keys.txt, image_grade_dataset.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, ../utils/geometric_features.py,file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, ae_model.py, file:///staging/groups/bhaskar_group/ivf/index_embryo.csv
 +WantGPULab = true
 +GPUJobLength = "long"
 gpus_minimum_capability = 7.0
@@ -30,9 +30,9 @@ requirements= Machine=="bhaskargpu4000.chtc.wisc.edu"
 +GPUModel = "NVIDIA H200"
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
-request_cpus = 4
-request_memory = 64GB
-request_disk = 80GB
+request_cpus = 16
+request_memory = 108GB
+request_disk = 108GB
 request_gpus = 1
 
 

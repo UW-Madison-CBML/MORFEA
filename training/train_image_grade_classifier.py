@@ -11,19 +11,6 @@ from torch.nn.utils.rnn import pad_sequence
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
-def collate_padd(batch):
-    signals = [item[0] for item in batch]
-    targets = [item[1] for item in batch]
-    
-    lengths = torch.tensor([len(s) for s in signals])
-    
-    signals_padded = torch.nn.utils.rnn.pad_sequence(
-        signals, batch_first=True, padding_value=0.0
-    )
-    
-    targets = torch.tensor(targets)
-    
-    return signals_padded, targets, lengths # Return all three
 def recall_precision_f1(confusion_mat, i):
     recall = 0 if confusion_mat[:, i].sum() == 0 else confusion_mat[i,i]/confusion_mat[:, i].sum()
             
@@ -108,7 +95,7 @@ class RunningStats:
         return math.sqrt(self.variance)
 
 
-def main(model_name, features):
+def main():
     weights = [0.2,0.4,0.4]
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
@@ -118,8 +105,9 @@ def main(model_name, features):
     
     torch.backends.cudnn.enabled = False
 
+    val_ratio = 0.2
     wandb.login(key=os.getenv("WANDB_KEY"))
-    learning_rate = 0.00001 
+    learning_rate = 0.0001
     weight_decay = 1e-3
     run = wandb.init(
         name = "image_grade",
@@ -129,50 +117,49 @@ def main(model_name, features):
     )
     grade_options = ["A","B","C"]
     embryo_image_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})
-    grade_df = pd.read_csv(os.path.abspath("embryo_dataset_grades.csv")).rename(columns={"video_name":"embryo_id"}) # don't drop NA's yet, that will happen in the datasets
-    df = embryo_image_df.merge(grade_df, how="left", left_on="embryo_id", right_on="embryo_id")
+    grade_df = pd.read_csv(os.path.abspath("embryo_dataset_grades.csv")).rename(columns={"video_name":"embryo_id"}) 
+    df = embryo_image_df.merge(grade_df, how="left", left_on="embryo_id", right_on="embryo_id").dropna(subset=["TE"])
     
     te_graded = df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
+    print(te_graded)
     np.random.shuffle(te_graded)
     VAL_EMBRYOS = te_graded[:int(val_ratio * len(te_graded))] 
-    for embryo in VAL_EMBRYOS:
-        print(f"{embryo}: {latents_df[latents_df['embryo_id'] == embryo].iloc[0]['TE']}")
-    mask = df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
+    print(VAL_EMBRYOS)
+    mask = df["embryo_id"].isin(VAL_EMBRYOS)
     val_df = df[mask]
-    print(f"val_ratio={val_ratio}, actual val ratio: {len(val_df)/len(latents_df)}")
-    latents_df = latents_df[~mask]
-    # latents df will have the grade columns already
-    dataset_te = ImageGradeDataset(latents_df, "TE") 
-    dataset_icm = ImageGradeDataset(latents_df, "ICM")
+    df = df[~mask]
+    
+    dataset_te = ImageGradeDataset(df, "TE") 
+    dataset_icm = ImageGradeDataset(df, "ICM")
     dataset_te_val = ImageGradeDataset(val_df, "TE", return_whole_seqs=True) 
     dataset_icm_val = ImageGradeDataset(val_df, "ICM", return_whole_seqs=True)
     crit_te = torch.nn.CrossEntropyLoss(weight= torch.tensor(weights, device=DEVICE))
     crit_icm = torch.nn.CrossEntropyLoss(weight= torch.tensor(weights, device=DEVICE))
-    model_te = ImageGradeClassifier(len(dataset_te.lat_cols))
+    model_te = ImageGradeModel()
     model_te = model_te.to(DEVICE)
-    model_icm = ImageGradeClassifier(len(dataset_icm.lat_cols))
+    model_icm = ImageGradeModel()
     model_icm = model_icm.to(DEVICE)
     epochs = 8 
-    optimizer_te = torch.optim.Adam(model_te.parameters(), lr=te_lr, weight_decay=weight_decay)
-    optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=icm_lr, weight_decay=weight_decay)
+    optimizer_te = torch.optim.Adam(model_te.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
 
     loader_te = DataLoader(
         dataset_te,
-        batch_size=128,
+        batch_size=32,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
         drop_last=True,
-        collate_fn=lambda x:dataset_te.collate_padd(x))
+        collate_fn=lambda x:dataset_te.pad_collate(x))
     loader_icm = DataLoader(
         dataset_icm,
-        batch_size=128,
+        batch_size=32,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
         drop_last=True, 
-        collate_fn=lambda x:dataset_icm.collate_padd(x))
+        collate_fn=lambda x:dataset_icm.pad_collate(x))
     loader_te_val = DataLoader(
         dataset_te_val,
         batch_size=4,
@@ -180,7 +167,7 @@ def main(model_name, features):
         num_workers=4,
         pin_memory=True,
         drop_last=False,
-        collate_fn=lambda x:dataset_te_val.collate_padd(x))
+        collate_fn=lambda x:dataset_te_val.pad_collate(x))
     loader_icm_val = DataLoader(
         dataset_icm_val,
         batch_size=4,
@@ -188,10 +175,11 @@ def main(model_name, features):
         num_workers=4,
         pin_memory=True,
         drop_last=False,
-        collate_fn=lambda x:dataset_icm_val.collate_padd(x))
+        collate_fn=lambda x:dataset_icm_val.pad_collate(x))
     scheduler_te = CosineAnnealingLR(optimizer_te, len(loader_te) * epochs)
     scheduler_icm = CosineAnnealingLR(optimizer_icm, len(loader_icm) * epochs)
 
+    print(len(loader_te))
     for epoch in range(epochs):
         model_te.train(); model_icm.train()
         # TE grades

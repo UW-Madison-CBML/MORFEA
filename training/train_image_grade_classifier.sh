@@ -9,5 +9,5 @@ if [ -f "api_keys.txt" ]; then
 fi
 ls -lh
 
-python train_lstm_classifier.py 
+python train_image_grade_classifier.py 
 
