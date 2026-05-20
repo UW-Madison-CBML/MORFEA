@@ -15,6 +15,6 @@ My.IsDaemonCore = True
 # requeued by the schedd if it exits abnormally or
 # is killed (e.g., during a reboot).
 on_exit_remove = (ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))
-arguments = "-f -l . -Lockfile visualize_cebra.dag.lock -Dag visualize_cebra.dag -CsdVersion $CondorVersion:' '25.10.0' '2026-04-21' 'BuildID:' '900018' 'PackageID:' '25.10.0-0.900018' 'GitSHA:' 'f6aba35b' 'RC' '$ -dagman /usr/bin/condor_dagman -AutoRescue 1 -update_submit"
+arguments = "-f -l . -Lockfile visualize_cebra.dag.lock -Dag visualize_cebra.dag -CsdVersion $CondorVersion:' '25.11.0' '2026-05-18' 'BuildID:' '911358' 'PackageID:' '25.11.0-0.911358' 'GitSHA:' '04a2d4fc' 'RC' '$ -dagman /usr/bin/condor_dagman -AutoRescue 1 -update_submit"
 environment = "_CONDOR_DAGMAN_LOG=visualize_cebra.dag.dagman.out _CONDOR_MAX_DAGMAN_LOG=0 _CONDOR_SCHEDD_ADDRESS_FILE=/var/lib/condor/spool/.schedd_address _CONDOR_SCHEDD_DAEMON_AD_FILE=/var/lib/condor/spool/.schedd_classad"
 queue

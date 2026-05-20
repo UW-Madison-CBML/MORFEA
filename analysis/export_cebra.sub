@@ -20,7 +20,7 @@ Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
 transfer_output_remaps = "cebra_latents.tar.gz =  file:///staging/groups/bhaskar_group/ivf/cebra_latents.tar.gz;"
-transfer_input_files = export_cebra.sh, export_cebra.py, raffael_model.py, raffael_conv_lstm.py, dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, api_keys.txt,  file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv,file:///staging/groups/bhaskar_group/ivf/cebra_latents.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz
+transfer_input_files = export_cebra.sh, export_cebra.py, ../training/dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, ../api_keys.txt,  file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv,file:///staging/groups/bhaskar_group/ivf/cebra_latents.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz
 
 
 +WantGPULab = true
@@ -39,4 +39,4 @@ request_gpus = 1
 
 
 #queue models from get_latents.txt
-queue model from (control-2026-03-12)
+queue model from (ver12-2026-04-06)
