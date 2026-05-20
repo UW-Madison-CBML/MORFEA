@@ -1,0 +1,17 @@
+JOB A train_lstm_classifier.sub
+VARS A args = "--name control-2026-03-12 --run-name pcvda1 --acceleration --velocity --pca-ps --distance-mat --curvature --icm-lr 0.001 --te-lr 0.001"
+JOB B train_lstm_classifier.sub
+VARS B args = "--name control-2026-03-12 --run-name pcvda2 --acceleration --velocity --pca-ps --distance-mat --curvature --icm-lr 0.0001 --te-lr 0.0001"
+JOB C train_lstm_classifier.sub
+VARS C args = "--name control-2026-03-12 --run-name pcvda3 --acceleration --velocity --pca-ps --distance-mat --curvature --icm-lr 0.00001 --te-lr 0.00001"
+JOB D train_lstm_classifier.sub
+VARS D args = "--name control-2026-03-12 --run-name pcvda4 --acceleration --velocity --pca-ps --distance-mat --curvature --icm-lr 0.000001 --te-lr 0.000001"
+JOB E train_lstm_classifier.sub
+VARS E args = "--name control-2026-03-12 --run-name pcvda5 --acceleration --velocity --pca-ps --distance-mat --curvature --icm-lr 0.0000001 --te-lr 0.0000001"
+JOB F train_lstm_classifier.sub
+VARS F args = "--name control-2026-03-12 --run-name pcvda6 --acceleration --velocity --pca-ps --distance-mat --curvature --icm-lr 0.00000001 --te-lr 0.00000001"
+PARENT A CHILD B
+PARENT B CHILD C
+PARENT C CHILD D
+PARENT D CHILD E
+PARENT E CHILD F

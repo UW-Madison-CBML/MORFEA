@@ -1,13 +1,10 @@
 #!/bin/bash
-python -m ruff check . --exit-zero
-echo "Installing dependencies..."
-# Extract dataset
+#python -m ruff check . --exit-zero
+
 echo "Extracting dataset..."
 tar -zxf latents.tar.gz
 tar -zxf cebra_latents.tar.gz
 tar -zxf embryo_dataset_annotations.tar.gz
-pip install torbi
-# Set HuggingFace token from api_keys.txt
 if [ -f "api_keys.txt" ]; then
     WB_KEY=$(tail -n 1 api_keys.txt)
     export WANDB_KEY=$WB_KEY
@@ -16,4 +13,4 @@ fi
 ls -lh
 
  
-python "$@"
+python train_stage_classifier.py "$@"

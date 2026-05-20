@@ -105,10 +105,10 @@ def main(model_name, features):
     run = wandb.init(
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
-        name=f"{model_name}-phase-{'c' if features['curvature'] else ''}{'v' if features['velocity'] else ''}{'p' if features['cebra_ps'] else ''}{'l' if features['latents'] else ''}{'d' if features['distance_mat'] else ''}{'a' if features['acceleration'] else ''}{'x' if features['pca_ps'] else ''}{'u' if features['umap_ps'] else ''}",
+        name=f"{model_name}-phase-{features['run_name']}",
     )
  
-    learning_rate = 0.0007
+    learning_rate = 0.001
     lat_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv")).rename(columns={"cell_id":"embryo_id"}) # metadata
     lat_np = np.load(os.path.join("latents",f"{model_name}.npy"))
     cebra_np = np.load(os.path.join("cebra_latents",f"{model_name}.npy"))
@@ -142,7 +142,7 @@ def main(model_name, features):
  
     loader = DataLoader(
         dataset,
-        batch_size=128,
+        batch_size=256,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
@@ -266,6 +266,7 @@ def main(model_name, features):
         prf_style = precision_recall_df.style
         print(prf_style.to_latex())
             
+        print("transition matrix: ", model.crf.transitions.detach().cpu().item())
  
         run.log({"val_acc":acc_stats.mean, "val_acc_std":acc_stats.std_dev,"area_between_curves_mean":area_between_curves_stats.mean,"area_between_curves_stddev":area_between_curves_stats.std_dev})
 
@@ -283,7 +284,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a stage classifier using latents and their morphodynamic features.")
  
  
-    parser.add_argument("--name", help="Model name. Must have already exported latents and cebra latents")
+    parser.add_argument("--model-name", help="Model name. Must have already exported latents and cebra latents")
+    parser.add_argument("--run-name", help="WandB run name.")
+
     parser.add_argument("--latents",action="store_true", help="Use to include latents")
     parser.add_argument("--cebra", action="store_true", help="Use to derive features from cebra latents")
 
@@ -299,4 +302,4 @@ if __name__ == "__main__":
   
     args = parser.parse_args()
  
-    main(args.name, vars(args))
+    main(args.model_name, vars(args))
