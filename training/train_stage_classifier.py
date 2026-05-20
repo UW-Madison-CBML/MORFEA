@@ -96,7 +96,7 @@ VAL_EMBRYOS =[
     
     
     
-def main(model_name, features):
+def main(model_name, features, lr=0.0001):
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -108,7 +108,7 @@ def main(model_name, features):
         name=f"{model_name}-phase-{features['run_name']}",
     )
  
-    learning_rate = 0.001
+    learning_rate = lr
     lat_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv")).rename(columns={"cell_id":"embryo_id"}) # metadata
     lat_np = np.load(os.path.join("latents",f"{model_name}.npy"))
     cebra_np = np.load(os.path.join("cebra_latents",f"{model_name}.npy"))
@@ -286,6 +286,7 @@ if __name__ == "__main__":
  
     parser.add_argument("--model-name", help="Model name. Must have already exported latents and cebra latents")
     parser.add_argument("--run-name", help="WandB run name.")
+    parser.add_arguemnt("--lr", type=float, default=0.0001, help="Learning rate")
 
     parser.add_argument("--latents",action="store_true", help="Use to include latents")
     parser.add_argument("--cebra", action="store_true", help="Use to derive features from cebra latents")
@@ -302,4 +303,4 @@ if __name__ == "__main__":
   
     args = parser.parse_args()
  
-    main(args.model_name, vars(args))
+    main(args.model_name, vars(args), lr=args.lr)
