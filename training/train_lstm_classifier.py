@@ -115,7 +115,7 @@ def main(model_name, features):
     te_lr = features['te_lr']
     icm_lr = features['icm_lr']
     run_name = features['run_name']
-    weights = [0.2,0.4,0.4]
+    weights = [0.4,0.4,0.2]
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -195,7 +195,7 @@ def main(model_name, features):
 
     loader_te = DataLoader(
         dataset_te,
-        batch_size=128,
+        batch_size=256,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
@@ -203,7 +203,7 @@ def main(model_name, features):
         collate_fn=collate_padd)
     loader_icm = DataLoader(
         dataset_icm,
-        batch_size=128,
+        batch_size=256,
         shuffle=True,
         num_workers=16,
         pin_memory=True,

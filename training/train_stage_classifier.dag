@@ -1,0 +1,18 @@
+JOB A train_stage_classifier.sub
+VARS A args = "--model-name control-2026-03-12 --run-name cvda1 --curvature --acceleration --velocity --distance-mat --lr 0.001"
+JOB B train_stage_classifier.sub
+VARS B args = "--model-name control-2026-03-12 --run-name cvda2 --curvature --acceleration --velocity --distance-mat --lr 0.0001"
+JOB C train_stage_classifier.sub
+VARS C args = "--model-name control-2026-03-12 --run-name cvda3 --curvature --acceleration --velocity --distance-mat --lr 0.00001"
+JOB D train_stage_classifier.sub
+VARS D args = "--model-name control-2026-03-12 --run-name cvda4 --curvature --acceleration --velocity --distance-mat --lr 0.000001"
+JOB E train_stage_classifier.sub
+VARS E args = "--model-name control-2026-03-12 --run-name cvda5 --curvature --acceleration --velocity --distance-mat --lr 0.0000001"
+JOB F train_stage_classifier.sub
+VARS F args = "--model-name control-2026-03-12 --run-name cvda6 --curvature --acceleration --velocity --distance-mat --lr 0.00000001"
+
+PARENT A CHILD B
+PARENT B CHILD C
+PARENT C CHILD D
+PARENT D CHILD E
+PARENT E CHILD F
