@@ -5,8 +5,6 @@ import pandas as pd
 import os
 from torch.utils.data import DataLoader
 from dataset_ivf_embryo import IVFEmbryoDataset
-from raffael_model import ConvLSTMAutoencoder
-from huggingface_hub import login, HfApi
 from datetime import datetime, timedelta
 import cebra
 from cebra import CEBRA
