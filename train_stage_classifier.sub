@@ -1,0 +1,33 @@
+# train_stage_classifier.sub
+# Submit from ~/Project_IVF. Requires in that directory:
+#   train_stage_classifier.sh, train_stage_classifier.py, stage_model.py, stage_dataset.py
+# Requires in parent home (~): utils/geometric_features.py
+# Optional: ~/api_keys.txt for WandB (omit to run without WandB)
+
+docker_image = jenslundsgaard/ivf-training:latest
+universe = docker
+
+shell = ./train_stage_classifier.sh $(model)
+
+log = train_stage_classifier_$(Cluster)_$(Process).log
+error = train_stage_classifier_$(Cluster)_$(Process).err
+output = train_stage_classifier_$(Cluster)_$(Process).out
+
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT_OR_EVICT
+Requirements = (Target.HasCHTCStaging == true)
+
+transfer_input_files = train_stage_classifier.sh, ../api_keys.txt, train_stage_classifier.py, stage_model.py, stage_dataset.py, file:///staging/groups/bhaskar_group/ivf/latents_for_staging.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz, ../utils/geometric_features.py, file:///staging/groups/bhaskar_group/ivf/cebra_latents.tar.gz
+
++WantGPULab = true
++GPUJobLength = "long"
+gpus_minimum_capability = 7.0
+requirements = Machine == "bhaskargpu4000.chtc.wisc.edu"
+
++GPUModel = "NVIDIA H200"
+request_cpus = 16
+request_memory = 64GB
+request_disk = 80GB
+request_gpus = 1
+
+queue model from train_stage_classifier.txt
