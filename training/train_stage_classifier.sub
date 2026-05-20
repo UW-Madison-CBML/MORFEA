@@ -32,6 +32,7 @@ request_memory = 64GB
 request_disk = 80GB
 request_gpus = 1
  
- 
-#queue args from train_stage_classifier.txt # for non-DAG usage
-queue 1
+# for non-DAG usage
+
+queue args from train_stage_classifier.txt 
+#queue 1
