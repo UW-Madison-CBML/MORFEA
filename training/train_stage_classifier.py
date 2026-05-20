@@ -126,7 +126,7 @@ def main(model_name, features, lr=0.0001):
     pca_df = pd.DataFrame(pca.fit_transform(std_scaler.fit_transform(lat_np)), columns=[f"pca_{i}" for i in range(8)], index=lat_df.index)
     
     df = pd.concat([lat_df, values_df, cebra_df, umap_df, pca_df], axis = 1)
-    mask = df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
+    mask = df["embryo_id"].isin(VAL_EMBRYOS)
     val_df = df[mask]
     df = df[~mask]
  
@@ -134,7 +134,7 @@ def main(model_name, features, lr=0.0001):
     dataset_val = StageDataset(val_df, "embryo_dataset_annotations", features, return_embryo_id=True, return_whole_seqs=True)
     #weights = get_class_weights(os.path.abspath("embryo_dataset_annotations"), df.groupby("embryo_id").size().reset_index(name='counts'), dataset.phases).to(DEVICE)
     crit = torch.nn.CrossEntropyLoss()
-    model = StageModel(input_size = len(dataset.lat_cols))
+    model = StageModel(input_size = len(dataset.lat_cols), num_classes=len(dataset.phases))
     torch.backends.cudnn.enabled = False
     model.to(DEVICE)
     
@@ -266,7 +266,7 @@ def main(model_name, features, lr=0.0001):
         prf_style = precision_recall_df.style
         print(prf_style.to_latex())
             
-        print("transition matrix: ", model.crf.transitions.detach().cpu().item())
+        print("transition matrix: ", model.crf.transitions.detach().cpu())
  
         run.log({"val_acc":acc_stats.mean, "val_acc_std":acc_stats.std_dev,"area_between_curves_mean":area_between_curves_stats.mean,"area_between_curves_stddev":area_between_curves_stats.std_dev})
 
@@ -286,7 +286,7 @@ if __name__ == "__main__":
  
     parser.add_argument("--model-name", help="Model name. Must have already exported latents and cebra latents")
     parser.add_argument("--run-name", help="WandB run name.")
-    parser.add_arguemnt("--lr", type=float, default=0.0001, help="Learning rate")
+    parser.add_argument("--lr", type=float, default=0.0001, help="Learning rate")
 
     parser.add_argument("--latents",action="store_true", help="Use to include latents")
     parser.add_argument("--cebra", action="store_true", help="Use to derive features from cebra latents")
