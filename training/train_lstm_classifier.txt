@@ -1,1 +1,1 @@
---name control-2026-03-12 --run-name kromp --kromp  --icm-lr 0.00001 --te-lr 0.00001
+--name control-2026-03-12 --run-name kromp --kromp  --icm-lr 0.0003 --te-lr 0.0003

@@ -19,7 +19,6 @@ RUN pip install --no-cache-dir \
     torchaudio==2.5.1 \
     --index-url https://download.pytorch.org/whl/cu124
 
-RUN pip install --no-cache-dir torbi
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

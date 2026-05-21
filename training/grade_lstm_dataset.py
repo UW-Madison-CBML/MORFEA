@@ -12,6 +12,7 @@ def add_annotations(group_name, group, features):
    
     lat_cols = [column for column in group.columns if column.startswith("z_")]
     trajectory = group[lat_cols].to_numpy()
+    
     cebra_cols = ["cebra_0", "cebra_1", "cebra_2"]
 
     if ('curvature' in features.keys() and features['curvature']):
@@ -61,7 +62,9 @@ def add_annotations(group_name, group, features):
     if('velocity' in features.keys() and features['velocity']):
         group['z_vel'] = get_vel(trajectory)
     if('cebra_latents' in features.keys() and features['cebra_latents']):
-        cebra_df = pd.DataFrame(cebra_traj, columns=["z_cebra_0","z_cebra_1", "z_cebra_2"], index=group.index)
+
+        cebra_trajectory = group[cebra_cols]
+        cebra_df = pd.DataFrame(cebra_trajectory, columns=["z_cebra_0","z_cebra_1", "z_cebra_2"], index=group.index)
         group = pd.concat([group, cebra_df], axis=1)
     if ('latents' in features.keys() and not features['latents']):
         group = group.drop(columns=lat_cols)

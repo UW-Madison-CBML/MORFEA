@@ -42,6 +42,8 @@ import json
 from torchsummary import summary
 from train_lstm_classifier import train_on as train_lstm_classifier_on
 from export_kromp_latents import export_kromp
+
+from dataset_ivf_embryo import read_gray, normalize_video
 class RunningStats:
     def __init__(self):
         self.n = 0
@@ -234,7 +236,12 @@ def reconstruction_loss(x_rec, x_true, l1_weight=0.5, ms_ssim_weight=0.5):
         "ms_ssim_loss": ms_ssim_loss.item(),
         "ms_ssim_value": ms_ssim_val.item()
     }
-
+# credit to creiser on stack overflow
+# https://stackoverflow.com/questions/66588715/runtimeerror-cudnn-error-cudnn-status-not-initialized-using-pytorch
+def force_cudnn_initialization():     
+    s = 32
+    dev = torch.device('cuda')
+    torch.nn.functional.conv2d(torch.zeros(s, s, s, s, device=dev), torch.zeros(s, s, s, s, device=dev))
 
 def train_convlstm(
     loss_type="l1",
@@ -249,8 +256,9 @@ def train_convlstm(
     latent_size = 4096
 ):
     gc.collect()
-    print(torch.cuda.memory_summary(device=None, abbreviated=False))
     torch.cuda.empty_cache()
+    force_cudnn_initialization()
+    print(torch.cuda.memory_summary(device=None, abbreviated=False))
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Build loss description for logging
@@ -763,9 +771,21 @@ ABLATION STUDY CONFIGURATION
                 plt.close(fig)   
         # export the kromp latents
         
-        metadata_df, kromp_lats = export_kromp(model)
+        metadata_df, kromp_lats,imgs = export_kromp(model)
+        idx = np.random.randint(len(metadata_df))
+        vol_img = normalize_video([read_gray(os.path.join("Blastocyst_Dataset","Images", metadata_df.iloc[idx]["Image"]), 128)], "minmax01")[0]
+        recon_img = imgs[idx]
+
+        vol_img = (vol_img * 255).astype(np.uint8)
+        recon_img = (recon_img * 255).astype(np.uint8)
+        comparison = np.concatenate((vol_img, recon_img), axis=1)
+
+        images = wandb.Image(comparison, caption="kromp_recon_val")
+        run.log({"kromp_recon_val": images})
+
         # train the lstm model on the kromp latents and log the loss to wandb
         kromp_lats_df = pd.DataFrame(kromp_lats, index=metadata_df.index, columns=[f"z_{i}" for i in range(kromp_lats.shape[1])])
+        
             
         kromp_df = pd.concat([metadata_df, kromp_lats_df], axis=1)
         
@@ -776,7 +796,7 @@ ABLATION STUDY CONFIGURATION
         kromp_mask = kromp_df["embryo_id"].isin(VAL_EMBRYOS)
         kromp_val_df = kromp_df[mask]
         kromp_df = kromp_df[~mask]
-        train_on(kromp_df, kromp_val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kromp", run, batch_size=128, epochs=30)
+        train_lstm_classifier_on(kromp_df, kromp_val_df, {"latents":True, "te_lr":0.0003, "icm_lr":0.0003}, False, "kromp", run, batch_size=128, epochs=30)
 
 
             
