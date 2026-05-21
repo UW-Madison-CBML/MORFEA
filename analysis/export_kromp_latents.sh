@@ -1,6 +1,6 @@
 #!/bin/bash
 
-unzip Blastocyst_Dataset.zip -d Blastocyst_Dataset/
+tar -xvf Blastocyst_Dataset.tar.gz
 ls Blastocyst_Dataset/
 
 mkdir -p kromp_latents

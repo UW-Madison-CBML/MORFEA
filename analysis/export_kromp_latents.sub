@@ -20,7 +20,7 @@ Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
 transfer_output_remaps = "kromp_latents.tar.gz =  file:///staging/groups/bhaskar_group/ivf/kromp_latents.tar.gz;"
-transfer_input_files = export_kromp_latents.sh, export_kromp_latents.py, ../training/ae_model.py, ../training/dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/Blastocyst_Dataset.zip, ../api_keys.txt
+transfer_input_files = export_kromp_latents.sh, export_kromp_latents.py, ../training/ae_model.py, ../training/dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/Blastocyst_Dataset.tar.gz, ../api_keys.txt
 
 
 +WantGPULab = true
@@ -29,7 +29,7 @@ gpus_minimum_capability = 7.0
 #Requirements = (Machine == "bhaskargpu4000.chtc.wisc.edu") && (DriverVersion == "12.8") && (DeviceName == "NVIDIA H200")
  
 +GPUModel = "NVIDIA H200"
-transfer_output_files = latents.tar.gz
+transfer_output_files = kromp_latents.tar.gz
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
 request_cpus = 16

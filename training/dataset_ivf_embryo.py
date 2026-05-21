@@ -8,7 +8,8 @@ from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 def read_gray(path, resize):
-    img = Image.open(path)
+    img = Image.open(path).convert('L')
+
     if img is None:
         raise FileNotFoundError(path)
 
