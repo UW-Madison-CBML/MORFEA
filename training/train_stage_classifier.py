@@ -198,7 +198,7 @@ def main(model_name, features, lr=0.0001):
         recall_stats = {phase: RunningStats() for phase in dataset_val.phases}
         precision_stats = {phase: RunningStats() for phase in dataset_val.phases}
         
-        sum_confusion_mat = np.zeros((len(dataset_val.phases), len(dataset_val.phases))
+        sum_confusion_mat = np.zeros((len(dataset_val.phases), len(dataset_val.phases)))
 
         with torch.no_grad():
             for lats, _, labels, mask, embryo_ids in loader_val:
@@ -210,7 +210,7 @@ def main(model_name, features, lr=0.0001):
                 mask_gpu = mask.to(DEVICE)
                 logits, emissions = model(lats, mask_gpu) # logits is a list of variable length tensor sequences of one hot's
                 emissions = emissions.cpu()
-                emissions = [emission_seq.masked_select(mask_seq).view((-1, len(dataset_val.phases))) for emission_seq, mask_seq in zip(emissions, mask_seq)]
+                emissions = [emission_seq.masked_select(mask_seq).view((-1, len(dataset_val.phases))) for emission_seq, mask_seq in zip(emissions, masks)]
 
                 preds = [logit_seq.detach().cpu().argmax(dim=-1) for logit_seq in logits] # logits come out one-hot
                 for pred, label, embryo_id, emissions_seq in zip(preds, labels, embryo_ids, emissions): # all outer most sizes are B
@@ -230,7 +230,6 @@ def main(model_name, features, lr=0.0001):
                     acc_top_2_stats.push(acc_top_2)
                     acc_top_5_stats.push(acc_top_5)
                     
-                    # log for individual embryos
                     if(len(pred) != len(label)):
                         print("bad index lists") 
                     else:
