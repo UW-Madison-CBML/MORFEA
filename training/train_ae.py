@@ -40,6 +40,8 @@ import shutil
 import hashlib
 import json
 from torchsummary import summary
+from train_lstm_classifier import train_on as train_lstm_classifier_on
+from export_kromp_latents import export_kromp
 class RunningStats:
     def __init__(self):
         self.n = 0
@@ -47,7 +49,6 @@ class RunningStats:
         self.m2 = 0.0
 
     def push(self, x):
-        """Add a new value and update statistics."""
         self.n += 1
         delta = x - self.mean
         self.mean += delta / self.n
@@ -56,12 +57,10 @@ class RunningStats:
 
     @property
     def variance(self):
-        """Returns sample variance (unbiased). Use self.m2 / self.n for population."""
         return self.m2 / (self.n - 1) if self.n > 1 else 0.0
 
     @property
     def std_dev(self):
-        """Returns sample standard deviation."""
         return math.sqrt(self.variance)
 
 VAL_EMBRYOS = []#"RS363-7", "CZ594-5","CJ261-10","RL747-8","TM272-9","LFA766-1","GT353-3","LGA881-2-5","LBE649-3","TH481-5","LTA908-2","BS648-7","GS955-7","HA1040-4","CM892-5","FC048-6","GC702-6","DI358-3","MM912-4","RK787-3","GSS052-2","OJ319-5","DML373-2","PS292-4","TM294-2","KT573-4","DJC641-4","FE14-020","LD400-1","MV930-2","MDCH869-4","AS662-2","LH1169-8","GA664-1","PMDPI029-1-3","DV116-3","FV709-11","GM456-3","RA361-4","LM844-1","DL020-3","VM570-4","MC833-6","LV613-2","ZS435-5","RM126-7","BK428-2","LS93-8","GS490-7","GF976-4","PMDPI029-1-11","DRL1048-1","BS294-7","CA658-12","RO793-2","GJ191-1","CC007-2","SL313-11","RC545-2-8","OJ319-9","PA289-8","TK319-10","SM686-7","KJ1077-3","BE645-10","BC167-4","VC581-1","FM162-6","PC758-2","HC459-6","DE069-10","GC340-3","BS596-5","PE256-2","LBE857-1","PH783-3","LS1045-4","CC455-3","DL617-6","BS1086-1","CK601-4","DA309-5","LTE064-1","KF460-4","LP181-1","GS349-4","LC47-8","GS205-6","EH309-8","BS1033-2","LL854-1","DHDPI042-6","BN356-6","PA145-2","GC340-1","MM334-5","AG274-2","BA518-7","BC973-4","BA1195-9","AM33-2","AB91-1","AB028-6","BC167-4","AL884-2","AM685-3"]
@@ -90,15 +89,6 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
 
 
 def save_and_push_model(model, repo_name, required_files, model_config=None):
-    """
-    Save model and push it along with required training files to HuggingFace Hub
-
-    Args:
-        model: The model to save
-        repo_name: Repository name on HuggingFace Hub
-        required_files: List of file paths to include in the repo
-        model_config: Optional dictionary with model configuration to save as config.json
-    """
     os.makedirs(repo_name, exist_ok=True)
     device = next(model.parameters()).device
     clean_state_dict = {k: v.cpu().clone() for k, v in model.state_dict().items()}
@@ -131,10 +121,8 @@ def save_and_push_model(model, repo_name, required_files, model_config=None):
     if model.decoder.lstm_dec is not None and model.encoder.lstm_enc is not None:
         model.encoder.lstm_enc.flatten_parameters()
         model.decoder.lstm_dec.flatten_parameters()
-    # Upload all files using HfApi (including config.json)
     api = HfApi()
 
-    # Upload config.json first if it exists
     config_file = os.path.join(repo_name, "config.json")
     if os.path.exists(config_file):
         try:
@@ -149,7 +137,6 @@ def save_and_push_model(model, repo_name, required_files, model_config=None):
             print(f"Warning: Failed to upload config.json: {e}")
 
     
-    # Upload additional required files
     for file_path in required_files:
         local_file = os.path.join(repo_name, os.path.basename(file_path))
         if os.path.exists(local_file):
@@ -168,20 +155,14 @@ def save_and_push_model(model, repo_name, required_files, model_config=None):
 
     print(f"Successfully pushed all files to {repo_name}")
 def gaussian_kernel(size=11, sigma=1.5):
-    """Generate Gaussian kernel for SSIM"""
     coords = torch.arange(size, dtype=torch.float32)
     coords -= size // 2
     g = torch.exp(-(coords ** 2) / (2 * sigma ** 2))
     g /= g.sum()
     return g.unsqueeze(0) * g.unsqueeze(1)
 
-
+# TODO just find a library with someone else's implementation
 def ssim(img1, img2, kernel_size=11, sigma=1.5, C1=0.01**2, C2=0.03**2):
-    """
-    Single-scale SSIM
-    Args:
-        img1, img2: (B, C, H, W)
-    """
     kernel = gaussian_kernel(kernel_size, sigma).to(img1.device)
     kernel = kernel.unsqueeze(0).unsqueeze(0)  # (1, 1, k, k)
     
@@ -216,7 +197,6 @@ def ms_ssim(img1, img2, kernel_size=11, sigma=1.5, weights=None, levels=5):
         if i == levels - 1:
             ssim_val = ssim(img1, img2, kernel_size, sigma)
         else:
-            # Compute CS (contrast-structure) only
             mu1 = F.conv2d(img1, kernel, padding=kernel_size//2, groups=img1.shape[1])
             mu2 = F.conv2d(img2, kernel, padding=kernel_size//2, groups=img1.shape[1])
             
@@ -231,35 +211,22 @@ def ms_ssim(img1, img2, kernel_size=11, sigma=1.5, weights=None, levels=5):
             img1 = F.avg_pool2d(img1, 2)
             img2 = F.avg_pool2d(img2, 2)
     
-    # Correct combination
     ms_ssim_val = torch.prod(torch.stack([mcs ** w for mcs, w in zip(mcs_list, weights[:-1])]))
     ms_ssim_val = (ssim_val ** weights[-1]) * ms_ssim_val
     
     return ms_ssim_val
 
 def reconstruction_loss(x_rec, x_true, l1_weight=0.5, ms_ssim_weight=0.5):
-    """
-    Combined reconstruction loss: L1 + MS-SSIM
-    Args:
-        x_rec: (B, T, 1, H, W) - reconstructed video
-        x_true: (B, T, 1, H, W) - original video
-        l1_weight: L1 loss weight
-        ms_ssim_weight: MS-SSIM loss weight
-    """
     B, T, C, H, W = x_rec.shape
     
-    # Flatten temporal dimension for MS-SSIM computation
     x_rec_flat = x_rec.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
     x_true_flat = x_true.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
     
-    # L1 Loss
     l1_loss = F.l1_loss(x_rec, x_true)
     
-    # MS-SSIM Loss
     ms_ssim_val = ms_ssim(x_rec_flat, x_true_flat)
     ms_ssim_loss = 1 - ms_ssim_val
     
-    # Combined loss
     total_loss = l1_weight * l1_loss + ms_ssim_weight * ms_ssim_loss
     
     return total_loss, {
@@ -282,18 +249,6 @@ def train_convlstm(
     latent_size = 4096
 ):
     gc.collect()
-    """Training ConvLSTM Autoencoder with configurable loss (single GPU)
-
-    Args:
-        loss_type: "l1" or "mse" - type of reconstruction loss to use with MS-SSIM
-        ms_ssim_weight: float - weight for MS-SSIM loss (0 to disable)
-        rec_weight: float - weight for reconstruction loss L1/MSE (0 to disable)
-        temporal_weight: float - weight for temporal smoothness loss (0 to disable)
-        dropout_rate: float - dropout rate (0 to disable)
-        use_convlstm: bool - whether to use ConvLSTM (False = no temporal modeling)
-        use_residual: bool - whether to use residual connections
-        use_batchnorm: bool - whether to use batch normalization
-    """
     print(torch.cuda.memory_summary(device=None, abbreviated=False))
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
@@ -605,13 +560,9 @@ ABLATION STUDY CONFIGURATION
         run.log({"avg_loss": avg_loss})
         print(f"epoch {epoch} avg loss={avg_loss:.4f}")
 
-        # Save the state dict
         torch.save(model.state_dict(), "convlstm_model_weights.pth")
 
-        # Generate unique repo name based on config and code
         date_label = datetime.now().strftime("%Y-%m-%d")
-
-        # Collect all config for hashing
         config_for_hash = {
             "mode": "convlstm",
             "loss_type": loss_type,
@@ -632,7 +583,6 @@ ABLATION STUDY CONFIGURATION
             "image_size": 128,
         }
 
-        # Required files for ConvLSTM model
         required_files = [
             "train.py",
             "raffael_model.py",
@@ -645,11 +595,9 @@ ABLATION STUDY CONFIGURATION
         ]
 
 
-        # Create comprehensive config for HuggingFace
         hf_config = {
             "model_type": "ConvLSTMAutoencoder",
             "architecture": "ConvLSTM Autoencoder",
-            # Model architecture parameters
             "seq_len": 50,
             "input_channels": 1,
             "encoder_hidden_dim": 256,
@@ -813,6 +761,24 @@ ABLATION STUDY CONFIGURATION
                 wandb.log({"temp_smoothness_train": wandb.Image(fig)})
 
                 plt.close(fig)   
+        # export the kromp latents
+        
+        metadata_df, kromp_lats = export_kromp(model)
+        # train the lstm model on the kromp latents and log the loss to wandb
+        kromp_lats_df = pd.DataFrame(kromp_lats, index=metadata_df.index, columns=[f"z_{i}" for i in range(kromp_lats.shape[1])])
+            
+        kromp_df = pd.concat([metadata_df, kromp_lats_df], axis=1)
+        
+        embryo_ids = kromp_df["embryo_id"].unique()
+        np.random.shuffle(embryo_ids)
+        # 30% seems about right?
+        VAL_EMBRYOS = embryo_ids[:int(0.3 * len(embryo_ids))]
+        kromp_mask = kromp_df["embryo_id"].isin(VAL_EMBRYOS)
+        kromp_val_df = kromp_df[mask]
+        kromp_df = kromp_df[~mask]
+        train_on(kromp_df, kromp_val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kromp", run, batch_size=128, epochs=30)
+
+
             
 
     run.finish()

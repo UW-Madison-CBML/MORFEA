@@ -1,14 +1,12 @@
 #!/bin/bash
 
 python -m ruff check . --select F821,E9 || exit 1
-# Parse positional arguments
+
 MODE="${1:-convlstm_latent_split}"  # Default to convlstm_latent_split
 LOSS_TYPE="${2:-l1}"  # Default to l1
 
-# Shift past the first two arguments to get ablation parameters
 shift 2 2>/dev/null || true
 
-# Default values (can be overridden by environment variables or command-line args)
 MS_SSIM_WEIGHT="${MS_SSIM_WEIGHT:-0.5}"
 REC_WEIGHT="${REC_WEIGHT:-0.5}"
 TEMPORAL_WEIGHT="${TEMPORAL_WEIGHT:-0.1}"
@@ -17,7 +15,6 @@ USE_CONVLSTM="${USE_CONVLSTM:-true}"
 USE_RESIDUAL="${USE_RESIDUAL:-true}"
 USE_BATCHNORM="${USE_BATCHNORM:-true}"
 
-# Parse command-line arguments (override defaults and environment variables)
 EXTRA_ARGS=""
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -70,7 +67,7 @@ cat > training_config.txt << EOF
 ABLATION STUDY - Training Configuration
 ========================================
 Date: $(date)
-Script: train_model.sh
+Script: train_ae.sh
 Mode: $MODE
 
 Loss Configuration:
@@ -87,7 +84,7 @@ Model Architecture:
 
 Latent Split: $([ "$MODE" = "convlstm_latent_split" ] && echo "ENABLED (2048 empty + 2048 embryo)" || echo "DISABLED")
 
-Command: python train.py $MODE \\
+Command: python train_ae.py $MODE \\
   --loss-type $LOSS_TYPE \\
   --ms-ssim-weight $MS_SSIM_WEIGHT \\
   --rec-weight $REC_WEIGHT \\

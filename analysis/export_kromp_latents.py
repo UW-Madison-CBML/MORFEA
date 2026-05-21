@@ -10,7 +10,8 @@ from huggingface_hub import login, HfApi
 from dataset_ivf_embryo import read_gray, normalize_video
 import os
 GRADES = ["A", "B", "C"] # I believe it is this order since 0 seems most prominent
-def main(model_name):
+
+def export_kromp(model):
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     torch.backends.cudnn.enabled = False
     # -----------------------------------------------------
@@ -50,9 +51,8 @@ def main(model_name):
     # normal size of video tensors is (64, 32, 1 ...) so ~2300 should work as one batch
     
     # ----------------------------------------------------------- 
-    # load model
+    # set up model
         
-    model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/"+model_name)
     model = model.to(DEVICE)
     model.eval()
 
@@ -60,12 +60,16 @@ def main(model_name):
     with torch.no_grad():
         _, latents = model(images_tensor)
     latents = latents.cpu().squeeze(1).numpy() # squeeze out time dim of 1: (B, 512)
+    return metadata_df, latents 
+        
+        
+def main(model_name):
+    model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/"+model_name)
     
+    metadata_df, latents = export_kromp(model)
     np.save(f"{model_name}.npy", latents)
     metadata_df.to_csv(f"{model_name}.csv")
-    
-        
-    
+
 
 if __name__ == "__main__":
     import argparse

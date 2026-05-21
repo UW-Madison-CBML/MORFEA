@@ -110,7 +110,9 @@ class RunningStats:
     @property
     def std_dev(self):
         return math.sqrt(self.variance)
-def train_on(latents_df, val_df, features, KEEP_NA, training_name, run):
+grade_options = ["A", "B", "C"] 
+
+def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=[0.3, 0.3,0.3], batch_size=256, epochs=8):
     dataset_te = GradeLSTMDataset(latents_df, "TE", features, keep_na=KEEP_NA) 
     dataset_icm = GradeLSTMDataset(latents_df, "ICM", features, keep_na=KEEP_NA)
     dataset_te_val = GradeLSTMDataset(val_df, "TE", features, keep_na=KEEP_NA, return_whole_seqs=True) 
@@ -121,14 +123,13 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run):
     model_te = model_te.to(DEVICE)
     model_icm = GradeLSTMClassifier(len(dataset_icm.lat_cols), keep_na=KEEP_NA)
     model_icm = model_icm.to(DEVICE)
-    epochs = 8 
     optimizer_te = torch.optim.Adam(model_te.parameters(), lr=features["te_lr"], weight_decay=1e-5)
     optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=features["te_lr"], weight_decay=1e-5)
 
 
     loader_te = DataLoader(
         dataset_te,
-        batch_size=256,
+        batch_size=batch_size,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
@@ -136,7 +137,7 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run):
         collate_fn=collate_padd)
     loader_icm = DataLoader(
         dataset_icm,
-        batch_size=256,
+        batch_size=batch_size,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
@@ -250,17 +251,19 @@ def train_on_kromp_latents(model_name, run, features):
     kromp_lats_df = pd.DataFrame(kromp_lats, index=kromp_metadata_df.index, columns=[f"z_{i}" for i in range(kromp_lats.shape[1])])
     df = pd.concat([kromp_metadata_df, kromp_lats_df], axis=1)
     
-    embryo_ids = df["embryo_id"].unique().to_list()
+    embryo_ids = df["embryo_id"].unique()
     np.random.shuffle(embryo_ids)
     # 30% seems about right?
     VAL_EMBRYOS = embryo_ids[:int(0.3 * len(embryo_ids))]
     mask = df["embryo_id"].isin(VAL_EMBRYOS)
     val_df = df[mask]
     df = df[~mask]
-    train_on(df, val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kromp", run)
+    train_on(df, val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kromp", run, batch_size=128, epochs=40)
 
 
 
+KEEP_NA = False
+grade_options = ["A", "B", "C", "NA"] if KEEP_NA else ["A","B","C"]
     
 
 def main(model_name, features):
@@ -274,7 +277,6 @@ def main(model_name, features):
 
         
     torch.backends.cudnn.enabled = False
-    KEEP_NA = False
 
     wandb.login(key=os.getenv("WANDB_KEY"))
     
@@ -295,7 +297,6 @@ def main(model_name, features):
             "run_kromp": run_kromp
             }
     )
-    grade_options = ["A", "B", "C", "NA"] if KEEP_NA else ["A","B","C"]
     learning_rate = 0.00001
 
     if run_kromp:
@@ -335,7 +336,8 @@ def main(model_name, features):
     print(f"val_ratio={val_ratio}, actual val ratio: {len(val_df)/len(latents_df)}")
     latents_df = latents_df[~mask]
     # latents df will have the grade columns already
-    train_on(latents_df, val_df, features, KEEP_NA, "latents", run):
+
+    train_on(latents_df, val_df, features, KEEP_NA, "latents", run)
 
 if __name__ == "__main__":
     import argparse
