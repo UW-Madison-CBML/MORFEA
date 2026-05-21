@@ -20,7 +20,7 @@ Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
 transfer_output_remaps = "kromp_latents.tar.gz =  file:///staging/groups/bhaskar_group/ivf/kromp_latents.tar.gz;"
-transfer_input_files = export_kromp_latents.sh, export_kromp_latents.py, get_latents.txt, ../training/ae_model.py, ../training/dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/Blastocyst_Dataset.zip, ../api_keys.txt
+transfer_input_files = export_kromp_latents.sh, export_kromp_latents.py, ../training/ae_model.py, ../training/dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/Blastocyst_Dataset.zip, ../api_keys.txt
 
 
 +WantGPULab = true

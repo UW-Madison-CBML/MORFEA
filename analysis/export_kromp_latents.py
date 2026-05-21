@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import torch
-from ae_model.py import ConvLSTMAutoencoder
+from ae_model import ConvLSTMAutoencoder
 from PIL import Image
 Image.LOAD_TRUNCATED_IMAGES = True
 from dataset_ivf_embryo import IVFEmbryoDataset
