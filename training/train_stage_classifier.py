@@ -201,14 +201,15 @@ def main(model_name, features, lr=0.0001):
         sum_confusion_mat = np.zeros((len(dataset_val.phases), len(dataset_val.phases)))
 
         with torch.no_grad():
-            for lats, _, labels, mask, embryo_ids in loader_val:
+            for lats, _, labels, masks, embryo_ids in loader_val:
             
                 model.eval()
                 B, T, L = lats.shape
                 # labels.shape = B, T 
                 lats = lats.to(DEVICE).float()
-                mask_gpu = mask.to(DEVICE)
-                logits, emissions = model(lats, mask_gpu) # logits is a list of variable length tensor sequences of one hot's
+                masks = masks.to(DEVICE)
+                logits, emissions = model(lats, masks) # logits is a list of variable length tensor sequences of one hot's
+                masks = masks.cpu()
                 emissions = emissions.cpu()
                 emissions = [emission_seq.masked_select(mask_seq).view((-1, len(dataset_val.phases))) for emission_seq, mask_seq in zip(emissions, masks)]
 

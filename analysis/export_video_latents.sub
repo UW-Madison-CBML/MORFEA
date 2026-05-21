@@ -1,4 +1,4 @@
-# export_latents.sub
+# export_video_latents.sub
    
 docker_image = jenslundsgaard/ivf-training:v1.7
 universe = docker
@@ -6,21 +6,21 @@ universe = docker
 #  commands) and arguments to be passed to jobs. 
 #  $(Process) will be a integer number for each job, starting with "0"
 #  and increasing for the relevant number of jobs.
-shell = ./export_latents.sh $(model)
+shell = ./export_video_latents.sh $(model)
    		
 # Specify the name of the log, standard error, and standard output (or
 # "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
 #  queue number assigned to this set of jobs at the time of submission.
-log = export_latents_$(Cluster)_$(Process).log
-error =  export_latents_$(Cluster)_$(Process).err
-output = export_latents_$(Cluster)_$(Process).out
+log = export_video_latents_$(Cluster)_$(Process).log
+error =  export_video_latents_$(Cluster)_$(Process).err
+output = export_video_latents_$(Cluster)_$(Process).out
 should_transfer_files = YES
 when_to_transfer_output = ON_EXIT_OR_EVICT
 Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
 transfer_output_remaps = "latents.tar.gz =  file:///staging/groups/bhaskar_group/ivf/latents.tar.gz;"
-transfer_input_files = export_latents.sh, export_latents.py, get_latents.txt, raffael_model.py, raffael_conv_lstm.py, dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, api_keys.txt,  file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv,file:///staging/groups/bhaskar_group/ivf/latents.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz
+transfer_input_files = export_video_latents.sh, export_video_latents.py, get_latents.txt, raffael_model.py, raffael_conv_lstm.py, dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, api_keys.txt,  file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv,file:///staging/groups/bhaskar_group/ivf/latents.tar.gz, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz
 
 
 +WantGPULab = true
@@ -38,5 +38,5 @@ request_disk = 80GB
 request_gpus = 1
 
 
-#queue models from export_latents.txt
+#queue models from export_video_latents.txt
 queue 1

@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Starting export_latents job..."
+echo "Starting export_video_latents job..."
 
 # Extract dataset
 echo "Extracting dataset..."
@@ -14,14 +14,14 @@ if [ -f "api_keys.txt" ]; then
 fi
 ls -lh
 # Run export script
-echo "Running export_latents.py..."
+echo "Running export_video_latents.py..."
 IFS="_" read -ra ADDR <<< "$1"
 
 #for i in "${ADDR[@]}"; do
 #done
-python export_latents.py --name "$1"
+python export_video_latents.py --name "$1"
 
-#cat get_latents.txt | xargs -I {} sh -c 'python export_latents.py --name "{}" --limit 50'
+#cat get_latents.txt | xargs -I {} sh -c 'python export_video_latents.py --name "{}" --limit 50'
 mkdir -p latents
 mv *.npy latents/
 mv *.csv latents/
