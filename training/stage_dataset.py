@@ -38,7 +38,7 @@ def add_annotations(group_name, group, annotations_dir, features):
 
     trajectory = group[lat_cols].to_numpy()
 
-    if (features['curvature']):
+    if ('curvature' in features.keys() and features['curvature']):
         
         curv12 = calculate_curvatures(trajectory, offset=12, retrospective=True, how='triangle')
         curv12 = np.nan_to_num(curv12, nan=0.0, posinf=0.0, neginf=0.0)
@@ -52,20 +52,20 @@ def add_annotations(group_name, group, annotations_dir, features):
         group = pd.concat([group,pd.DataFrame({"z_curv12":curv12, "z_curv20":curv20, "curv4":curv4}, index = group.index)], axis=1)
 
 
-    if (features['cebra_ps']):
+    if ('cebra_ps' in features.keys() and eatures['cebra_ps']):
         
         cebra_trajectory = group[cebra_cols]
         sigs = get_path_sigs(cebra_trajectory, 3)
         sigs_df = pd.DataFrame(sigs, columns = [f"z_cebra_sig_{feature}" for feature in range(sigs.shape[1])], index=group.index)
         group = pd.concat([group, sigs_df], axis=1)
-    if (features['pca_ps']):
+    if ('pca_ps' in features.keys() and eatures['pca_ps']):
         
         pca_trajectory = group[[col for col in group.columns if col.startswith("pca")]]
         sigs = get_path_sigs(pca_trajectory, 3)
         sigs_df = pd.DataFrame(sigs, columns = [f"z_pca_sig_{feature}" for feature in range(sigs.shape[1])], index=group.index)
         group = pd.concat([group, sigs_df], axis=1)
 
-    if (features['umap_ps']):
+    if ('umap_ps' in features.keys() and features['umap_ps']):
         
         umap_trajectory = group[[col for col in group.columns if col.startswith("umap")]]
         sigs = get_path_sigs(umap_trajectory, 3)
@@ -73,19 +73,19 @@ def add_annotations(group_name, group, annotations_dir, features):
         group = pd.concat([group, sigs_df], axis=1)
 
 
-    if(features['distance_mat']):
+    if('distance_mat' in features.keys() and features['distance_mat']):
         mat = distance_matrix(np.array([trajectory[0]]), trajectory).flatten()
         
         group["z_dist"] = mat
     
-    if(features['acceleration']):
+    if('acceleration' in features.keys() and features['acceleration']):
         group['z_acc'] = get_acc(trajectory)
         
-    if(features['velocity']):
+    if('velocity' in features.keys() and features['velocity']):
         group['z_vel'] = get_vel(trajectory)
 
 
-    if (not features['latents']):
+    if ('latents' in features.keys() and not features['latents']):
         group = group.drop(columns=lat_cols)
     
     return group
