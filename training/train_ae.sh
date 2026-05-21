@@ -125,7 +125,7 @@ cat training_config.txt
 echo "========================================="
 
 # Build command with ablation arguments
-CMD="python train.py $MODE --loss-type $LOSS_TYPE"
+CMD="python train_ae.py $MODE --loss-type $LOSS_TYPE"
 CMD="$CMD --ms-ssim-weight $MS_SSIM_WEIGHT"
 CMD="$CMD --rec-weight $REC_WEIGHT"
 CMD="$CMD --temporal-weight $TEMPORAL_WEIGHT"

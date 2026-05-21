@@ -58,15 +58,16 @@ def export_kromp(model):
 
     images_tensor = images_tensor.to(DEVICE)
     with torch.no_grad():
-        _, latents = model(images_tensor)
+        imgs, latents = model(images_tensor)
     latents = latents.cpu().squeeze(1).numpy() # squeeze out time dim of 1: (B, 512)
-    return metadata_df, latents 
+    imgs = imgs.cpu().squeeze(1).squeeze(1).numpy() # (B, 128, 128)
+    return metadata_df, latents, imgs
         
         
 def main(model_name):
     model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/"+model_name)
     
-    metadata_df, latents = export_kromp(model)
+    metadata_df, latents, _ = export_kromp(model)
     np.save(f"{model_name}.npy", latents)
     metadata_df.to_csv(f"{model_name}.csv")
 

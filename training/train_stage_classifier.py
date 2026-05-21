@@ -215,19 +215,21 @@ def main(model_name, features, lr=0.0001):
 
                 preds = [logit_seq.detach().cpu().argmax(dim=-1) for logit_seq in logits] # logits come out one-hot
                 for pred, label, embryo_id, emissions_seq in zip(preds, labels, embryo_ids, emissions): # all outer most sizes are B
+
                     # top_1 is calculated from decoded seqs, top_k for k > 1 is based on emissions
+
                     acc_top_1= (pred == label).sum().item()/label.shape[0]
                     acc_top_1_stats.push(acc_top_1)
                     label_one_hots = F.one_hot(label, num_classes=len(dataset_val.phases))
                     _, top_2_indices = emissions_seq.topk(2, dim=-1)
                     _, top_5_indices = emissions_seq.topk(5, dim=-1)
-                     
-                    zeros = torch.zeros_like(label_one_hots)
-                    
-                    top_2_hots = zeros.scatter_(dim=-1, index=top_2_indices, value=1)
-                    top_5_hots = zeros.scatter_(dim=-1, index=top_5_indices, value=1)
-                    acc_top_2 = torch.einsum("ti,ti->",top_2_hots, label)/label_one_hots.shape[0]
-                    acc_top_5 = torch.einsum("ti,ti->",top_5_hots, label)/label_one_hots.shape[0]
+
+                    top_2_hots = torch.zeros_like(label_one_hots).scatter_(dim=-1, index=top_2_indices, value=1)
+                    top_5_hots = torch.zeros_like(label_one_hots).scatter_(dim=-1, index=top_5_indices, value=1)
+
+                    acc_top_2 = torch.einsum("ti,ti->",top_2_hots, label_one_hots)/label_one_hots.shape[0]
+                    acc_top_5 = torch.einsum("ti,ti->",top_5_hots, label_one_hots)/label_one_hots.shape[0]
+
                     acc_top_2_stats.push(acc_top_2)
                     acc_top_5_stats.push(acc_top_5)
                     

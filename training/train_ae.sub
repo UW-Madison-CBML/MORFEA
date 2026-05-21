@@ -21,7 +21,7 @@ when_to_transfer_output = ON_EXIT_OR_EVICT
 Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
-transfer_input_files = train_ae.sh, train_ae.py, model.py, ../api_keys.txt, dataset_ivf.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, build_index.py, ae_model.py, ablation.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, dataset_ivf_embryo.py ,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, file:///staging/groups/bhaskar_group/ivf/Blastocyst_Dataset.tar.gz,../analysis/export_kromp_latents.py, train_lstm_classifier.py, grade_lstm_model.py, grade_lstm_dataset.py
+transfer_input_files = train_ae.sh, train_ae.py, ../api_keys.txt, dataset_ivf.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, ../utils/build_index.py, ae_model.py, ablation.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, dataset_ivf_embryo.py ,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, file:///staging/groups/bhaskar_group/ivf/Blastocyst_Dataset.tar.gz,../analysis/export_kromp_latents.py, train_lstm_classifier.py, grade_lstm_model.py, grade_lstm_dataset.py, ../utils/geometric_features.py
 gpus_minimum_capability = 7.0
 requirements= Machine=="bhaskargpu4000.chtc.wisc.edu"
  
