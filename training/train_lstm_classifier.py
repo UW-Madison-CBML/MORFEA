@@ -14,6 +14,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def collate_padd(batch):
     signals = [item[0] for item in batch]
     targets = [item[1] for item in batch]
@@ -109,75 +110,7 @@ class RunningStats:
     @property
     def std_dev(self):
         return math.sqrt(self.variance)
-
-
-def main(model_name, features):
-    te_lr = features['te_lr']
-    icm_lr = features['icm_lr']
-    run_name = features['run_name']
-    weights = [0.4,0.4,0.2]
-    torch.cuda.empty_cache()
-    torch.autograd.detect_anomaly(True)
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    
-    
-    torch.backends.cudnn.enabled = False
-    KEEP_NA = False
-
-    wandb.login(key=os.getenv("WANDB_KEY"))
-    
-    weight_decay = 1e-4
-    val_ratio = 0.4
-    run = wandb.init(
-        name = run_name,
-        entity="jenslundsgaard7-uw-madison",
-        project="IVF-Training",
-        config={
-            "weights":weights,
-            "keep_na":KEEP_NA,
-            "te_lr": te_lr,
-            "icm_lr": icm_lr,  
-            "features": features,
-            "val_ratio": val_ratio,
-            "weight_decay": weight_decay,
-            }
-    )
-    grade_options = ["A", "B", "C", "NA"] if KEEP_NA else ["A","B","C"]
-    learning_rate = 0.00001
-    metadata_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv"), keep_default_na=(not KEEP_NA))
-    latents = np.load(os.path.join("latents",f"{model_name}.npy"))
-    lat_cols = [f"z_{i}" for i in range(latents.shape[1])]
-    cebra_latents = np.load(os.path.join("cebra_latents", f"{model_name}.npy"))
-    #normalize latents here
-    #lat_mean = latents.mean(axis=0)
-    #lat_std_dev = np.std(latents, axis=0) + 1e-8
-    #latents =  (latents - lat_mean) / lat_std_dev
-
-    umap = UMAP(n_components=8)
-    pca = PCA(n_components=8)
-    std_scaler = StandardScaler()
-    umap_df = pd.DataFrame(umap.fit_transform(latents), columns=[f"umap_{i}" for i in range(8)], index=metadata_df.index)
-    pca_df = pd.DataFrame(pca.fit_transform(std_scaler.fit_transform(latents)), columns=[f"pca_{i}" for i in range(8)], index=metadata_df.index)
-
-    latents_df = pd.concat([metadata_df, pd.DataFrame(latents, columns=lat_cols, index=metadata_df.index), pd.DataFrame(cebra_latents, columns=["cebra_0", "cebra_1", "cebra_2"], index=metadata_df.index), umap_df, pca_df], axis=1)
-    #latents_df = latents_df[latents_df['phase'].str.contains("tM|tSB|tB|tEB")] # just classify around the blastocyst stage
-    
-    te_graded = latents_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
-    np.random.shuffle(te_graded)
-    VAL_EMBRYOS = te_graded[:int(val_ratio * len(te_graded))] 
-    #for embryo in ["RS363-7","JE021-4","ZS435-6","QC211-2","GE1055-6","LBS371-1-8","CAV074-1","RA803-4",]: # remove a bunch of C's
-    #    if embryo in VAL_EMBRYOS:
-    #        VAL_EMBRYOS.remove(embryo)
-    #for embryo in ["PH664-7","JV227-2","LLN873-1","LA367-4","RA580-2","MC373-5","DV210-4"]: # add a bunch of C's
-    #    VAL_EMBRYOS.append(embryo)
-    for embryo in VAL_EMBRYOS:
-        print(f"{embryo}: {latents_df[latents_df['embryo_id'] == embryo].iloc[0]['TE']}")
-    mask = latents_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
-    val_df = latents_df[mask]
-    print(f"val_ratio={val_ratio}, actual val ratio: {len(val_df)/len(latents_df)}")
-    latents_df = latents_df[~mask]
-    # latents df will have the grade columns already
+def train_on(latents_df, val_df, features, KEEP_NA, training_name, run):
     dataset_te = GradeLSTMDataset(latents_df, "TE", features, keep_na=KEEP_NA) 
     dataset_icm = GradeLSTMDataset(latents_df, "ICM", features, keep_na=KEEP_NA)
     dataset_te_val = GradeLSTMDataset(val_df, "TE", features, keep_na=KEEP_NA, return_whole_seqs=True) 
@@ -189,8 +122,8 @@ def main(model_name, features):
     model_icm = GradeLSTMClassifier(len(dataset_icm.lat_cols), keep_na=KEEP_NA)
     model_icm = model_icm.to(DEVICE)
     epochs = 8 
-    optimizer_te = torch.optim.Adam(model_te.parameters(), lr=te_lr, weight_decay=weight_decay)
-    optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=icm_lr, weight_decay=weight_decay)
+    optimizer_te = torch.optim.Adam(model_te.parameters(), lr=features["te_lr"], weight_decay=1e-5)
+    optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=features["te_lr"], weight_decay=1e-5)
 
 
     loader_te = DataLoader(
@@ -242,7 +175,7 @@ def main(model_name, features):
             optimizer_te.step()
 
             scheduler_te.step()
-            run.log({"te": loss.item()})
+            run.log({f"{training_name}_te": loss.item()})
         # ICM grades
         for features, targets, lengths in loader_icm:
             features = features.to(DEVICE)
@@ -255,7 +188,7 @@ def main(model_name, features):
             loss.backward() 
             optimizer_icm.step()
             scheduler_icm.step()
-            run.log({"icm": loss.item()})
+            run.log({f"{training_name}_icm": loss.item()})
     
         te_acc_stats = RunningStats()
         icm_acc_stats = RunningStats()
@@ -299,15 +232,110 @@ def main(model_name, features):
         
         for i, g in enumerate(grade_options):
             recall, precision, f1 = recall_precision_f1(te_confusion_mat, i)
-            run.log({f"te_{g}_recall": recall,f"te_{g}_precision": precision,f"te_{g}_f1":f1})
+            run.log({f"{training_name}_te_{g}_recall": recall,f"{training_name}_te_{g}_precision": precision,f"{training_name}_te_{g}_f1":f1})
             #---------------------------------------------------------------------------------- 
             
             recall, precision, f1 = recall_precision_f1(icm_confusion_mat, i)
-            run.log({f"icm_{g}_recall": recall,f"icm_{g}_precision": precision,f"icm_{g}_f1":f1})
+            run.log({f"{training_name}_icm_{g}_recall": recall,f"{training_name}_icm_{g}_precision": precision,f"{training_name}_icm_{g}_f1":f1})
         print(grade_options)
         print("te confusion:"); print(te_confusion_mat)
         print("icm confusion:"); print(icm_confusion_mat)
-        run.log({"te_acc_mean": te_acc_stats.mean, "te_acc_std":te_acc_stats.std_dev, "icm_acc_mean":icm_acc_stats.mean, "icm_acc_std":icm_acc_stats.std_dev})
+        run.log({f"{training_name}_te_acc_mean": te_acc_stats.mean, f"{training_name}_te_acc_std":te_acc_stats.std_dev, f"{training_name}_icm_acc_mean":icm_acc_stats.mean, f"{training_name}_icm_acc_std":icm_acc_stats.std_dev})
+
+
+def train_on_kromp_latents(model_name, run, features):
+    # just call the image name the embryo id
+    kromp_metadata_df = pd.read_csv(os.path.join("kromp_latents", f"{model_name}.csv")).rename(columns={"Image":"embryo_id"})
+    kromp_lats = np.load(os.path.join("kromp_latents", f"{model_name}.npy"))
+    kromp_lats_df = pd.DataFrame(kromp_lats, index=kromp_metadata_df.index, columns=[f"z_{i}" for i in range(kromp_lats.shape[1])])
+    df = pd.concat([kromp_metadata_df, kromp_lats_df], axis=1)
+    
+    embryo_ids = df["embryo_id"].unique().to_list()
+    np.random.shuffle(embryo_ids)
+    # 30% seems about right?
+    VAL_EMBRYOS = embryo_ids[:int(0.3 * len(embryo_ids))]
+    mask = df["embryo_id"].isin(VAL_EMBRYOS)
+    val_df = df[mask]
+    df = df[~mask]
+    train_on(df, val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kromp", run)
+
+
+
+    
+
+def main(model_name, features):
+    te_lr = features['te_lr']
+    icm_lr = features['icm_lr']
+    run_name = features['run_name']
+    run_kromp = features['kromp']
+    weights = [0.4,0.4,0.2]
+    torch.cuda.empty_cache()
+    torch.autograd.detect_anomaly(True)
+
+        
+    torch.backends.cudnn.enabled = False
+    KEEP_NA = False
+
+    wandb.login(key=os.getenv("WANDB_KEY"))
+    
+    weight_decay = 1e-4
+    val_ratio = 0.4
+    run = wandb.init(
+        name = run_name,
+        entity="jenslundsgaard7-uw-madison",
+        project="IVF-Training",
+        config={
+            "weights":weights,
+            "keep_na":KEEP_NA,
+            "te_lr": te_lr,
+            "icm_lr": icm_lr,  
+            "features": features,
+            "val_ratio": val_ratio,
+            "weight_decay": weight_decay,
+            "run_kromp": run_kromp
+            }
+    )
+    grade_options = ["A", "B", "C", "NA"] if KEEP_NA else ["A","B","C"]
+    learning_rate = 0.00001
+
+    if run_kromp:
+        train_on_kromp_latents(model_name, run, features)
+
+    
+    metadata_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv"), keep_default_na=(not KEEP_NA))
+    latents = np.load(os.path.join("latents",f"{model_name}.npy"))
+    lat_cols = [f"z_{i}" for i in range(latents.shape[1])]
+    cebra_latents = np.load(os.path.join("cebra_latents", f"{model_name}.npy"))
+    #normalize latents here
+    #lat_mean = latents.mean(axis=0)
+    #lat_std_dev = np.std(latents, axis=0) + 1e-8
+    #latents =  (latents - lat_mean) / lat_std_dev
+
+    umap = UMAP(n_components=8)
+    pca = PCA(n_components=8)
+    std_scaler = StandardScaler()
+    umap_df = pd.DataFrame(umap.fit_transform(latents), columns=[f"umap_{i}" for i in range(8)], index=metadata_df.index)
+    pca_df = pd.DataFrame(pca.fit_transform(std_scaler.fit_transform(latents)), columns=[f"pca_{i}" for i in range(8)], index=metadata_df.index)
+
+    latents_df = pd.concat([metadata_df, pd.DataFrame(latents, columns=lat_cols, index=metadata_df.index), pd.DataFrame(cebra_latents, columns=["cebra_0", "cebra_1", "cebra_2"], index=metadata_df.index), umap_df, pca_df], axis=1)
+    #latents_df = latents_df[latents_df['phase'].str.contains("tM|tSB|tB|tEB")] # just classify around the blastocyst stage
+    
+    te_graded = latents_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
+    np.random.shuffle(te_graded)
+    VAL_EMBRYOS = te_graded[:int(val_ratio * len(te_graded))] 
+    #for embryo in ["RS363-7","JE021-4","ZS435-6","QC211-2","GE1055-6","LBS371-1-8","CAV074-1","RA803-4",]: # remove a bunch of C's
+    #    if embryo in VAL_EMBRYOS:
+    #        VAL_EMBRYOS.remove(embryo)
+    #for embryo in ["PH664-7","JV227-2","LLN873-1","LA367-4","RA580-2","MC373-5","DV210-4"]: # add a bunch of C's
+    #    VAL_EMBRYOS.append(embryo)
+    for embryo in VAL_EMBRYOS:
+        print(f"{embryo}: {latents_df[latents_df['embryo_id'] == embryo].iloc[0]['TE']}")
+    mask = latents_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
+    val_df = latents_df[mask]
+    print(f"val_ratio={val_ratio}, actual val ratio: {len(val_df)/len(latents_df)}")
+    latents_df = latents_df[~mask]
+    # latents df will have the grade columns already
+    train_on(latents_df, val_df, features, KEEP_NA, "latents", run):
 
 if __name__ == "__main__":
     import argparse
