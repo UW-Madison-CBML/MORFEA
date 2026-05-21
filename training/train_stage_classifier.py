@@ -211,7 +211,7 @@ def main(model_name, features, lr=0.0001):
                 logits, emissions = model(lats, masks) # logits is a list of variable length tensor sequences of one hot's
                 masks = masks.cpu()
                 emissions = emissions.cpu()
-                emissions = [emission_seq.masked_select(mask_seq).view((-1, len(dataset_val.phases))) for emission_seq, mask_seq in zip(emissions, masks)]
+                emissions = [emission_seq[mask_seq] for emission_seq, mask_seq in zip(emissions, masks)]
 
                 preds = [logit_seq.detach().cpu().argmax(dim=-1) for logit_seq in logits] # logits come out one-hot
                 for pred, label, embryo_id, emissions_seq in zip(preds, labels, embryo_ids, emissions): # all outer most sizes are B

@@ -1,6 +1,8 @@
 #!/bin/bash
 
 unzip Blastocyst_Dataset.zip -d Blastocyst_Dataset/
+ls Blastocyst_Dataset/
+
 mkdir -p kromp_latents
 
 if [ -f "api_keys.txt" ]; then
