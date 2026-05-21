@@ -7,6 +7,25 @@ from PIL import Image, ImageFile
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
+def read_gray(path, resize):
+    img = Image.open(path)
+    if img is None:
+        raise FileNotFoundError(path)
+
+    if resize is not None:
+        img = img.resize((resize, resize), Image.BILINEAR)
+
+    return np.array(img, dtype="float32")
+
+def normalize_video(vol, norm):
+    if norm == "zscore":
+        m, s = vol.mean(), vol.std() + 1e-6
+        vol = (vol - m) / s
+    elif norm == "minmax01":
+        lo, hi = np.percentile(vol, 1), np.percentile(vol, 99)
+        vol = (vol - lo) / (hi - lo + 1e-6)
+        vol = np.clip(vol, 0, 1)
+    return vol
 
 class IVFEmbryoDataset(Dataset):
     def __init__(self, df, resize=128, norm="minmax01", max_frames=None):
@@ -15,26 +34,7 @@ class IVFEmbryoDataset(Dataset):
         self.norm = norm
         self.max_frames = None
 
-    def _read_gray(self, path):
-        img = Image.open(path)
-        if img is None:
-            raise FileNotFoundError(path)
-
-        if self.resize is not None:
-            img = img.resize((self.resize, self.resize), Image.BILINEAR)
-
-        return np.array(img, dtype="float32")
-
-    def _normalize_video(self, vol):
-        if self.norm == "zscore":
-            m, s = vol.mean(), vol.std() + 1e-6
-            vol = (vol - m) / s
-        elif self.norm == "minmax01":
-            lo, hi = np.percentile(vol, 1), np.percentile(vol, 99)
-            vol = (vol - lo) / (hi - lo + 1e-6)
-            vol = np.clip(vol, 0, 1)
-        return vol
-
+    
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
 
@@ -47,10 +47,10 @@ class IVFEmbryoDataset(Dataset):
         if self.max_frames is not None and len(embryo_paths) > self.max_frames:
             embryo_paths = embryo_paths[:self.max_frames]
 
-        embryo_frames = [self._read_gray(p) for p in embryo_paths]
+        embryo_frames = [read_gray(p, self.resize) for p in embryo_paths]
         embryo_vol = np.stack(embryo_frames, axis=0)  # (T, H, W)
 
-        embryo_vol = self._normalize_video(embryo_vol)
+        embryo_vol = normalize_video(embryo_vol, self.norm)
 
         embryo_vol = embryo_vol[:, None, :, :]
 
