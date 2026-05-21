@@ -148,8 +148,7 @@ if [ -n "$EXTRA_ARGS" ]; then
     CMD="$CMD $EXTRA_ARGS"
 fi
 
-# Run training with specified configuration
-echo "Executing: $CMD"
+tar -xvf Blastocyst_Dataset.tar.gz
 eval $CMD
 
 #python -m torch.distributed.launch --nproc_per_node=4 --use_env train.py
