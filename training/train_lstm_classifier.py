@@ -317,6 +317,8 @@ if __name__ == "__main__":
     parser.add_argument("--name", help="Model name. Must have already exported latents")
     parser.add_argument("--run-name", help="Wandb run name")
 
+    parser.add_argument("--kromp", action="store_true", help="Use to also train the model on the single frame latent seqs from Kromp et al.")
+
     parser.add_argument("--latents",action="store_true", help="Use to include latents")
     parser.add_argument("--cebra-latents", action="store_true", help="Use to include distance to first frame")
 

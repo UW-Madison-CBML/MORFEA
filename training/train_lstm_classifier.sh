@@ -2,6 +2,7 @@
 
 tar -zxf latents.tar.gz
 tar -zxf cebra_latents.tar.gz
+tar -zxf kromp_latents.tar.gz
 
 # Set HuggingFace token from api_keys.txt
 if [ -f "api_keys.txt" ]; then
