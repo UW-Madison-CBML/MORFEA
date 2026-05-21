@@ -43,4 +43,4 @@ class StageModel(Module):
             decoded_list = self.crf.decode(emissions, mask=mask) # decoded_list: List<List>
             decoded_tensors = [F.one_hot(torch.tensor(seq), num_classes=self.num_classes) for seq in decoded_list]
              
-            return decoded_tensors
+            return decoded_tensors, emissions

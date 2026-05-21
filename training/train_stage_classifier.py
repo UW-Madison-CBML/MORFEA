@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from sklearn.metrics import ConfusionMatrixDisplay
 from stage_dataset import StageDataset
 from stage_model import StageModel
 from torch.utils.data import DataLoader
@@ -188,13 +189,16 @@ def main(model_name, features, lr=0.0001):
             optimizer.step()
             scheduler.step()
             run.log({"loss": loss.item(), "lr": scheduler.get_last_lr()[0]})
-        acc_stats = RunningStats()
-        area_between_curves_stats = RunningStats()
+        acc_top_1_stats = RunningStats()
 
-        stats_dict = {} 
+        acc_top_2_stats = RunningStats()
+        acc_top_5_stats = RunningStats()
+
         f1_stats = {phase: RunningStats() for phase in dataset_val.phases}
         recall_stats = {phase: RunningStats() for phase in dataset_val.phases}
         precision_stats = {phase: RunningStats() for phase in dataset_val.phases}
+        
+        sum_confusion_mat = np.zeros((len(dataset_val.phases), len(dataset_val.phases))
 
         with torch.no_grad():
             for lats, _, labels, mask, embryo_ids in loader_val:
@@ -203,21 +207,30 @@ def main(model_name, features, lr=0.0001):
                 B, T, L = lats.shape
                 # labels.shape = B, T 
                 lats = lats.to(DEVICE).float()
-                mask = mask.to(DEVICE)
-                logits = model(lats, mask) # logits is a list of variable length tensor sequences of one hot's
+                mask_gpu = mask.to(DEVICE)
+                logits, emissions = model(lats, mask_gpu) # logits is a list of variable length tensor sequences of one hot's
+                emissions = emissions.cpu()
+                emissions = [emission_seq.masked_select(mask_seq).view((-1, len(dataset_val.phases))) for emission_seq, mask_seq in zip(emissions, mask_seq)]
 
                 preds = [logit_seq.detach().cpu().argmax(dim=-1) for logit_seq in logits] # logits come out one-hot
-                for pred, label, embryo_id in zip(preds, labels, embryo_ids): # all outer most sizes are B
-                    acc = (pred == label).sum().item()/label.shape[0]
-                    area_between_curves = torch.abs(pred - label).sum().item()
-                    acc_stats.push(acc)
-                    area_between_curves_stats.push(area_between_curves)
+                for pred, label, embryo_id, emissions_seq in zip(preds, labels, embryo_ids, emissions): # all outer most sizes are B
+                    # top_1 is calculated from decoded seqs, top_k for k > 1 is based on emissions
+                    acc_top_1= (pred == label).sum().item()/label.shape[0]
+                    acc_top_1_stats.push(acc_top_1)
+                    label_one_hots = F.one_hot(label, num_classes=len(dataset_val.phases))
+                    _, top_2_indices = emissions_seq.topk(2, dim=-1)
+                    _, top_5_indices = emissions_seq.topk(5, dim=-1)
+                     
+                    zeros = torch.zeros_like(label_one_hots)
+                    
+                    top_2_hots = zeros.scatter_(dim=-1, index=top_2_indices, value=1)
+                    top_5_hots = zeros.scatter_(dim=-1, index=top_5_indices, value=1)
+                    acc_top_2 = torch.einsum("ti,ti->",top_2_hots, label)/label_one_hots.shape[0]
+                    acc_top_5 = torch.einsum("ti,ti->",top_5_hots, label)/label_one_hots.shape[0]
+                    acc_top_2_stats.push(acc_top_2)
+                    acc_top_5_stats.push(acc_top_5)
+                    
                     # log for individual embryos
-                    if (embryo_id in stats_dict.keys()):
-                        stats_dict[embryo_id].push(acc)
-                    else:
-                        stats_dict[embryo_id] = RunningStats()
-                        stats_dict[embryo_id].push(acc)
                     if(len(pred) != len(label)):
                         print("bad index lists") 
                     else:
@@ -248,6 +261,7 @@ def main(model_name, features, lr=0.0001):
                 # now look at the confusion matrix for precision recall calculations
                 confusion_vol = torch.stack([torch.einsum("ti,tj->ij", F.one_hot(pred.to(dtype=torch.long), num_classes=model.num_classes), F.one_hot(label.to(dtype=torch.long), num_classes=model.num_classes)) for pred, label in zip(preds, labels)])
                 confusion_mat = confusion_vol.sum(dim=0)
+                sum_confusion_mat = sum_confusion_mat + confusion_mat.numpy() 
                 for i in range(model.num_classes):
                     recall, precision, f1 = recall_precision_f1(confusion_mat, i) 
                     f1_stats[dataset_val.phases[i]].push(f1)
@@ -258,6 +272,15 @@ def main(model_name, features, lr=0.0001):
                 f"{phase} f1": f1_stats[phase].mean, f"{phase} f1 std": f1_stats[phase].std_dev, 
                 f"{phase} precision": precision_stats[phase].mean, f"{phase} precision std": precision_stats[phase].std_dev})
 
+        disp = ConfusionMatrixDisplay(confusion_matrix=sum_confusion_mat, display_labels=dataset_val.phases)
+        disp.plot(cmap='Blues')
+        fig = disp.figure_
+        ax = disp.ax_
+        ax.set_title("Confusion Matrix Example")
+        run.log({"confusion_matrix": wandb.Image(fig)}) 
+        plt.close(fig)
+
+        
         f1_stats = {key: (value.mean, value.std_dev) for key,value in f1_stats.items()}
         precision_stats = {key: (value.mean, value.std_dev) for key,value in precision_stats.items()}
         recall_stats = {key: (value.mean, value.std_dev) for key,value in recall_stats.items()}
@@ -275,9 +298,9 @@ def main(model_name, features, lr=0.0001):
         prf_style = precision_recall_df.style
         print(prf_style.to_latex())
             
-        print("transition matrix: ", model.crf.transitions.detach().cpu())
+        #print("transition matrix: ", model.crf.transitions.detach().cpu())
  
-        run.log({"val_acc":acc_stats.mean, "val_acc_std":acc_stats.std_dev,"area_between_curves_mean":area_between_curves_stats.mean,"area_between_curves_stddev":area_between_curves_stats.std_dev})
+        run.log({"val_acc_top_1":acc_top_1_stats.mean, "val_acc_top_1_std":acc_top_1_stats.std_dev, "val_acc_top_5":acc_top_5_stats.mean, "val_acc_top_5_std":acc_top_5_stats.std_dev, "val_acc_top_5":acc_top_5_stats.mean, "val_acc_top_5_std":acc_top_5_stats.std_dev})
 
         # ------------------------------------------------
         #highest_std = sorted(list(stats_dict.items()), key = lambda x: -1*(x[1].mean))[:10]
