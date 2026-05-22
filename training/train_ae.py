@@ -84,7 +84,7 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
     query = z_seq[:, :-1, :].reshape(-1,L)
     positive_key = z_seq[:, 1:, :].reshape(-1,L)
 
-    negative_keys = z_seq.roll(shifts=T//2, dims=1)[:, :-1, :].reshape(-1,1,L)
+    negative_keys = z_seq.roll(shifts=T//2, dims=1)[:, :-1, :].reshape(-1,1,L) # for unpaired we add the buffer dim 1 cause there's only a single negative key to compare with here
 
     output = loss(query, positive_key, negative_keys) 
     return weight * output
@@ -238,10 +238,11 @@ def reconstruction_loss(x_rec, x_true, l1_weight=0.5, ms_ssim_weight=0.5):
     }
 # credit to creiser on stack overflow
 # https://stackoverflow.com/questions/66588715/runtimeerror-cudnn-error-cudnn-status-not-initialized-using-pytorch
-def force_cudnn_initialization():     
+"""def force_cudnn_initialization():     
     s = 32
     dev = torch.device('cuda')
-    torch.nn.functional.conv2d(torch.zeros(s, s, s, s, device=dev), torch.zeros(s, s, s, s, device=dev))
+    torch.nn.functional.conv2d(torch.zeros(s, s, s, s, device=dev), torch.zeros(s, s, s, s, device=dev))"""
+
 
 def train_convlstm(
     loss_type="l1",
@@ -255,9 +256,11 @@ def train_convlstm(
     model_name="", 
     latent_size = 4096
 ):
+
+    torch.backends.cudnn.enabled = False
     gc.collect()
     torch.cuda.empty_cache()
-    force_cudnn_initialization()
+    
     print(torch.cuda.memory_summary(device=None, abbreviated=False))
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

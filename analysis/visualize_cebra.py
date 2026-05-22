@@ -5,7 +5,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 matplotlib.use('Agg') 
-from utils.geometric_features import calculate_curvatures, get_acc, get_vel
+from geometric_features import calculate_curvatures, get_acc, get_vel
 import numpy as np
 import pandas as pd
 import os

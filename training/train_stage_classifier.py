@@ -97,7 +97,7 @@ VAL_EMBRYOS =[
     
     
     
-def main(model_name, features, lr=0.0001):
+def main(model_name, features, lr=0.0008):
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -107,6 +107,7 @@ def main(model_name, features, lr=0.0001):
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
         name=f"{model_name}-phase-{features['run_name']}",
+        config={"lr":lr}
     )
  
     learning_rate = lr
@@ -135,7 +136,7 @@ def main(model_name, features, lr=0.0001):
     dataset_val = StageDataset(val_df, "embryo_dataset_annotations", features, return_embryo_id=True, return_whole_seqs=True)
     #weights = get_class_weights(os.path.abspath("embryo_dataset_annotations"), df.groupby("embryo_id").size().reset_index(name='counts'), dataset.phases).to(DEVICE)
     crit = torch.nn.CrossEntropyLoss()
-    model = StageModel(input_size = len(dataset.lat_cols), num_classes=len(dataset.phases))
+    model = StageModel(input_size = len(dataset.lat_cols), num_classes=len(dataset_val.phases))
     torch.backends.cudnn.enabled = False
     trainable_params = 0
     all_params = 0
@@ -200,6 +201,8 @@ def main(model_name, features, lr=0.0001):
         
         sum_confusion_mat = np.zeros((len(dataset_val.phases), len(dataset_val.phases)))
 
+        all_preds = []
+        all_labels = []
         with torch.no_grad():
             for lats, _, labels, masks, embryo_ids in loader_val:
             
@@ -214,6 +217,8 @@ def main(model_name, features, lr=0.0001):
                 emissions = [emission_seq[mask_seq] for emission_seq, mask_seq in zip(emissions, masks)]
 
                 preds = [logit_seq.detach().cpu().argmax(dim=-1) for logit_seq in logits] # logits come out one-hot
+                all_preds += preds
+                all_labels += labels
                 for pred, label, embryo_id, emissions_seq in zip(preds, labels, embryo_ids, emissions): # all outer most sizes are B
 
                     # top_1 is calculated from decoded seqs, top_k for k > 1 is based on emissions
@@ -274,15 +279,22 @@ def main(model_name, features, lr=0.0001):
                 f"{phase} f1": f1_stats[phase].mean, f"{phase} f1 std": f1_stats[phase].std_dev, 
                 f"{phase} precision": precision_stats[phase].mean, f"{phase} precision std": precision_stats[phase].std_dev})
 
+        print(sum_confusion_mat)
+
+        fig, ax = plt.subplots(figsize=(10, 10))
         disp = ConfusionMatrixDisplay(confusion_matrix=sum_confusion_mat, display_labels=dataset_val.phases)
-        disp.plot(cmap='Blues')
-        fig = disp.figure_
-        ax = disp.ax_
-        ax.set_title("Confusion Matrix Example")
-        run.log({"confusion_matrix": wandb.Image(fig)}) 
+        disp.plot(cmap='Blues', ax=ax, values_format='d')
+        
+        plt.xticks(rotation=45, ha='right')
+        run.log({"confusion_matrix": wandb.Image(fig), "confusion_matrix": wandb.plot.confusion_matrix(
+            probs=None,
+            y_true=torch.cat(all_labels).numpy(),
+            preds=torch.cat(all_preds).numpy(),
+            class_names=dataset_val.phases,
+        )}) 
         plt.close(fig)
 
-        
+       
         f1_stats = {key: (value.mean, value.std_dev) for key,value in f1_stats.items()}
         precision_stats = {key: (value.mean, value.std_dev) for key,value in precision_stats.items()}
         recall_stats = {key: (value.mean, value.std_dev) for key,value in recall_stats.items()}
@@ -302,7 +314,8 @@ def main(model_name, features, lr=0.0001):
             
         #print("transition matrix: ", model.crf.transitions.detach().cpu())
  
-        run.log({"val_acc_top_1":acc_top_1_stats.mean, "val_acc_top_1_std":acc_top_1_stats.std_dev, "val_acc_top_5":acc_top_5_stats.mean, "val_acc_top_5_std":acc_top_5_stats.std_dev, "val_acc_top_5":acc_top_5_stats.mean, "val_acc_top_5_std":acc_top_5_stats.std_dev})
+        run.log({"val_acc_top_1":acc_top_1_stats.mean, "val_acc_top_1_std":acc_top_1_stats.std_dev, "val_acc_top_5":acc_top_5_stats.mean, "val_acc_top_5_std":acc_top_5_stats.std_dev, "val_acc_top_2":acc_top_2_stats.mean, "val_acc_top_2_std":acc_top_2_stats.std_dev})
+
 
         # ------------------------------------------------
         #highest_std = sorted(list(stats_dict.items()), key = lambda x: -1*(x[1].mean))[:10]

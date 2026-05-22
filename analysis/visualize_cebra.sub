@@ -23,7 +23,7 @@ when_to_transfer_output = ON_EXIT_OR_EVICT
 Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
-transfer_input_files = visualize_cebra.sh, visualize_cebra.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv ,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz, ../utils/geometric_features.py, file:///staging/groups/bhaskar_group/ivf/cebra_latents.tar.gz, cebra_plots.tar.gz
+transfer_input_files = visualize_cebra.sh, visualize_cebra.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv ,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz, ../utils/geometric_features.py, file:///staging/groups/bhaskar_group/ivf/cebra_latents.tar.gz, cebra_plots.tar.gz, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz
 transfer_output_files = cebra_plots.tar.gz
 #transfer_output_remaps = "cebra_plots.tar.gz = $(model)_cebra_plots.tar.gz;"
 #transfer_output_files = model_weights.pth 

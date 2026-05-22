@@ -52,13 +52,13 @@ def add_annotations(group_name, group, annotations_dir, features):
         group = pd.concat([group,pd.DataFrame({"z_curv12":curv12, "z_curv20":curv20, "curv4":curv4}, index = group.index)], axis=1)
 
 
-    if ('cebra_ps' in features.keys() and eatures['cebra_ps']):
+    if ('cebra_ps' in features.keys() and features['cebra_ps']):
         
         cebra_trajectory = group[cebra_cols]
         sigs = get_path_sigs(cebra_trajectory, 3)
         sigs_df = pd.DataFrame(sigs, columns = [f"z_cebra_sig_{feature}" for feature in range(sigs.shape[1])], index=group.index)
         group = pd.concat([group, sigs_df], axis=1)
-    if ('pca_ps' in features.keys() and eatures['pca_ps']):
+    if ('pca_ps' in features.keys() and features['pca_ps']):
         
         pca_trajectory = group[[col for col in group.columns if col.startswith("pca")]]
         sigs = get_path_sigs(pca_trajectory, 3)
