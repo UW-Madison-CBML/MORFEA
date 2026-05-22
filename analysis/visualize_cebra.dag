@@ -1,10 +1,6 @@
 JOB A visualize_cebra.sub
-VARS A args="ver12-2026-04-06 all_raff --all-phases --all-grades"
-JOB B visualize_cebra.sub
-VARS B args="ver12-2026-04-06 blasto_raff --all-grades --phases tB"
-JOB C visualize_cebra.sub
-VARS C args="ver12-2026-04-06 morblast_raff --all-grades --phases tM tSB tB tEB tHB"
+VARS A args="control-2026-03-12 all --all-phases --all-grades"
 
 
-PARENT A CHILD B
-PARENT B CHILD C
+#PARENT A CHILD B
+#PARENT B CHILD C
