@@ -37,7 +37,7 @@ def get_phases(embryo_id, seq_len):
     new_column = new_column[:seq_len]
     
     return np.array([PHASES.index(phase) for phase in new_column]) 
-def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, cbar_label="Time", log_scale=False):
+def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, cbar_label="Time", log_scale=False, folder="cebra_plots", axlabel="Cebra"):
     if(c is None):
         c = [np.linspace(0,1,len(seq)) for seq in seqs]
     x_list = [x for seq in seqs for x in seq[:, 0]]
@@ -69,9 +69,9 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
             individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
             group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
 
-        individ_ax.set_xlabel("Cebra 1")
-        individ_ax.set_ylabel("Cebra 2")
-        individ_ax.set_zlabel("Cebra 3")
+        individ_ax.set_xlabel(f"{axlabel} 1")
+        individ_ax.set_ylabel(f"{axlabel} 2")
+        individ_ax.set_zlabel(f"{axlabel} 3")
         
         plt.tight_layout(rect=[0, 0, 0.85, 1])
         individ_fig.subplots_adjust(right=0.85) 
@@ -83,15 +83,15 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
             if individ_im is not None:
                 individ_fig.colorbar(individ_im, cax=cbar_ax, label=cbar_label)
 
-        individ_fig.savefig(os.path.join("cebra_plots",f"individ-{f_name}-{i}.png"))
+        individ_fig.savefig(os.path.join(folder,f"individ-{f_name}-{i}.png"))
         plt.close(individ_fig) 
         if(uniform_bounds):
             grid_axes[i].set_xlim(x_lim)
             grid_axes[i].set_ylim(y_lim)
             grid_axes[i].set_zlim(z_lim) 
-        grid_axes[i].set_xlabel("Cebra 1")
-        grid_axes[i].set_ylabel("Cebra 2")
-        grid_axes[i].set_zlabel("Cebra 3")
+        grid_axes[i].set_xlabel(f"{axlabel} 1")
+        grid_axes[i].set_ylabel(f"{axlabel} 2")
+        grid_axes[i].set_zlabel(f"{axlabel} 3")
     
     
     plt.tight_layout(rect=[0, 0, 0.85, 1])
@@ -104,15 +104,15 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         if grid_im is not None:
             grid_fig.colorbar(grid_im, cax=cbar_ax, label=cbar_label)
 
-    grid_fig.savefig(os.path.join("cebra_plots",f"grid-{f_name}.png"))
+    grid_fig.savefig(os.path.join(folder,f"grid-{f_name}.png"))
     plt.close(grid_fig)   
     
     group_ax.set_xlim(x_lim)
     group_ax.set_ylim(y_lim)
     group_ax.set_zlim(z_lim) 
-    group_ax.set_xlabel("Cebra 1")
-    group_ax.set_ylabel("Cebra 2")
-    group_ax.set_zlabel("Cebra 3")
+    group_ax.set_xlabel(f"{axlabel} 1")
+    group_ax.set_ylabel(f"{axlabel} 2")
+    group_ax.set_zlabel(f"{axlabel} 3")
     group_fig.subplots_adjust(right=0.85) 
     if(cmap == "phase"):
         legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(PHASES)]
@@ -122,7 +122,7 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         if group_im is not None:
             group_fig.colorbar(group_im, cax=cbar_ax, label=cbar_label)
 
-    group_fig.savefig(os.path.join("cebra_plots",f"group-{f_name}.png"))
+    group_fig.savefig(os.path.join(folder,f"group-{f_name}.png"))
     plt.close(group_fig)
 
 
