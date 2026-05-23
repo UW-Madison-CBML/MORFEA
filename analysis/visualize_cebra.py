@@ -188,6 +188,28 @@ def main(model_name, image_name, grade_args, phase_args):
             c.append(calculate_curvatures(seq, offset=13))
             
         plot_sequences(seqs, f"curv_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True)
+        #--------------------------------
+        # acceleration
+        seqs = []
+        c = []
+        for group in embryo_groups:
+            seq = group[["z_0","z_1","z_2"]].to_numpy()
+            seqs.append(seq)
+            c.append(get_acc(seq))
+            
+        plot_sequences(seqs, f"acc_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True)
+
+        #--------------------------------
+        # velocity
+        seqs = []
+        c = []
+        for group in embryo_groups:
+            seq = group[["z_0","z_1","z_2"]].to_numpy()
+            seqs.append(seq)
+            c.append(get_vel(seq))
+            
+        plot_sequences(seqs, f"vel_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True)
+
 
         
     

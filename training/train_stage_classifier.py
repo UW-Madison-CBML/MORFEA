@@ -285,8 +285,8 @@ def main(model_name, features, lr=0.0008):
         disp = ConfusionMatrixDisplay(confusion_matrix=sum_confusion_mat, display_labels=dataset_val.phases)
         disp.plot(cmap='Blues', ax=ax, values_format='d')
         
-        plt.xticks(rotation=45, ha='right')
-        run.log({"confusion_matrix": wandb.Image(fig), "confusion_matrix": wandb.plot.confusion_matrix(
+        ax.set_xticks(rotation=45, ha='right')
+        run.log({"confusion_matrix": wandb.Image(fig), "confusion_matrix_table": wandb.plot.confusion_matrix(
             probs=None,
             y_true=torch.cat(all_labels).numpy(),
             preds=torch.cat(all_preds).numpy(),
@@ -305,7 +305,18 @@ def main(model_name, features, lr=0.0008):
             pd.DataFrame(precision_stats.values(), index=precision_stats.keys(), columns=["precision","precision_std"]),    
             pd.DataFrame(recall_stats.values(), index=recall_stats.keys(), columns=["recall","recall_std"])
             ], axis=1)
-        print(precision_recall_df)
+        
+        fig, ax = plt.subplots
+        f1s = precision_recall_df["f1"]
+        f1_errs = precision_recall_df["f1_std"]
+        ax.bar(dataset_val.phases, f1s)
+        ax.errorbar(dataset_val.phases, f1s, yerr=f1_errs, fmt="o", color="black")
+        ax.xticks(rotation=45, ha='right')
+        
+        run.log({"f1_bars": wandb.Image(fig)})
+        plt.close(fig)
+
+
         for stat in ["precision","recall", "f1"]:
             precision_recall_df[stat] = [f"$\\num{{{mean}}} \\pm \\num{{{std}}}$" for mean, std in zip(precision_recall_df[stat], precision_recall_df[f"{stat}_std"])]
         precision_recall_df = precision_recall_df.drop(columns = [col for col in precision_recall_df.columns if "std" in col])
