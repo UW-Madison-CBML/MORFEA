@@ -1,0 +1,42 @@
+# visualize_pca.sub
+   
+container_image =docker://jenslundsgaard/ivf-training:v1.7
+
+#docker_image = pytorch/pytorch:2.9.0-cuda12.8-cudnn9-runtime
+#docker_image = pytorch/pytorch:1.1.0-cuda10.0-cudnn7.5-runtime
+universe = container
+# Specify your executable (single binary or a script that runs several
+#  commands) and arguments to be passed to jobs. 
+#  $(Process) will be a integer number for each job, starting with "0"
+#  and increasing for the relevant number of jobs.
+#shell = ./visualize_pca.sh $(model) $(args)
+   		
+shell = ./visualize_pca.sh $(args)
+# Specify the name of the log, standard error, and standard output (or
+# "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
+#  queue number assigned to this set of jobs at the time of submission.
+log = visualize_pca_$(Cluster)_$(Process).log
+error = visualize_pca_$(Cluster)_$(Process).err
+output = visualize_pca_$(Cluster)_$(Process).out
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT_OR_EVICT
+Requirements = (Target.HasCHTCStaging == true)
+#require_gpus = (DriverVersion >= 10.1)
+# Transfer our executable script
+transfer_input_files = visualize_pca.sh, visualize_pca.py, visualize_cebra.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv ,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz, ../utils/geometric_features.py, pca_plots.tar.gz, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz
+transfer_output_files = pca_plots.tar.gz
+#transfer_output_remaps = "cebra_plots.tar.gz = $(model)_cebra_plots.tar.gz;"
+#transfer_output_files = model_weights.pth 
+# Requirements (e.g., operating system) your job needs, what amount of
+# compute resources each job will need on the computer where it runs.
+request_cpus = 8
+request_memory = 64GB
+request_disk = 80GB
+
+#notemp-2026-03-12
+#nolstm-2026-03-12
+
+queue args from (
+control-2026-03-12 all --all-phases --all-grades
+)
+#queue 1
