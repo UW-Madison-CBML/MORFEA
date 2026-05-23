@@ -45,10 +45,10 @@ def main(model_name, image_name, grade_args, phase_args):
     PCA_COLS = ["pca_0","pca_1","pca_2"]
     # latents df is also metadata for the cebra embeddings
     latents_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv"))
-    latents_np = np.load(os.path.join("cebra_latents", f"{model_name}.npy"))
+    latents_np = np.load(os.path.join("latents", f"{model_name}.npy"))
     pca = PCA(n_components=3)
     standard_scaler = StandardScaler()
-    pca_lats = pca.fit_transform(standard_scaler(latents_np))
+    pca_lats = pca.fit_transform(standard_scaler.fit_transform(latents_np))
     pca_df = pd.DataFrame(pca_lats, columns = PCA_COLS, index=latents_df.index)
     df = pd.concat([latents_df,pca_df], axis=1)
     if("NA" not in grade_args):
@@ -72,7 +72,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(group[PCA_COLS].to_numpy())
             c.append([GRADE_COLORS[GRADES.index(g)]] * len(group))
             
-    plot_sequences(seqs, f"grade_{image_name}", c=c, cmap=None, cbar_label="Grade")
+    plot_sequences(seqs, f"grade_{image_name}", c=c, cmap=None, cbar_label="Grade", folder="pca_plots", axlabel="PCA")
     # do a bunch per grade using diff colormaps
     for g, embryo_groups in zip(grade_args, embryo_grade_groups):
         #--------------------------------
@@ -84,7 +84,7 @@ def main(model_name, image_name, grade_args, phase_args):
             c.append(group['time_step'].to_numpy()/group['time_step'].max()) # since we are removing some phases we need to use ground_truth time not inherent order of df
             
             
-        plot_sequences(seqs, f"time_{g}_{image_name}",c=c, cbar_label="Time")
+        plot_sequences(seqs, f"time_{g}_{image_name}",c=c, cbar_label="Time", folder="pca_plots", axlabel="PCA")
         #--------------------------------
         # phase
         seqs = []
@@ -93,7 +93,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(group[PCA_COLS].to_numpy())
             c.append([PHASES.index(p) for p in group['phase']])
             
-        plot_sequences(seqs, f"phase_{g}_{image_name}", c=c, cmap="phase", cbar_label="Phase")
+        plot_sequences(seqs, f"phase_{g}_{image_name}", c=c, cmap="phase", cbar_label="Phase", folder="pca_plots", axlabel="PCA")
         #--------------------------------
         # curvature
         seqs = []
@@ -103,7 +103,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(calculate_curvatures(seq, offset=13))
             
-        plot_sequences(seqs, f"curv_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True)
+        plot_sequences(seqs, f"curv_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA")
         #--------------------------------
         # acceleration
         seqs = []
@@ -113,7 +113,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(get_acc(seq))
             
-        plot_sequences(seqs, f"acc_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True)
+        plot_sequences(seqs, f"acc_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA")
 
         #--------------------------------
         # velocity
@@ -124,7 +124,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(get_vel(seq))
             
-        plot_sequences(seqs, f"vel_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True)
+        plot_sequences(seqs, f"vel_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA")
 
 
         
