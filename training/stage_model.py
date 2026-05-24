@@ -8,12 +8,11 @@ class StageModel(Module):
     def __init__(self, input_size, num_classes=18):
         super().__init__()
         self.num_classes = num_classes
-
-        self.lin1 = torch.nn.Linear(input_size, 64)
-        self.lin2 = torch.nn.Linear(64, 64)
-        self.lstm = torch.nn.LSTM(64, 64, batch_first = True)
-        self.lin3 = torch.nn.Linear(64, num_classes)
-        
+        self.lin1 = torch.nn.Linear(input_size, 256)
+        self.lin2 = torch.nn.Linear(256, 128)
+        self.lstm = torch.nn.LSTM(128, 128, batch_first = True)
+        self.lin3 = torch.nn.Linear(128, num_classes)
+       
         self.dropout = torch.nn.Dropout(0.3)
         self.crf = CRF(num_classes, batch_first=True)
         with torch.no_grad():

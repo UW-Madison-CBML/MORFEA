@@ -97,7 +97,7 @@ VAL_EMBRYOS =[
     
     
     
-def main(model_name, features, lr=0.0008):
+def main(model_name, features, lr=0.001):
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -279,13 +279,11 @@ def main(model_name, features, lr=0.0008):
                 f"{phase} f1": f1_stats[phase].mean, f"{phase} f1 std": f1_stats[phase].std_dev, 
                 f"{phase} precision": precision_stats[phase].mean, f"{phase} precision std": precision_stats[phase].std_dev})
 
-        print(sum_confusion_mat)
-
+        sum_confusion_mat = sum_confusion_mat.astype(int)
         fig, ax = plt.subplots(figsize=(10, 10))
         disp = ConfusionMatrixDisplay(confusion_matrix=sum_confusion_mat, display_labels=dataset_val.phases)
         disp.plot(cmap='Blues', ax=ax, values_format='d')
-        
-        ax.set_xticks(rotation=45, ha='right')
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='right') 
         run.log({"confusion_matrix": wandb.Image(fig), "confusion_matrix_table": wandb.plot.confusion_matrix(
             probs=None,
             y_true=torch.cat(all_labels).numpy(),
@@ -306,16 +304,22 @@ def main(model_name, features, lr=0.0008):
             pd.DataFrame(recall_stats.values(), index=recall_stats.keys(), columns=["recall","recall_std"])
             ], axis=1)
         
-        fig, ax = plt.subplots
+        """fig, ax = plt.subplots()
         f1s = precision_recall_df["f1"]
         f1_errs = precision_recall_df["f1_std"]
-        ax.bar(dataset_val.phases, f1s)
-        ax.errorbar(dataset_val.phases, f1s, yerr=f1_errs, fmt="o", color="black")
-        ax.xticks(rotation=45, ha='right')
-        
-        run.log({"f1_bars": wandb.Image(fig)})
-        plt.close(fig)
 
+        ax.bar(dataset_val.phases, f1s)
+
+        ax.errorbar(dataset_val.phases, f1s, yerr=f1_errs, fmt="none", color="black", capsize=5)
+
+        ax.tick_params(axis='x', labelrotation=45)
+
+        for label in ax.get_xticklabels():
+            label.set_horizontalalignment('right')
+
+        fig.tight_layout() # makes it so the figure doesn't cut off the phase labels
+        run.log({"f1_bars": wandb.Image(fig)})
+        plt.close(fig)"""
 
         for stat in ["precision","recall", "f1"]:
             precision_recall_df[stat] = [f"$\\num{{{mean}}} \\pm \\num{{{std}}}$" for mean, std in zip(precision_recall_df[stat], precision_recall_df[f"{stat}_std"])]
@@ -340,8 +344,7 @@ def main(model_name, features, lr=0.0008):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Train a stage classifier using latents and their morphodynamic features.")
- 
- 
+  
     parser.add_argument("--model-name", help="Model name. Must have already exported latents and cebra latents")
     parser.add_argument("--run-name", help="WandB run name.")
     parser.add_argument("--lr", type=float, default=0.0001, help="Learning rate")

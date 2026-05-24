@@ -37,6 +37,6 @@ request_disk = 80GB
 #nolstm-2026-03-12
 
 queue args from (
-control-2026-03-12 all --all-phases --all-grades
+nolstm-2026-03-12 nolstm --all-phases --all-grades
 )
 #queue 1
