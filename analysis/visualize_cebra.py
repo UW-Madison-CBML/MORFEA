@@ -37,7 +37,7 @@ def get_phases(embryo_id, seq_len):
     new_column = new_column[:seq_len]
     
     return np.array([PHASES.index(phase) for phase in new_column]) 
-def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, cbar_label="Time", log_scale=False, folder="cebra_plots", axlabel="Cebra"):
+def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, cbar_label="Time", log_scale=False, folder="cebra_plots", axlabel="Cebra", axis_off = False, individ_names = None):
     if(c is None):
         c = [np.linspace(0,1,len(seq)) for seq in seqs]
     x_list = [x for seq in seqs for x in seq[:, 0]]
@@ -82,8 +82,12 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
             cbar_ax = individ_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
             if individ_im is not None:
                 individ_fig.colorbar(individ_im, cax=cbar_ax, label=cbar_label)
-
-        individ_fig.savefig(os.path.join(folder,f"individ-{f_name}-{i}.png"))
+        if(axis_off):
+            individ_ax.set_axis_off()
+        if individ_names is not None:
+            individ_fig.savefig(os.path.join(folder,f"{individ_name[i]}-{f_name}-{i}.png"))
+        else:
+            individ_fig.savefig(os.path.join(folder,f"individ-{f_name}-{i}.png"))
         plt.close(individ_fig) 
         if(uniform_bounds):
             grid_axes[i].set_xlim(x_lim)
@@ -92,6 +96,9 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         grid_axes[i].set_xlabel(f"{axlabel} 1")
         grid_axes[i].set_ylabel(f"{axlabel} 2")
         grid_axes[i].set_zlabel(f"{axlabel} 3")
+        
+        if(axis_off):
+            grid_axes[i].set_axis_off()
     
     
     plt.tight_layout(rect=[0, 0, 0.85, 1])
@@ -103,7 +110,8 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         cbar_ax = grid_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
         if grid_im is not None:
             grid_fig.colorbar(grid_im, cax=cbar_ax, label=cbar_label)
-
+    if(axis_off):
+       grad_ax.set_axis_off()
     grid_fig.savefig(os.path.join(folder,f"grid-{f_name}.png"))
     plt.close(grid_fig)   
     
@@ -121,6 +129,10 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         cbar_ax = group_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
         if group_im is not None:
             group_fig.colorbar(group_im, cax=cbar_ax, label=cbar_label)
+    
+
+    if(axis_off):
+        group_ax.set_axis_off()
 
     group_fig.savefig(os.path.join(folder,f"group-{f_name}.png"))
     plt.close(group_fig)
