@@ -85,7 +85,7 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         if(axis_off):
             individ_ax.set_axis_off()
         if individ_names is not None:
-            individ_fig.savefig(os.path.join(folder,f"{individ_name[i]}-{f_name}-{i}.png"))
+            individ_fig.savefig(os.path.join(folder,f"{individ_names[i]}-{f_name}-{i}.png"))
         else:
             individ_fig.savefig(os.path.join(folder,f"individ-{f_name}-{i}.png"))
         plt.close(individ_fig) 
