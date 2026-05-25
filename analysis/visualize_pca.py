@@ -1,14 +1,16 @@
 import cebra
+import os
 import torch
 from cebra import CEBRA
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import sys
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../utils")) # for non-CHTC use
 matplotlib.use('Agg') 
 from geometric_features import calculate_curvatures, get_acc, get_vel
 import numpy as np
 import pandas as pd
-import os
 from huggingface_hub import login
 from torch.utils.data import DataLoader
 from matplotlib.patches import Patch
@@ -74,7 +76,7 @@ def main(model_name, image_name, grade_args, phase_args):
     names = []
     for g in grade_args:
         embryo_groups_names = list(df[df[GRADE] == g].groupby("embryo_id"))
-        rng.shuffle(embryo_groups)
+        rng.shuffle(embryo_groups_names)
         if max_imgs != -1:
             embryo_groups_names = embryo_groups_names[:max_imgs]
         embryo_names, embryo_groups = zip(*embryo_groups_names)
@@ -82,7 +84,7 @@ def main(model_name, image_name, grade_args, phase_args):
         embryo_grade_groups_names.append(embryo_names)
         
         for name, group in zip(embryo_names, embryo_groups):
-            seqs.append(group[0][PCA_COLS].to_numpy())
+            seqs.append(group[PCA_COLS].to_numpy())
             c.append([GRADE_COLORS[GRADES.index(g)]] * len(group))
             names.append(name)
             
