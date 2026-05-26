@@ -257,7 +257,8 @@ def train_convlstm(
     latent_size = 4096
 ):
 
-    torch.backends.cudnn.enabled = False
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.enabled = True 
     gc.collect()
     torch.cuda.empty_cache()
     
@@ -775,8 +776,10 @@ ABLATION STUDY CONFIGURATION
         # export the kromp latents
         
         metadata_df, kromp_lats,imgs = export_kromp(model)
+
+        metadata_df = metadata_df.rename(columns={"Image":"embryo_id"})
         idx = np.random.randint(len(metadata_df))
-        vol_img = normalize_video([read_gray(os.path.join("Blastocyst_Dataset","Images", metadata_df.iloc[idx]["Image"]), 128)], "minmax01")[0]
+        vol_img = normalize_video([read_gray(os.path.join("Blastocyst_Dataset","Images", metadata_df.iloc[idx]["embryo_id"]), 128)], "minmax01")[0]
         recon_img = imgs[idx]
 
         vol_img = (vol_img * 255).astype(np.uint8)
