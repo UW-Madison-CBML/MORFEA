@@ -236,12 +236,6 @@ def reconstruction_loss(x_rec, x_true, l1_weight=0.5, ms_ssim_weight=0.5):
         "ms_ssim_loss": ms_ssim_loss.item(),
         "ms_ssim_value": ms_ssim_val.item()
     }
-# credit to creiser on stack overflow
-# https://stackoverflow.com/questions/66588715/runtimeerror-cudnn-error-cudnn-status-not-initialized-using-pytorch
-"""def force_cudnn_initialization():     
-    s = 32
-    dev = torch.device('cuda')
-    torch.nn.functional.conv2d(torch.zeros(s, s, s, s, device=dev), torch.zeros(s, s, s, s, device=dev))"""
 
 
 def train_convlstm(
@@ -257,8 +251,7 @@ def train_convlstm(
     latent_size = 4096
 ):
 
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.enabled = True 
+    torch.backends.cudnn.enabled = False
     gc.collect()
     torch.cuda.empty_cache()
     
