@@ -250,14 +250,18 @@ def train_convlstm(
     model_name="", 
     latent_size = 4096
 ):
+    
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(DEVICE)
+    print(type(DEVICE)) 
+    #torch.backends.cudnn.enabled = False
 
-    torch.backends.cudnn.enabled = False
+    torch.cuda.init()
     gc.collect()
     torch.cuda.empty_cache()
     
     print(torch.cuda.memory_summary(device=None, abbreviated=False))
-    torch.autograd.detect_anomaly(True)
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #torch.autograd.detect_anomaly(True)
     # Build loss description for logging
     loss_components = []
     if ms_ssim_weight > 0:
@@ -345,6 +349,7 @@ ABLATION STUDY CONFIGURATION
 
     print("Configuration saved to training_config_detailed.txt")
 
+    torch.cuda.init()
     model = ConvLSTMAutoencoder(
         None,
         seq_len=50,
@@ -365,6 +370,8 @@ ABLATION STUDY CONFIGURATION
     )
 
     VAL_EMBRYOS = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"}).dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
+    torch.cuda.init()
+    torch.zeros(1, device=DEVICE)
     model = model.to(DEVICE)
     trainable_params = 0
     all_params = 0
@@ -398,7 +405,7 @@ ABLATION STUDY CONFIGURATION
     # Create DataLoaders
     loader = DataLoader(
         train_dataset,
-        batch_size=64,
+        batch_size=128,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
