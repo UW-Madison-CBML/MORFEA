@@ -148,7 +148,7 @@ if [ -n "$EXTRA_ARGS" ]; then
     CMD="$CMD $EXTRA_ARGS"
 fi
 
-tar -xvf Blastocyst_Dataset.tar.gz
+tar -xvf kanakasabapathy.tar.gz
 eval $CMD
 
 #python -m torch.distributed.launch --nproc_per_node=4 --use_env train.py
