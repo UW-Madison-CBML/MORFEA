@@ -251,9 +251,6 @@ def train_convlstm(
     latent_size = 4096
 ):
     
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(DEVICE)
-    print(type(DEVICE)) 
     #torch.backends.cudnn.enabled = False
 
     torch.cuda.init()
