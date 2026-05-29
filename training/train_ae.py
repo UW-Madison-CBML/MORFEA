@@ -41,7 +41,7 @@ import hashlib
 import json
 from torchsummary import summary
 from train_lstm_classifier import train_on as train_lstm_classifier_on
-from export_kromp_latents import export_kromp
+from export_kanakasabapathy_latents import export_kanakasabapathy
 
 from dataset_ivf_embryo import read_gray, normalize_video
 class RunningStats:
@@ -405,7 +405,7 @@ ABLATION STUDY CONFIGURATION
     # Create DataLoaders
     loader = DataLoader(
         train_dataset,
-        batch_size=128,
+        gatch_size=128,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
@@ -773,9 +773,9 @@ ABLATION STUDY CONFIGURATION
                 wandb.log({"temp_smoothness_train": wandb.Image(fig)})
 
                 plt.close(fig)   
-        # export the kromp latents
+        # export the kanakasabapathy latents
         
-        metadata_df, kromp_lats,imgs = export_kromp(model)
+        metadata_df, kanaka_lats,imgs = export_kanakasabapathy(model)
 
         metadata_df = metadata_df.rename(columns={"Image":"embryo_id"})
         idx = np.random.randint(len(metadata_df))
@@ -786,23 +786,23 @@ ABLATION STUDY CONFIGURATION
         recon_img = (recon_img * 255).astype(np.uint8)
         comparison = np.concatenate((vol_img, recon_img), axis=1)
 
-        images = wandb.Image(comparison, caption="kromp_recon_val")
-        run.log({"kromp_recon_val": images})
+        images = wandb.Image(comparison, caption="kanakasabapathy_recon_val")
+        run.log({"kanakasabapathy_recon_val": images})
 
-        # train the lstm model on the kromp latents and log the loss to wandb
-        kromp_lats_df = pd.DataFrame(kromp_lats, index=metadata_df.index, columns=[f"z_{i}" for i in range(kromp_lats.shape[1])])
+        # train the lstm model on the kanakasabapathy latents and log the loss to wandb
+        kanakasabapathy_lats_df = pd.DataFrame(kanakasabapathy_lats, index=metadata_df.index, columns=[f"z_{i}" for i in range(kanakasabapathy_lats.shape[1])])
         
             
-        kromp_df = pd.concat([metadata_df, kromp_lats_df], axis=1)
+        kanakasabapathy_df = pd.concat([metadata_df, kanakasabapathy_lats_df], axis=1)
         
-        embryo_ids = kromp_df["embryo_id"].unique()
+        embryo_ids = kanakasabapathy_df["embryo_id"].unique()
         np.random.shuffle(embryo_ids)
         # 30% seems about right?
         VAL_EMBRYOS = embryo_ids[:int(0.3 * len(embryo_ids))]
-        kromp_mask = kromp_df["embryo_id"].isin(VAL_EMBRYOS)
-        kromp_val_df = kromp_df[mask]
-        kromp_df = kromp_df[~mask]
-        train_lstm_classifier_on(kromp_df, kromp_val_df, {"latents":True, "te_lr":0.0003, "icm_lr":0.0003}, False, "kromp", run, batch_size=128, epochs=30)
+        kanakasabapathy_mask = kanakasabapathy_df["embryo_id"].isin(VAL_EMBRYOS)
+        kanakasabapathy_val_df = kanakasabapathy_df[mask]
+        kanakasabapathy_df = kanakasabapathy_df[~mask]
+        train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.0003, "icm_lr":0.0003}, False, "kanakasabapathy", run, batch_size=128, epochs=30)
 
 
             

@@ -244,12 +244,12 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         run.log({f"{training_name}_te_acc_mean": te_acc_stats.mean, f"{training_name}_te_acc_std":te_acc_stats.std_dev, f"{training_name}_icm_acc_mean":icm_acc_stats.mean, f"{training_name}_icm_acc_std":icm_acc_stats.std_dev})
 
 
-def train_on_kromp_latents(model_name, run, features):
+def train_on_kanakasabapathy_latents(model_name, run, features):
     # just call the image name the embryo id
-    kromp_metadata_df = pd.read_csv(os.path.join("kromp_latents", f"{model_name}.csv")).rename(columns={"Image":"embryo_id"})
-    kromp_lats = np.load(os.path.join("kromp_latents", f"{model_name}.npy"))
-    kromp_lats_df = pd.DataFrame(kromp_lats, index=kromp_metadata_df.index, columns=[f"z_{i}" for i in range(kromp_lats.shape[1])])
-    df = pd.concat([kromp_metadata_df, kromp_lats_df], axis=1)
+    kanakasabapathy_metadata_df = pd.read_csv(os.path.join("kanakasabapathy_latents", f"{model_name}.csv")).rename(columns={"Image":"embryo_id"})
+    kanakasabapathy_lats = np.load(os.path.join("kanakasabapathy_latents", f"{model_name}.npy"))
+    kanakasabapathy_lats_df = pd.DataFrame(kanakasabapathy_lats, index=kanakasabapathy_metadata_df.index, columns=[f"z_{i}" for i in range(kanakasabapathy_lats.shape[1])])
+    df = pd.concat([kanakasabapathy_metadata_df, kanakasabapathy_lats_df], axis=1)
     
     embryo_ids = df["embryo_id"].unique()
     np.random.shuffle(embryo_ids)
@@ -258,7 +258,7 @@ def train_on_kromp_latents(model_name, run, features):
     mask = df["embryo_id"].isin(VAL_EMBRYOS)
     val_df = df[mask]
     df = df[~mask]
-    train_on(df, val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kromp", run, batch_size=128, epochs=40)
+    train_on(df, val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kanakasabapathy", run, batch_size=128, epochs=40)
 
 
 
@@ -270,7 +270,7 @@ def main(model_name, features):
     te_lr = features['te_lr']
     icm_lr = features['icm_lr']
     run_name = features['run_name']
-    run_kromp = features['kromp']
+    run_kanakasabapathy = features['kanakasabapathy']
     weights = [0.4,0.4,0.2]
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
@@ -294,13 +294,13 @@ def main(model_name, features):
             "features": features,
             "val_ratio": val_ratio,
             "weight_decay": weight_decay,
-            "run_kromp": run_kromp
+            "run_kanakasabapathy": run_kanakasabapathy
             }
     )
     learning_rate = 0.00001
 
-    if run_kromp:
-        train_on_kromp_latents(model_name, run, features)
+    if run_kanakasabapathy:
+        train_on_kanakasabapathy_latents(model_name, run, features)
 
     
     metadata_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv"), keep_default_na=(not KEEP_NA))
@@ -347,7 +347,7 @@ if __name__ == "__main__":
     parser.add_argument("--name", help="Model name. Must have already exported latents")
     parser.add_argument("--run-name", help="Wandb run name")
 
-    parser.add_argument("--kromp", action="store_true", help="Use to also train the model on the single frame latent seqs from Kromp et al.")
+    parser.add_argument("--kanakasabapathy", action="store_true", help="Use to also train the model on the single frame latent seqs from Kanakasabapathy et al.")
 
     parser.add_argument("--latents",action="store_true", help="Use to include latents")
     parser.add_argument("--cebra-latents", action="store_true", help="Use to include distance to first frame")
