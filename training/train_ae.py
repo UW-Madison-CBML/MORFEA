@@ -250,8 +250,9 @@ def train_convlstm(
     model_name="", 
     latent_size = 4096
 ):
-    
-    #torch.backends.cudnn.enabled = False
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # have yet to find a fix for this
+    torch.backends.cudnn.enabled = False
 
     torch.cuda.init()
     gc.collect()
@@ -774,7 +775,7 @@ ABLATION STUDY CONFIGURATION
                 plt.close(fig)   
         # export the kanakasabapathy latents
         
-        metadata_df, kanaka_lats,imgs = export_kanakasabapathy(model)
+        metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model)
 
         metadata_df = metadata_df.rename(columns={"Image":"embryo_id"})
         idx = np.random.randint(len(metadata_df))
