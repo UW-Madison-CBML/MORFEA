@@ -779,7 +779,7 @@ ABLATION STUDY CONFIGURATION
 
         metadata_df = metadata_df.rename(columns={"Image":"embryo_id"})
         idx = np.random.randint(len(metadata_df))
-        vol_img = normalize_video([read_gray(os.path.join("kanakasabapathy", metadata_df.iloc[idx]["path"]), 128)], "minmax01")[0]
+        vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 128)], "minmax01")[0]
         recon_img = imgs[idx]
 
         vol_img = (vol_img * 255).astype(np.uint8)
