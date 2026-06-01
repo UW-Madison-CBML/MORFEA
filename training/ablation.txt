@@ -1,1 +1,1 @@
-convlstm mse --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.05 --size 512 --name morfea
+convlstm mse --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.05 --size 1024 --name morfea
