@@ -438,7 +438,7 @@ ABLATION STUDY CONFIGURATION
     cebra_time_model = CEBRA(model_architecture="offset10-model-mse",
                         batch_size=512,
                         learning_rate=5e-5,
-                        temperature=10,
+                        temperature=13,
                         output_dimension=3,
                         num_hidden_units=128,
                         max_iterations=3000,
@@ -779,7 +779,7 @@ ABLATION STUDY CONFIGURATION
 
         metadata_df = metadata_df.rename(columns={"Image":"embryo_id"})
         idx = np.random.randint(len(metadata_df))
-        vol_img = normalize_video([read_gray(os.path.join("Blastocyst_Dataset","Images", metadata_df.iloc[idx]["embryo_id"]), 128)], "minmax01")[0]
+        vol_img = normalize_video([read_gray(os.path.join("kanakasabapathy", metadata_df.iloc[idx]["path"]), 128)], "minmax01")[0]
         recon_img = imgs[idx]
 
         vol_img = (vol_img * 255).astype(np.uint8)
