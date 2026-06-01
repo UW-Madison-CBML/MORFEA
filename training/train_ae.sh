@@ -149,6 +149,7 @@ if [ -n "$EXTRA_ARGS" ]; then
 fi
 
 tar -xvf kanakasabapathy.tar.gz
+mv alldata/ kanakasabapathy/
 eval $CMD
 
 #python -m torch.distributed.launch --nproc_per_node=4 --use_env train.py
