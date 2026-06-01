@@ -369,6 +369,8 @@ ABLATION STUDY CONFIGURATION
     VAL_EMBRYOS = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"}).dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
     torch.cuda.init()
     torch.zeros(1, device=DEVICE)
+    with torch.no_grad():
+        torch.nn.LSTM(5,5,batch_first=True)(torch.rand(1,5,5))
     model = model.to(DEVICE)
     trainable_params = 0
     all_params = 0
@@ -402,7 +404,7 @@ ABLATION STUDY CONFIGURATION
     # Create DataLoaders
     loader = DataLoader(
         train_dataset,
-        gatch_size=128,
+        batch_size=64,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
