@@ -776,8 +776,10 @@ ABLATION STUDY CONFIGURATION
         # export the kanakasabapathy latents
         
         metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model)
-
-        metadata_df = metadata_df.rename(columns={"Image":"embryo_id"})
+        # spoof the ICM grades
+        metadata_df['ICM'] = metadata_df["TE"]
+        # not necessary for kanakasabapathy
+        #metadata_df = metadata_df.rename(columns={"Image":"embryo_id"})
         idx = np.random.randint(len(metadata_df))
         vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 128)], "minmax01")[0]
         recon_img = imgs[idx]
