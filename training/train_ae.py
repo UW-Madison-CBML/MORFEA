@@ -745,8 +745,9 @@ ABLATION STUDY CONFIGURATION
 
                 plt.close(fig) 
                 # look at some validation recons
-                vol_img = embryo_vol[0, -1, 0].cpu().detach().numpy()
-                recon_img = embryo_recon[0, -1, 0].cpu().detach().numpy()
+                rand_idx = np.random.randint(embryo_vol.shape[1]) 
+                vol_img = embryo_vol[0, rand_idx, 0].cpu().detach().numpy()
+                recon_img = embryo_recon[0, rand_idx, 0].cpu().detach().numpy()
 
                 vol_img = (vol_img * 255).astype(np.uint8)
                 recon_img = (recon_img * 255).astype(np.uint8)
