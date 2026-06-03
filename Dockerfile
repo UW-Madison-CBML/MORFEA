@@ -9,6 +9,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-
+# manually install torch dependent packages without deps
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt
+    pip install --no-cache-dir literate-dataclasses cebra==0.4.0 info-nce-pytorch pytorch-crf --no-deps && \
+    pip install --no-cache-dir -r requirements.txt --upgrade-strategy only-if-needed
