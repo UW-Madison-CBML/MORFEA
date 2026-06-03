@@ -436,7 +436,7 @@ ABLATION STUDY CONFIGURATION
         drop_last=False 
     )
     cebra_time_model = CEBRA(model_architecture="offset10-model-mse",
-                        batch_size=512,
+                        batch_size=2048,
                         learning_rate=5e-5,
                         temperature=13,
                         output_dimension=3,
