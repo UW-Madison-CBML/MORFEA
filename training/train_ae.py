@@ -384,7 +384,7 @@ ABLATION STUDY CONFIGURATION
     )
     run.log({"train_params":trainable_params})
     run.log({"params":all_params})
-    learning_rate = 2e-4
+    learning_rate = 5e-4
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
     df = pd.read_csv(os.path.abspath("index.csv"))
@@ -405,11 +405,12 @@ ABLATION STUDY CONFIGURATION
     # Create DataLoaders
     loader = DataLoader(
         train_dataset,
-        batch_size=64,
+        batch_size=128,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
-        drop_last=True
+        drop_last=True,
+        persistent_workers=True
     )
     val_loader = DataLoader(
         val_dataset,
@@ -451,6 +452,9 @@ ABLATION STUDY CONFIGURATION
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
 
     for epoch in range(epochs):
+        gc.collect()
+        torch.cuda.empty_cache()
+
         model.train()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
