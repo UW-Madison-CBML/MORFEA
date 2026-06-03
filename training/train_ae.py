@@ -252,7 +252,7 @@ def train_convlstm(
 ):
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # have yet to find a fix for this
-    torch.backends.cudnn.enabled = False
+    #torch.backends.cudnn.enabled = False
 
     torch.cuda.init()
     gc.collect()
