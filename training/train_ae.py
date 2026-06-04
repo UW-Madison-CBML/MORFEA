@@ -90,10 +90,10 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
     return weight * output
 
 
-def save_and_push_model(in_model, repo_name, required_files, model_config=None):
-    model = in_model.clone().cpu()
+def save_and_push_model(model, repo_name, required_files, model_config=None):
+    model.cpu()
     os.makedirs(repo_name, exist_ok=True)
-    device = next(in_model.parameters()).device
+    device = next(model.parameters()).device
     clean_state_dict = {k: v.cpu().clone() for k, v in model.state_dict().items()}
     # make a copy of the model on the cpu()
     model.load_state_dict(clean_state_dict)
@@ -481,7 +481,7 @@ def train_lstm(
 
             loss = loss.detach().cpu() 
             total += loss.item()
-            count += 1
+            coun( += 1
 
             if (index % 50 == 0) and run is not None:
                 log_dict = {
@@ -557,8 +557,24 @@ def train_lstm(
             "normalization": "minmax01",
             "date": date_label,
         }
+        model_clone = ConvLSTMAutoencoder(
+            None,
+            input_channels=1,
+            encoder_layers=2,
+            decoder_layers=2,
+            latent_size=latent_size,
+            use_classifier=False,
+            num_classes=2,
+            use_latent_split=False,
+            # Ablation parameters
+            dropout_rate=dropout_rate,
+            use_lstm=use_lstm,
+            use_residual=use_residual,
+            use_batchnorm=use_batchnorm
+        )
 
-        save_and_push_model(model, model_name +"-"+ date_label, required_files, model_config=hf_config)
+        model_clone.load_state_dict(model.state_dict())
+        save_and_push_model(model_clone, model_name +"-"+ date_label, required_files, model_config=hf_config)
         val_metrics = {
             'mse': RunningStats(),
             'l1': RunningStats(),
