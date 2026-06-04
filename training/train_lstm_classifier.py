@@ -199,10 +199,6 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         icm_confusion_mat = torch.zeros((3,3))
         with torch.no_grad():
             for features, targets, lengths in loader_te_val:
-                
-                print(f"targets shape: {targets.shape}")
-
-                print(f"features shape: {features.shape}")
 
                 features = features.to(DEVICE)
                 logits = model_te(features, lengths)
