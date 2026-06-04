@@ -13,6 +13,7 @@ from umap import UMAP
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from torch.optim.lr_scheduler import CosineAnnealingLR
+import gc
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def collate_padd(batch):
@@ -134,6 +135,7 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         num_workers=16,
         pin_memory=True,
         drop_last=True,
+        persistent_workers=True,
         collate_fn=collate_padd)
     loader_icm = DataLoader(
         dataset_icm,
@@ -142,6 +144,7 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         num_workers=16,
         pin_memory=True,
         drop_last=True, 
+        persistent_workers=True,
         collate_fn=collate_padd)
     loader_te_val = DataLoader(
         dataset_te_val,
@@ -238,6 +241,8 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         print("te confusion:"); print(te_confusion_mat)
         print("icm confusion:"); print(icm_confusion_mat)
         run.log({f"{training_name}_te_acc_mean": te_acc_stats.mean, f"{training_name}_te_acc_std":te_acc_stats.std_dev, f"{training_name}_icm_acc_mean":icm_acc_stats.mean, f"{training_name}_icm_acc_std":icm_acc_stats.std_dev})
+        gc.collect()
+        torch.cuda.empty_cache()
 
 
 def train_on_kanakasabapathy_latents(model_name, run, features):
@@ -255,6 +260,7 @@ def train_on_kanakasabapathy_latents(model_name, run, features):
     val_df = df[mask]
     df = df[~mask]
     train_on(df, val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kanakasabapathy", run, batch_size=128, epochs=40)
+    
 
 
 
@@ -272,7 +278,6 @@ def main(model_name, features):
     torch.autograd.detect_anomaly(True)
 
         
-    torch.backends.cudnn.enabled = False
 
     wandb.login(key=os.getenv("WANDB_KEY"))
     
@@ -293,7 +298,7 @@ def main(model_name, features):
             "run_kanakasabapathy": run_kanakasabapathy
             }
     )
-    learning_rate = 0.00001
+    learning_rate = 0.0001
 
     if run_kanakasabapathy:
         train_on_kanakasabapathy_latents(model_name, run, features)

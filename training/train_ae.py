@@ -90,11 +90,12 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
     return weight * output
 
 
-def save_and_push_model(model, repo_name, required_files, model_config=None):
+def save_and_push_model(in_model, repo_name, required_files, model_config=None):
+    model = in_model.clone().cpu()
     os.makedirs(repo_name, exist_ok=True)
-    device = next(model.parameters()).device
+    device = next(in_model.parameters()).device
     clean_state_dict = {k: v.cpu().clone() for k, v in model.state_dict().items()}
-    model.cpu()
+    # make a copy of the model on the cpu()
     model.load_state_dict(clean_state_dict)
     try:
         model.save_pretrained(repo_name)
@@ -257,8 +258,6 @@ def train_lstm(
     batch_size = 64
 
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # have yet to find a fix for this
-    #torch.backends.cudnn.enabled = False
 
     torch.cuda.init()
     gc.collect()
@@ -712,8 +711,8 @@ def train_lstm(
         # 30% seems about right?
         VAL_EMBRYOS = embryo_ids[:int(0.3 * len(embryo_ids))]
         kanakasabapathy_mask = kanakasabapathy_df["embryo_id"].isin(VAL_EMBRYOS)
-        kanakasabapathy_val_df = kanakasabapathy_df[mask]
-        kanakasabapathy_df = kanakasabapathy_df[~mask]
+        kanakasabapathy_val_df = kanakasabapathy_df[kanakasabapathy_mask]
+        kanakasabapathy_df = kanakasabapathy_df[~kanakasabapathy_mask]
         train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.0003, "icm_lr":0.0003}, False, "kanakasabapathy", run, batch_size=128, epochs=30)
 
 
