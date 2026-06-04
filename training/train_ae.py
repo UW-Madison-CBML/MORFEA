@@ -253,7 +253,7 @@ def train_lstm(
 
     
     epochs = 30
-    learning_rate = 5e-4
+    learning_rate = 2e-4
     batch_size = 64
 
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
