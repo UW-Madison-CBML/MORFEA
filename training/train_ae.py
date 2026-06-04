@@ -91,7 +91,6 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
 
 
 def save_and_push_model(model, repo_name, required_files, model_config=None):
-    model.cpu()
     os.makedirs(repo_name, exist_ok=True)
     device = next(model.parameters()).device
     clean_state_dict = {k: v.cpu().clone() for k, v in model.state_dict().items()}
@@ -263,8 +262,7 @@ def train_lstm(
     gc.collect()
     torch.cuda.empty_cache()
     
-    print(torch.cuda.memory_summary(device=None, abbreviated=False))
-    torch.autograd.detect_anomaly(True)
+    #torch.autograd.detect_anomaly(True)
     # Build loss description for logging
    
     date_label = datetime.now().strftime("%Y-%m-%d")
@@ -352,7 +350,6 @@ def train_lstm(
         num_workers=16,
         pin_memory=True,
         drop_last=True,
-        persistent_workers=True
     )
     val_loader = DataLoader(
         val_dataset,
@@ -378,25 +375,19 @@ def train_lstm(
         pin_memory=True,
         drop_last=False 
     )
-    cebra_time_model = CEBRA(model_architecture="offset10-model-mse",
-                        batch_size=1024,
-                        learning_rate=5e-5,
-                        temperature=13,
-                        output_dimension=3,
-                        num_hidden_units=128,
-                        max_iterations=3000,
-                        distance="euclidean",
-                        conditional="time",
-                        device="cuda_if_available",
-                        verbose=True,
-                        time_offsets=10)
+    
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
 
     for epoch in range(epochs):
+        print(f"epoch {epoch}")
+        print(torch.cuda.memory_summary(device=DEVICE, abbreviated=False))
         gc.collect()
         torch.cuda.empty_cache()
 
         model.train()
+        if model.decoder.lstm_dec is not None and model.encoder.lstm_enc is not None:
+            model.encoder.lstm_enc.flatten_parameters()
+            model.decoder.lstm_dec.flatten_parameters()
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
         count = 0
@@ -404,10 +395,11 @@ def train_lstm(
         end_time = time.perf_counter()
         for index, (embryo_vol, _, _) in enumerate(pbar):
             optimizer.zero_grad()
-
+            t0 = time.perf_counter()
             embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, 500, 500)
-
+            t1 = time.perf_counter()
             embryo_recon, embryo_lat = model(embryo_vol)
+            t2 = time.perf_counter()
             if(index % 47 == 0):
                 vol_img = embryo_vol[0, -1, 0].cpu().detach().numpy()
                 recon_img = embryo_recon[0, -1, 0].cpu().detach().numpy()
@@ -464,6 +456,7 @@ def train_lstm(
                 continue
 
             loss.backward()
+            t3 = time.perf_counter()
             total_norm = 0
             for p in model.parameters():
                 if p.grad is not None:
@@ -478,6 +471,13 @@ def train_lstm(
             scheduler.step()
             optimizer.step()
             end_time = time.perf_counter()
+            if (index % 5 == 0):
+                run.log({
+                    "data_to_gpu_time": t1 - t0,
+                    "model_forward_time": t2 - t1,
+                    "grad_calc_time": t3 - t2,
+                    "optimizer_step_time": end_time - t3,
+                        })
 
             loss = loss.detach().cpu() 
             total += loss.item()
@@ -606,6 +606,20 @@ def train_lstm(
         }
         run.log(val_log_dict)
         run.log(val_log_std_dict)
+
+
+        cebra_time_model = CEBRA(model_architecture="offset10-model-mse",
+            batch_size=1024,
+            learning_rate=5e-5,
+            temperature=13,
+            output_dimension=3,
+            num_hidden_units=128,
+            max_iterations=3000,
+            distance="euclidean",
+            conditional="time",
+            device="cuda_if_available",
+            verbose=True,
+            time_offsets=10)
         cebra_latents = []
         cebra_labels = []
         model.eval()
@@ -614,11 +628,12 @@ def train_lstm(
             for embryo_vol in full_seq_loader_train:
                 embryo_vol = embryo_vol.to(DEVICE)
                 _, z_seq = model(embryo_vol)
-                traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
+                traj = z_seq.cpu().numpy()[0] # batch size one just use that batch
                 cebra_latents.append(traj)
                 cebra_labels.append((np.arange(len(traj)) + offset ).reshape(-1, 1).astype(np.float32))
                 offset += len(traj) + 10000
         cebra_time_model.fit(np.concatenate(cebra_latents, axis=0), np.concatenate(cebra_labels, axis=0))
+        
         #cebra_time_model.save("cebra_time_model.pt")
 
 
@@ -629,7 +644,7 @@ def train_lstm(
                     continue
                 embryo_vol = embryo_vol.to(DEVICE) 
                 embryo_recon, z_seq = model(embryo_vol)
-                traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
+                traj = z_seq.cpu().numpy()[0] # batch size one just use that batch
                 distance_mat = distance_matrix(traj,traj)
                 fig, ax = plt.subplots(figsize=(8, 6))
                 im = ax.imshow(distance_mat, cmap='viridis')
@@ -651,6 +666,7 @@ def train_lstm(
                 wandb.log({"pca_val": wandb.Image(fig)})
 
                 plt.close(fig)                
+                
                 cebra_embedding = cebra_time_model.transform(traj, session_id=0) # i guess dont batch it?
                 fig, ax = plt.subplots(figsize=(8, 6))
                 ax = fig.add_subplot(111, projection='3d')
@@ -674,8 +690,9 @@ def train_lstm(
      
                 images = wandb.Image(comparison, caption="embryo_recon_val")
                 run.log({"reconstruction_val": images})
-
+        
         rand_img = np.random.randint(40, 64) 
+        del cebra_time_model
         with torch.no_grad():
             for i, embryo_vol in enumerate(full_seq_loader_train):
                 if i % rand_img != 0:
@@ -696,6 +713,7 @@ def train_lstm(
         # export the kanakasabapathy latents
         
         metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model)
+        model.train()
         # spoof the ICM grades
         metadata_df['ICM'] = metadata_df["TE"]
         # not necessary for kanakasabapathy
