@@ -301,7 +301,6 @@ def train_lstm(
     torch.cuda.init()
     model = ConvLSTMAutoencoder(
         None,
-        seq_len=50,
         input_channels=1,
         encoder_layers=2,
         decoder_layers=2,
@@ -529,7 +528,6 @@ def train_lstm(
         hf_config = {
             "model_type": "ConvLSTMAutoencoder",
             "architecture": "ConvLSTM Autoencoder",
-            "seq_len": 50,
             "input_channels": 1,
             "encoder_hidden_dim": 256,
             "encoder_layers": 2,
