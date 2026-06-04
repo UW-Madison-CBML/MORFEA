@@ -481,7 +481,7 @@ def train_lstm(
 
             loss = loss.detach().cpu() 
             total += loss.item()
-            coun( += 1
+            count += 1
 
             if (index % 50 == 0) and run is not None:
                 log_dict = {
@@ -557,8 +557,7 @@ def train_lstm(
             "normalization": "minmax01",
             "date": date_label,
         }
-        model_clone = ConvLSTMAutoencoder(
-            None,
+        model_clone = ConvLSTMAutoencoder(None,
             input_channels=1,
             encoder_layers=2,
             decoder_layers=2,
@@ -566,12 +565,8 @@ def train_lstm(
             use_classifier=False,
             num_classes=2,
             use_latent_split=False,
-            # Ablation parameters
             dropout_rate=dropout_rate,
-            use_lstm=use_lstm,
-            use_residual=use_residual,
-            use_batchnorm=use_batchnorm
-        )
+            use_lstm=use_lstm,use_residual=use_residual,use_batchnorm=use_batchnorm)
 
         model_clone.load_state_dict(model.state_dict())
         save_and_push_model(model_clone, model_name +"-"+ date_label, required_files, model_config=hf_config)
