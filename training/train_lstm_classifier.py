@@ -13,6 +13,7 @@ from umap import UMAP
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from tqdm import tqdm
 import gc
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -163,7 +164,7 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
     scheduler_te = CosineAnnealingLR(optimizer_te, len(loader_te) * epochs)
     scheduler_icm = CosineAnnealingLR(optimizer_icm, len(loader_icm) * epochs)
 
-    for epoch in range(epochs):
+    for epoch in tqdm(range(epochs)):
         model_te.train(); model_icm.train()
         # TE grades
         for features, targets, lengths in loader_te:
