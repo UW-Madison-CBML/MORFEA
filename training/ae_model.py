@@ -145,9 +145,8 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
 
-    def __init__(self, seq_len, latent_size=4096, num_layers=2, use_lstm=True):
+    def __init__(self, latent_size=4096, num_layers=2, use_lstm=True):
         super(Decoder, self).__init__()
-        self.seq_len = seq_len
         self.latent_size = latent_size
 
         self.latent_expand = nn.Linear(latent_size, 256 * 16 * 16)
@@ -215,7 +214,6 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
     def __init__(
         self,
         config=None,
-        seq_len=20,
         input_channels=1,
         encoder_layers=2,
         decoder_layers=2,
@@ -230,7 +228,6 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         use_batchnorm=True
         ):
         super(ConvLSTMAutoencoder, self).__init__()
-        self.seq_len = seq_len
         self.use_classifier = use_classifier
         self.latent_size = latent_size
         self.use_latent_split = use_latent_split
@@ -241,7 +238,6 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         self.use_batchnorm = use_batchnorm
         if(config != None):
             if isinstance(config, dict):
-                self.seq_len = config.get('seq_len', seq_len)
                 self.use_classifier = config.get('use_classifier', use_classifier)
                 self.latent_size = config.get('latent_size', latent_size)
                 self.use_latent_split = config.get('use_latent_split', use_latent_split)
@@ -250,7 +246,6 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
                 self.use_residual = config.get('use_residual', use_residual)
                 self.use_batchnorm = config.get('use_batchnorm', use_batchnorm)
             else:
-                self.seq_len = config.seq_len
                 self.use_classifier = config.use_classifier
                 self.latent_size = config.latent_size
                 self.use_latent_split = config.use_latent_split
