@@ -132,10 +132,10 @@ class Encoder(nn.Module):
         # Flatten and compress spatial dimensions with linear layer
         B, T, C, H, W = h_seq.shape
         h_flat = h_seq.view(B, T, C * H * W)  # Linear just works on bottom most dim
-        z_compressed = self.dropout(h_flat)
-        z_compressed = F.relu(self.latent_compress(z_compressed))
+        z_compressed = F.relu(self.latent_compress(h_flat))
         if self.use_lstm:
             z_compressed, _ = self.lstm_enc(z_compressed)
+        z_compressed = self.dropout(z_compressed)
         z_compressed = self.lin1(z_compressed)
         z_seq = z_compressed.view(B, T, self.latent_size)  
 
@@ -167,7 +167,8 @@ class Decoder(nn.Module):
             self.lstm_dec = nn.LSTM(latent_size, latent_size, batch_first=True)
         else:
             self.lstm_dec = None
-
+    
+        self.dropout = nn.Dropout(0.1)
         self.spatial_decoder = nn.Sequential(
             # 16 -> 32 
             ResidualUpBlock(256, 128),
@@ -190,6 +191,7 @@ class Decoder(nn.Module):
         z_flat = F.relu(self.lin1(z_flat))
         if self.use_lstm:
             z_flat, _ = self.lstm_dec(z_flat)
+        z_flat = self.dropout(z_flat) 
         z_expanded = F.relu(self.latent_expand(z_flat))  # (B*T, latent_dim * 16 * 16)
         z_spatial = z_expanded.view(B, T, 256, 16, 16)  # (B, T, latent_dim, 16, 16)
 

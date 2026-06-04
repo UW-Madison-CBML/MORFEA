@@ -255,7 +255,8 @@ def train_lstm(
     epochs = 30
     learning_rate = 2e-4
     batch_size = 64
-
+    warm_restarts = False
+    # ------------------------------------------------------
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     torch.cuda.init()
@@ -290,6 +291,7 @@ def train_lstm(
             "latent_size": latent_size,
             "image_size": 128,
             "distributed": False,
+            "warm_restarts":True,
         },
     )
 
@@ -376,7 +378,7 @@ def train_lstm(
         drop_last=False 
     )
     
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, len(loader) * epochs) if warm_restarts else torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
 
     for epoch in range(epochs):
         print(f"epoch {epoch}")
