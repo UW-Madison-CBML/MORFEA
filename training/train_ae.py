@@ -238,18 +238,24 @@ def reconstruction_loss(x_rec, x_true, l1_weight=0.5, ms_ssim_weight=0.5):
     }
 
 
-def train_convlstm(
+def train_lstm(
     loss_type="l1",
     ms_ssim_weight=0.5,
     rec_weight=0.5,
     temporal_weight=0.1,
     dropout_rate=0.1,
-    use_convlstm=True,
+    use_lstm=True,
     use_residual=True,
     use_batchnorm=True,
     model_name="", 
-    latent_size = 4096
-):
+    latent_size = 4096):
+    #hyperparameters:
+
+    
+    epochs = 30
+    learning_rate = 5e-4
+    batch_size = 64
+
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # have yet to find a fix for this
     #torch.backends.cudnn.enabled = False
@@ -259,28 +265,9 @@ def train_convlstm(
     torch.cuda.empty_cache()
     
     print(torch.cuda.memory_summary(device=None, abbreviated=False))
-    #torch.autograd.detect_anomaly(True)
+    torch.autograd.detect_anomaly(True)
     # Build loss description for logging
-    loss_components = []
-    if ms_ssim_weight > 0:
-        loss_components.append(f"MS-SSIM({ms_ssim_weight})")
-    if rec_weight > 0:
-        loss_components.append(f"{loss_type.upper()}({rec_weight})")
-    if temporal_weight > 0:
-        loss_components.append(f"Temporal({temporal_weight})")
-    loss_description = " + ".join(loss_components) if loss_components else "None"
-
-    # Build model description for logging
-    model_features = []
-    if use_convlstm:
-        model_features.append("ConvLSTM")
-    if use_residual:
-        model_features.append("Residual")
-    if use_batchnorm:
-        model_features.append("BatchNorm")
-    if dropout_rate > 0:
-        model_features.append(f"Dropout({dropout_rate})")
-    model_description = "+".join(model_features) if model_features else "Baseline"
+   
     date_label = datetime.now().strftime("%Y-%m-%d")
 
     wandb.login(key=os.getenv("WANDB_KEY"))
@@ -289,72 +276,34 @@ def train_convlstm(
         project="IVF-Training",
         name=model_name +"-" + date_label,
         config={
-            "learning_rate": 0.02,
+            "learning_rate": learning_rate,
+            "batch_size":batch_size,
             "architecture": "ConvLSTM Autoencoder",
-            "model_features": model_description,
             "dataset": "https://zenodo.org/records/7912264",
-            "epochs": 10,
-            "train_split": 0.85,
-            "val_split": 0.15,
-            "loss": loss_description,
-            "loss_type": loss_type,
+            "epochs": epochs,
+            "train_split": "not ICM graded",
+            "val_split": "ICM graded",
             "ms_ssim_weight": ms_ssim_weight,
             "rec_weight": rec_weight,
             "temporal_weight": temporal_weight,
             "dropout_rate": dropout_rate,
-            "use_convlstm": use_convlstm,
+            "use_lstm": use_lstm,
             "use_residual": use_residual,
             "use_batchnorm": use_batchnorm,
             "latent_size": latent_size,
-            "seq_len": 50,
             "image_size": 128,
             "distributed": False,
         },
     )
 
     login(os.getenv("HF_KEY"))
-    print(torch.cuda.memory_summary(device=None, abbreviated=False))
-    print(DEVICE)
-    print(f"\n{'='*60}")
-    print(f"ABLATION STUDY - Training Configuration")
-    print(f"{'='*60}")
-    print(f"\nLoss Configuration:")
-    print(f"  Base Loss Type: {loss_type.upper()}")
-    print(f"  MS-SSIM Weight: {ms_ssim_weight} {'(DISABLED)' if ms_ssim_weight == 0 else ''}")
-    print(f"  Reconstruction Weight: {rec_weight} {'(DISABLED)' if rec_weight == 0 else ''}")
-    print(f"  Temporal Smoothness Weight: {temporal_weight} {'(DISABLED)' if temporal_weight == 0 else ''}")
-    print(f"  Combined Loss: {loss_description}")
-    print(f"\nModel Architecture Configuration:")
-    print(f"  ConvLSTM: {'ENABLED' if use_convlstm else 'DISABLED'}")
-    print(f"  Residual Connections: {'ENABLED' if use_residual else 'DISABLED'}")
-    print(f"  Batch Normalization: {'ENABLED' if use_batchnorm else 'DISABLED'}")
-    print(f"  Dropout Rate: {dropout_rate} {'(DISABLED)' if dropout_rate == 0 else ''}")
-    print(f"  Model Features: {model_description}")
-    print(f"{'='*60}\n")
-
-    # Save detailed training configuration
-    config_content = f"""ConvLSTM Autoencoder Training Configuration (ABLATION)
-================================================================================
-Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-
-ABLATION STUDY CONFIGURATION
-================================================================================
-
-"""
-
-    with open("training_config_detailed.txt", "w") as f:
-        f.write(config_content)
-
-    print("Configuration saved to training_config_detailed.txt")
 
     torch.cuda.init()
     model = ConvLSTMAutoencoder(
         None,
         seq_len=50,
         input_channels=1,
-        encoder_hidden_dim=256,
         encoder_layers=2,
-        decoder_hidden_dim=128,
         decoder_layers=2,
         latent_size=latent_size,
         use_classifier=False,
@@ -362,16 +311,13 @@ ABLATION STUDY CONFIGURATION
         use_latent_split=False,
         # Ablation parameters
         dropout_rate=dropout_rate,
-        use_convlstm=use_convlstm,
+        use_lstm=use_lstm,
         use_residual=use_residual,
         use_batchnorm=use_batchnorm
     )
 
     VAL_EMBRYOS = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"}).dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
     torch.cuda.init()
-    torch.zeros(1, device=DEVICE)
-    with torch.no_grad():
-        torch.nn.LSTM(5,5,batch_first=True)(torch.rand(1,5,5))
     model = model.to(DEVICE)
     trainable_params = 0
     all_params = 0
@@ -384,7 +330,6 @@ ABLATION STUDY CONFIGURATION
     )
     run.log({"train_params":trainable_params})
     run.log({"params":all_params})
-    learning_rate = 5e-4
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
     df = pd.read_csv(os.path.abspath("index.csv"))
@@ -402,10 +347,9 @@ ABLATION STUDY CONFIGURATION
     full_seq_dataset_val = IVFEmbryoDataset(full_seq_df_val, resize=128, norm="minmax01")
     full_seq_dataset_train = IVFEmbryoDataset(full_seq_df_train, resize=128, norm="minmax01")
 
-    # Create DataLoaders
     loader = DataLoader(
         train_dataset,
-        batch_size=128,
+        batch_size=batch_size,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
@@ -415,10 +359,10 @@ ABLATION STUDY CONFIGURATION
     val_loader = DataLoader(
         val_dataset,
         batch_size=1,
-        shuffle=False,  # No shuffle for validation
+        shuffle=False,
         num_workers=16,
         pin_memory=True,
-        drop_last=False  # Don't drop last for validation
+        drop_last=False 
     )
     full_seq_loader_val = DataLoader(
         full_seq_dataset_val,
@@ -437,7 +381,7 @@ ABLATION STUDY CONFIGURATION
         drop_last=False 
     )
     cebra_time_model = CEBRA(model_architecture="offset10-model-mse",
-                        batch_size=2048,
+                        batch_size=1024,
                         learning_rate=5e-5,
                         temperature=13,
                         output_dimension=3,
@@ -448,7 +392,6 @@ ABLATION STUDY CONFIGURATION
                         device="cuda_if_available",
                         verbose=True,
                         time_offsets=10)
-    epochs = 30
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
 
     for epoch in range(epochs):
@@ -466,7 +409,6 @@ ABLATION STUDY CONFIGURATION
 
             embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, 500, 500)
 
-            # Forward pass - returns (reconstruction, latent_seq)
             embryo_recon, embryo_lat = model(embryo_vol)
             if(index % 47 == 0):
                 vol_img = embryo_vol[0, -1, 0].cpu().detach().numpy()
@@ -489,13 +431,12 @@ ABLATION STUDY CONFIGURATION
                 wandb.log({"temp_smoothness": wandb.Image(fig)})
 
                 plt.close(fig)
-            # Reconstruction loss using MS-SSIM + L1 or MSE (with configurable weights)
+
             if loss_type == "l1":
                 rec_loss, rec_metrics = reconstruction_loss(
                     embryo_recon, embryo_vol, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight
                 )
             elif loss_type == "mse":
-                # MS-SSIM + MSE loss
                 B, T, C, H, W = embryo_recon.shape
                 x_rec_flat = embryo_recon.view(B * T, C, H, W)
                 x_true_flat = embryo_vol.view(B * T, C, H, W)
@@ -540,7 +481,7 @@ ABLATION STUDY CONFIGURATION
             optimizer.step()
             end_time = time.perf_counter()
 
-            
+            loss = loss.detach().cpu() 
             total += loss.item()
             count += 1
 
@@ -576,38 +517,12 @@ ABLATION STUDY CONFIGURATION
         run.log({"avg_loss": avg_loss})
         print(f"epoch {epoch} avg loss={avg_loss:.4f}")
 
-        torch.save(model.state_dict(), "convlstm_model_weights.pth")
 
         date_label = datetime.now().strftime("%Y-%m-%d")
-        config_for_hash = {
-            "mode": "convlstm",
-            "loss_type": loss_type,
-            "ms_ssim_weight": ms_ssim_weight,
-            "rec_weight": rec_weight,
-            "temporal_weight": temporal_weight,
-            "dropout_rate": dropout_rate,
-            "use_convlstm": use_convlstm,
-            "use_residual": use_residual,
-            "use_batchnorm": use_batchnorm,
-            "learning_rate": 2e-4,
-            "encoder_hidden_dim": 256,
-            "encoder_layers": 2,
-            "decoder_hidden_dim": 128,
-            "decoder_layers": 2,
-            "latent_size": latent_size,
-            "seq_len": 50,
-            "image_size": 128,
-        }
-
+        
         required_files = [
-            "train.py",
-            "raffael_model.py",
-            "raffael_losses.py",
-            "raffael_conv_lstm.py",
-            "dataset_ivf.py",
-            "train_model.sh",
-            "training_config.txt",
-            "training_config_detailed.txt",
+            "train_ae.py",
+            "ae_model.py",
         ]
 
 
@@ -625,30 +540,24 @@ ABLATION STUDY CONFIGURATION
             "num_classes": 2,
             "use_latent_split": False,
             "image_size": 128,
-            # Ablation parameters
             "dropout_rate": dropout_rate,
-            "use_convlstm": use_convlstm,
+            "use_lstm": use_lstm,
             "use_residual": use_residual,
             "use_batchnorm": use_batchnorm,
-            # Loss configuration
             "loss_type": loss_type,
             "ms_ssim_weight": ms_ssim_weight,
             "rec_weight": rec_weight,
             "temporal_weight": temporal_weight,
-            "loss_description": loss_description,
-            # Training configuration
-            "learning_rate": 2e-4,
+            "learning_rate": learning_rate,
             "weight_decay": 1e-5,
             "optimizer": "Adam",
             "scheduler": "CosineAnnealingLR",
             "batch_size": 1,
             "epochs": 10,
             "gradient_clip": 5.0,
-            # Dataset
             "dataset": "https://zenodo.org/records/7912264",
             "resize": 128,
             "normalization": "minmax01",
-            # Reproducibility
             "date": date_label,
         }
 
@@ -678,8 +587,6 @@ ABLATION STUDY CONFIGURATION
                 ms_ssim_val = ms_ssim(val_recon_flat, embryo_vol_flat)
                 val_metrics['ssim'].push((1 - ms_ssim_val).item())
 
-                # Temporal smoothness of latents
-                # val_lat is (B, T, latent_size)
                 if T > 1:
                     val_metrics['temp'].push(temporal_smoothness_loss(val_lat).item())
         # Log to wandb with val_ prefix
@@ -823,13 +730,12 @@ if __name__ == "__main__":
     import sys
     import argparse
 
-    # Check if using old command line interface
-    if len(sys.argv) > 1 and sys.argv[1] == "convlstm":
+    if len(sys.argv) > 1 and sys.argv[1] == "lstm":
         mode = sys.argv[1]
         parser = argparse.ArgumentParser(description="Train ConvLSTM Autoencoder with Ablation Studies")
         parser.add_argument("mode", type=str, help="Training mode")
 
-        # Loss ablation arguments
+        # loss ablation arguments
         parser.add_argument("--loss-type", type=str, default="l1", choices=["l1", "mse"],
                           help="Reconstruction loss type: l1 or mse (default: l1)")
         parser.add_argument("--ms-ssim-weight", type=float, default=0.5,
@@ -838,11 +744,10 @@ if __name__ == "__main__":
                           help="Weight for reconstruction loss (default: 0.5, set to 0 to disable)")
         parser.add_argument("--temporal-weight", type=float, default=0.1,
                           help="Weight for temporal smoothness loss (default: 0.1, set to 0 to disable)")
-
-        # Model ablation arguments
+        #model layer ablations
         parser.add_argument("--dropout-rate", type=float, default=0.1,
                           help="Dropout rate (default: 0.1, set to 0 to disable)")
-        parser.add_argument("--no-convlstm", action="store_true",
+        parser.add_argument("--no-lstm", action="store_true",
                           help="Disable ConvLSTM (no temporal modeling)")
         parser.add_argument("--no-residual", action="store_true",
                           help="Disable residual connections")
@@ -852,13 +757,13 @@ if __name__ == "__main__":
         parser.add_argument("--size", type=int, default=4096, help="lat size bruh")
         args = parser.parse_args()
 
-        train_convlstm(
+        train_lstm(
             loss_type=args.loss_type,
             ms_ssim_weight=args.ms_ssim_weight,
             rec_weight=args.rec_weight,
             temporal_weight=args.temporal_weight,
             dropout_rate=args.dropout_rate,
-            use_convlstm=not args.no_convlstm,
+            use_lstm=not args.no_lstm,
             use_residual=not args.no_residual,
             use_batchnorm=not args.no_batchnorm,
             model_name = args.name,

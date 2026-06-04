@@ -69,10 +69,9 @@ class ResidualUpBlock(nn.Module):
 
 class Encoder(nn.Module):
 
-    def __init__(self, input_channels=1, hidden_dim=256, num_layers=2, latent_size=4096, use_convlstm=True):
+    def __init__(self, input_channels=1, num_layers=2, latent_size=4096, use_lstm=True):
         super(Encoder, self).__init__()
 
-        self.hidden_dim = hidden_dim
         self.latent_size = latent_size
 
         self.spatial_cnn = nn.Sequential(
@@ -86,7 +85,7 @@ class Encoder(nn.Module):
             ResidualBlock(128, 256, downsample=True),
         )
 
-        self.use_convlstm = use_convlstm
+        self.use_lstm = use_lstm
         """if not self.use_convlstm:
             self.convlstm = None 
         else:
@@ -98,14 +97,15 @@ class Encoder(nn.Module):
                 batch_first=True,
                 return_all_layers=False
                 )"""
-        if self.use_convlstm:
+        
+        self.dropout = nn.Dropout(0.1)
+
+        self.latent_compress = nn.Linear(256 * 16 * 16, latent_size)
+        if self.use_lstm:
             self.lstm_enc = nn.LSTM(latent_size, latent_size, batch_first=True)
         else:
             self.lstm_enc = None
 
-        self.dropout = nn.Dropout(0.1)
-
-        self.latent_compress = nn.Linear(hidden_dim * 16 * 16, latent_size)
         self.lin1 = nn.Linear(latent_size,latent_size)
 
 
@@ -134,7 +134,7 @@ class Encoder(nn.Module):
         h_flat = h_seq.view(B, T, C * H * W)  # Linear just works on bottom most dim
         z_compressed = self.dropout(h_flat)
         z_compressed = F.relu(self.latent_compress(z_compressed))
-        if self.use_convlstm:
+        if self.use_lstm:
             z_compressed, _ = self.lstm_enc(z_compressed)
         z_compressed = self.lin1(z_compressed)
         z_seq = z_compressed.view(B, T, self.latent_size)  
@@ -145,15 +145,14 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
 
-    def __init__(self, seq_len, latent_size=4096, latent_dim=256, hidden_dim=256, num_layers=2, use_convlstm=True):
+    def __init__(self, seq_len, latent_size=4096, num_layers=2, use_lstm=True):
         super(Decoder, self).__init__()
         self.seq_len = seq_len
-        self.latent_dim = latent_dim
         self.latent_size = latent_size
 
-        self.latent_expand = nn.Linear(latent_size, latent_dim * 16 * 16)
+        self.latent_expand = nn.Linear(latent_size, 256 * 16 * 16)
 
-        self.use_convlstm = use_convlstm
+        self.use_lstm = use_lstm
         """if not self.use_convlstm:
             self.convlstm = None 
         else:
@@ -165,14 +164,14 @@ class Decoder(nn.Module):
                 batch_first=True,
                 return_all_layers=False
             )"""
-        if self.use_convlstm:
+        if self.use_lstm:
             self.lstm_dec = nn.LSTM(latent_size, latent_size, batch_first=True)
         else:
             self.lstm_dec = None
 
         self.spatial_decoder = nn.Sequential(
             # 16 -> 32 
-            ResidualUpBlock(hidden_dim, 128),
+            ResidualUpBlock(256, 128),
 
             # 32 -> 64 
             ResidualUpBlock(128, 64),
@@ -190,10 +189,10 @@ class Decoder(nn.Module):
 
         z_flat = z_seq # linear works on bottom most dim
         z_flat = F.relu(self.lin1(z_flat))
-        if self.use_convlstm:
+        if self.use_lstm:
             z_flat, _ = self.lstm_dec(z_flat)
         z_expanded = F.relu(self.latent_expand(z_flat))  # (B*T, latent_dim * 16 * 16)
-        z_spatial = z_expanded.view(B, T, self.latent_dim, 16, 16)  # (B, T, latent_dim, 16, 16)
+        z_spatial = z_expanded.view(B, T, 256, 16, 16)  # (B, T, latent_dim, 16, 16)
 
         """# ConvLSTM decodes temporal dimension
         if(self.use_convlstm):
@@ -218,9 +217,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         config=None,
         seq_len=20,
         input_channels=1,
-        encoder_hidden_dim=256,
         encoder_layers=2,
-        decoder_hidden_dim=128,
         decoder_layers=2,
         latent_size=4096,
         use_classifier=True,
@@ -228,71 +225,61 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         use_latent_split=False,
         # Ablation parameters
         dropout_rate=0.1,
-        use_convlstm=True,
+        use_lstm=True,
         use_residual=True,
         use_batchnorm=True
         ):
         super(ConvLSTMAutoencoder, self).__init__()
         self.seq_len = seq_len
         self.use_classifier = use_classifier
-        self.encoder_hidden_dim = encoder_hidden_dim
         self.latent_size = latent_size
         self.use_latent_split = use_latent_split
         # Store ablation settings for reproducibility
         self.dropout_rate = dropout_rate
-        self.use_convlstm = use_convlstm
+        self.use_lstm = use_lstm
         self.use_residual = use_residual
         self.use_batchnorm = use_batchnorm
         if(config != None):
             if isinstance(config, dict):
                 self.seq_len = config.get('seq_len', seq_len)
                 self.use_classifier = config.get('use_classifier', use_classifier)
-                self.encoder_hidden_dim = config.get('encoder_hidden_dim', encoder_hidden_dim)
                 self.latent_size = config.get('latent_size', latent_size)
                 self.use_latent_split = config.get('use_latent_split', use_latent_split)
                 self.dropout_rate = config.get('dropout_rate', dropout_rate)
-                self.use_convlstm = config.get('use_convlstm', use_convlstm)
+                self.use_lstm = config.get('use_lstm', use_lstm)
                 self.use_residual = config.get('use_residual', use_residual)
                 self.use_batchnorm = config.get('use_batchnorm', use_batchnorm)
             else:
                 self.seq_len = config.seq_len
                 self.use_classifier = config.use_classifier
-                self.encoder_hidden_dim = config.encoder_hidden_dim
                 self.latent_size = config.latent_size
                 self.use_latent_split = config.use_latent_split
                 self.dropout_rate = config.dropout_rate
-                self.use_convlstm = config.use_convlstm
+                self.use_lstm = config.use_lstm
                 self.use_residual = config.use_residual
                 self.use_batchnorm = config.use_batchnorm
 
         self.encoder = Encoder(
             latent_size=self.latent_size,
-            use_convlstm=self.use_convlstm
+            use_lstm=self.use_lstm
         )
 
         self.decoder = Decoder(
-            seq_len=self.seq_len,
             latent_size=self.latent_size,
-            use_convlstm=self.use_convlstm
+            use_lstm=self.use_lstm
         )
 
 
     def forward(self, x, return_all=False, hidden=None):
         B, T, C, orig_H, orig_W = x.shape
 
-        if return_all:
-            z_seq, z_last, h_last_enc, c_last_enc = self.encoder(x, return_all=return_all)#, hidden_state=hidden_state['enc'] if hidden_state != None else None)
 
-        else:
-            z_seq = self.encoder(x)#, hidden_state=hidden_state['enc'] if hidden_state != None else None)
+        z_seq = self.encoder(x)
 
 
-        # Decode (outputs 128x128)
-        if return_all:
-            x_rec, h_last_dec, c_last_dec = self.decoder(z_seq, return_all=return_all)#, hidden_state=hidden_state['dec'] if hidden_state != None else None)
+        
 
-        else:
-            x_rec = self.decoder(z_seq)#, hidden_state=hidden_state['dec'] if hidden_state != None else None)
+        x_rec = self.decoder(z_seq)
 
         # Resize back to original input size if needed
         if orig_H != 128 or orig_W != 128:
@@ -300,29 +287,11 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
             x_rec_flat = torch.nn.functional.interpolate(x_rec_flat, size=(orig_H, orig_W), mode='bilinear', align_corners=True)
             x_rec = x_rec_flat.view(B, T, C, orig_H, orig_W)
 
-        if return_all:
-            # Build output dictionary
-            output = {
-                "reconstruction": x_rec,
-                "z_seq": z_seq,
-                "z_last": z_last,
-            }
-
-            # Optional classification
-            if self.use_classifier:
-                logits = self.classifier(z_last)
-                output["logits"] = logits
-
-            return output
-        else:
-            # Return tuple: (reconstruction, latent_vector)
-            return x_rec, z_seq
+        return x_rec, z_seq
 
     def encode(self, x):
-        """Encode only, for extracting latent"""
         z_seq, z_last = self.encoder(x)
         return z_seq, z_last
 
     def decode(self, z_seq):
-        """Decode only, for reconstructing from latent"""
         return self.decoder(z_seq)
