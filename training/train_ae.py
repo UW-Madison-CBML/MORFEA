@@ -753,8 +753,8 @@ if __name__ == "__main__":
                           help="Disable residual connections")
         parser.add_argument("--no-batchnorm", action="store_true",
                           help="Disable batch normalization")
-        parser.add_argument("--name", type=str, default="", help="model name duhh")
-        parser.add_argument("--size", type=int, default=4096, help="lat size bruh")
+        parser.add_argument("--name", type=str, default="", help="model name")
+        parser.add_argument("--size", type=int, default=4096, help="lat dimensions")
         args = parser.parse_args()
 
         train_lstm(
