@@ -9,6 +9,7 @@ from ae_model import ConvLSTMAutoencoder
 from huggingface_hub import login, HfApi
 from dataset_ivf_embryo import read_gray, normalize_video
 import os
+import gc
 GRADES = ["A", "B", "C"] # I believe it is this order since 0 seems most prominent
 
 def export_kanakasabapathy(model):
@@ -18,7 +19,6 @@ def export_kanakasabapathy(model):
     images_4 = [os.path.join("kanakasabapathy","4",path) for path in os.listdir(os.path.join("kanakasabapathy","4"))]
     images_5 = [os.path.join("kanakasabapathy","5",path) for path in os.listdir(os.path.join("kanakasabapathy","5"))]
     paths = images_3 + images_4 + images_5
-    print(paths)
     grades = (["C"] * len(images_3))+ (["B"] * len(images_4))+(["A"] * len(images_5))
     metadata_df = pd.DataFrame({"path":paths, "TE":grades, "embryo_id":np.arange(len(paths))}) #spoof the embryo id as just a number
 
@@ -26,7 +26,6 @@ def export_kanakasabapathy(model):
     #--------------------------------------------------------------
     # now let's get the data set up
     
-    print(metadata_df.head())
     image_abs_paths = paths
     images_vol = np.stack([read_gray(path, 128) for path in image_abs_paths], axis=0)
     
@@ -35,7 +34,6 @@ def export_kanakasabapathy(model):
     
     images_tensor = torch.from_numpy(images_vol) # (B, 128, 128)
     images_tensor = images_tensor.unsqueeze(1).unsqueeze(1) # insert a channel and time dim of 1: (B, 1, 1, 128, 128)
-    print("tensor shape: ", images_tensor.shape)
     # normal size of video tensors is (64, 32, 1 ...) so ~2300 should work as one batch
     
     # ----------------------------------------------------------- 
@@ -49,6 +47,9 @@ def export_kanakasabapathy(model):
         imgs, latents = model(images_tensor)
     latents = latents.cpu().squeeze(1).numpy() # squeeze out time dim of 1: (B, 512)
     imgs = imgs.cpu().squeeze(1).squeeze(1).numpy() # (B, 128, 128)
+    gc.collect()
+    torch.cuda.memory.empty_cache()
+    model.train()
     return metadata_df, latents, imgs
         
         

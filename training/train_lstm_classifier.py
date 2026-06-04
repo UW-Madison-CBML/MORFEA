@@ -135,7 +135,6 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         num_workers=16,
         pin_memory=True,
         drop_last=True,
-        persistent_workers=True,
         collate_fn=collate_padd)
     loader_icm = DataLoader(
         dataset_icm,
@@ -144,7 +143,6 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         num_workers=16,
         pin_memory=True,
         drop_last=True, 
-        persistent_workers=True,
         collate_fn=collate_padd)
     loader_te_val = DataLoader(
         dataset_te_val,
@@ -237,9 +235,9 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
             
             recall, precision, f1 = recall_precision_f1(icm_confusion_mat, i)
             run.log({f"{training_name}_icm_{g}_recall": recall,f"{training_name}_icm_{g}_precision": precision,f"{training_name}_icm_{g}_f1":f1})
-        print(grade_options)
-        print("te confusion:"); print(te_confusion_mat)
-        print("icm confusion:"); print(icm_confusion_mat)
+        #print(grade_options)
+        #print("te confusion:"); print(te_confusion_mat)
+        #print("icm confusion:"); print(icm_confusion_mat)
         run.log({f"{training_name}_te_acc_mean": te_acc_stats.mean, f"{training_name}_te_acc_std":te_acc_stats.std_dev, f"{training_name}_icm_acc_mean":icm_acc_stats.mean, f"{training_name}_icm_acc_std":icm_acc_stats.std_dev})
         gc.collect()
         torch.cuda.empty_cache()
