@@ -14,7 +14,6 @@ GRADES = ["A", "B", "C"] # I believe it is this order since 0 seems most promine
 
 def export_kanakasabapathy(model):
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-    torch.backends.cudnn.enabled = False
     images_3 = [os.path.join("kanakasabapathy","3",path) for path in os.listdir(os.path.join("kanakasabapathy","3"))]
     images_4 = [os.path.join("kanakasabapathy","4",path) for path in os.listdir(os.path.join("kanakasabapathy","4"))]
     images_5 = [os.path.join("kanakasabapathy","5",path) for path in os.listdir(os.path.join("kanakasabapathy","5"))]
