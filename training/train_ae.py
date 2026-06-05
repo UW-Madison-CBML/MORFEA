@@ -248,14 +248,18 @@ def train_lstm(
     use_residual=True,
     use_batchnorm=True,
     model_name="", 
-    latent_size = 4096):
+    latent_size = 4096,
+    lr=2e-4,
+    epochs=25,
+    warm_restarts=False
+    ):
     #hyperparameters:
 
     
-    epochs = 30
-    learning_rate = 2e-4
+    #epochs = 30
+    #learning_rate = 2e-4
     batch_size = 64
-    warm_restarts = False
+    #warm_restarts = False
     # ------------------------------------------------------
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -783,6 +787,10 @@ if __name__ == "__main__":
                           help="Disable batch normalization")
         parser.add_argument("--name", type=str, default="", help="model name")
         parser.add_argument("--size", type=int, default=4096, help="lat dimensions")
+
+        parser.add_argument("--lr", type=float, default=2e-4, help="learning rate")
+        parser.add_argument("--epochs", type=int, default=25, help="epochs")
+        parser.add_argument("--warm-restarts", action="store_true", help="turn on warm restarts lr scheduling, default is cosine annealing decreasing over the the whole run")
         args = parser.parse_args()
 
         train_lstm(
@@ -795,7 +803,10 @@ if __name__ == "__main__":
             use_residual=not args.no_residual,
             use_batchnorm=not args.no_batchnorm,
             model_name = args.name,
-            latent_size = args.size
+            latent_size = args.size,
+            lr=args.lr,
+            epochs=args.epochs,
+            warm_restarts=args.warm_restarts
 
         )
     elif len(sys.argv) > 1 and sys.argv[1] == "vit":
