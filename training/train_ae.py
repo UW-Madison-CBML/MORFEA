@@ -257,7 +257,7 @@ def train_lstm(
 
     
     #epochs = 30
-    #learning_rate = 2e-4
+    #lr = 2e-4
     batch_size = 64
     #warm_restarts = False
     # ------------------------------------------------------
@@ -278,7 +278,7 @@ def train_lstm(
         project="IVF-Training",
         name=model_name +"-" + date_label,
         config={
-            "learning_rate": learning_rate,
+            "lr": lr,
             "batch_size":batch_size,
             "architecture": "ConvLSTM Autoencoder",
             "dataset": "https://zenodo.org/records/7912264",
@@ -332,7 +332,7 @@ def train_lstm(
     )
     run.log({"train_params":trainable_params})
     run.log({"params":all_params})
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
 
     df = pd.read_csv(os.path.abspath("index.csv"))
     mask = df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
@@ -551,7 +551,7 @@ def train_lstm(
             "ms_ssim_weight": ms_ssim_weight,
             "rec_weight": rec_weight,
             "temporal_weight": temporal_weight,
-            "learning_rate": learning_rate,
+            "lr": lr,
             "weight_decay": 1e-5,
             "optimizer": "Adam",
             "scheduler": "CosineAnnealingLR",
