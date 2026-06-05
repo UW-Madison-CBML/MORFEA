@@ -117,9 +117,9 @@ class Encoder(nn.Module):
         if H != 128 or W != 128:
             x = torch.nn.functional.interpolate(x, size=(128, 128), mode='bilinear', align_corners=True)
 
-        x = self.spatial_cnn(x)      # (B*T, 256, 16, 16)
+        x = self.spatial_cnn(x)      
         _, C2, H2, W2 = x.shape
-        x = x.view(B, T, C2, H2, W2)  # (B, T, 256, 16, 16)
+        x = x.view(B, T, C2, H2, W2)  
 
         """# ConvLSTM processes temporal sequence
         if(self.use_convlstm):
