@@ -76,10 +76,10 @@ class Encoder(nn.Module):
 
         self.spatial_cnn = nn.Sequential(
             # 128 -> 64 
-            ResidualBlock(input_channels, 32, downsample=True),
+            ResidualBlock(input_channels, 64, downsample=True),
 
             # 64 -> 32 
-            ResidualBlock(32, 64, downsample=True),
+            ResidualBlock(64, 64, downsample=True),
 
             # 32 -> 16 
             ResidualBlock(64, 64, downsample=True),
@@ -177,9 +177,9 @@ class Decoder(nn.Module):
             ResidualUpBlock(64, 64),
 
             # 64 -> 128 
-            ResidualUpBlock(64, 32),
+            ResidualUpBlock(64, 64),
 
-            nn.Conv2d(32, 1, kernel_size=3, padding=1),
+            nn.Conv2d(64, 1, kernel_size=3, padding=1),
             nn.Sigmoid()  # Assume pixels normalized to [0,1]
         )
         self.lin1 = nn.Linear(latent_size,latent_size)
