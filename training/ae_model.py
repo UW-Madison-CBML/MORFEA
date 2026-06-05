@@ -76,13 +76,13 @@ class Encoder(nn.Module):
 
         self.spatial_cnn = nn.Sequential(
             # 128 -> 64 
-            ResidualBlock(input_channels, 64, downsample=True),
+            ResidualBlock(input_channels, 32, downsample=True),
 
             # 64 -> 32 
-            ResidualBlock(64, 128, downsample=True),
+            ResidualBlock(32, 64, downsample=True),
 
             # 32 -> 16 
-            ResidualBlock(128, 256, downsample=True),
+            ResidualBlock(64, 64, downsample=True),
         )
 
         self.use_lstm = use_lstm
@@ -100,7 +100,7 @@ class Encoder(nn.Module):
         
         self.dropout = nn.Dropout(0.1)
 
-        self.latent_compress = nn.Linear(256 * 16 * 16, latent_size)
+        self.latent_compress = nn.Linear(64 * 16 * 16, latent_size)
         if self.use_lstm:
             self.lstm_enc = nn.LSTM(latent_size, latent_size, batch_first=True)
         else:
@@ -149,7 +149,7 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.latent_size = latent_size
 
-        self.latent_expand = nn.Linear(latent_size, 256 * 16 * 16)
+        self.latent_expand = nn.Linear(latent_size, 64 * 16 * 16)
 
         self.use_lstm = use_lstm
         """if not self.use_convlstm:
@@ -171,10 +171,10 @@ class Decoder(nn.Module):
         self.dropout = nn.Dropout(0.1)
         self.spatial_decoder = nn.Sequential(
             # 16 -> 32 
-            ResidualUpBlock(256, 128),
+            ResidualUpBlock(64, 64),
 
             # 32 -> 64 
-            ResidualUpBlock(128, 64),
+            ResidualUpBlock(64, 64),
 
             # 64 -> 128 
             ResidualUpBlock(64, 32),
@@ -192,8 +192,8 @@ class Decoder(nn.Module):
         if self.use_lstm:
             z_flat, _ = self.lstm_dec(z_flat)
         z_flat = self.dropout(z_flat) 
-        z_expanded = F.relu(self.latent_expand(z_flat))  # (B*T, latent_dim * 16 * 16)
-        z_spatial = z_expanded.view(B, T, 256, 16, 16)  # (B, T, latent_dim, 16, 16)
+        z_expanded = F.relu(self.latent_expand(z_flat)) 
+        z_spatial = z_expanded.view(B, T, 64, 16, 16)  
 
         """# ConvLSTM decodes temporal dimension
         if(self.use_convlstm):
@@ -272,9 +272,6 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
 
 
         z_seq = self.encoder(x)
-
-
-        
 
         x_rec = self.decoder(z_seq)
 
