@@ -245,12 +245,12 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
          
         
         fig_te, ax_te = plt.subplots(figsize=(10, 10))
-        disp = ConfusionMatrixDisplay(confusion_matrix=te_confusion_mat, grade_options)
+        disp = ConfusionMatrixDisplay(confusion_matrix=te_confusion_mat, display_labels= grade_options)
         disp.plot(cmap='Blues', ax=ax_te, values_format='d')
         plt.setp(ax_te.get_xticklabels(), rotation=45, ha='right') 
 
         fig_icm, ax_icm = plt.subplots(figsize=(10, 10))
-        disp = ConfusionMatrixDisplay(confusion_matrix=icm_confusion_mat, grade_options)
+        disp = ConfusionMatrixDisplay(confusion_matrix=icm_confusion_mat, display_labels= grade_options)
         disp.plot(cmap='Blues', ax=ax_icm, values_format='d')
         plt.setp(ax_icm.get_xticklabels(), rotation=45, ha='right') 
 
