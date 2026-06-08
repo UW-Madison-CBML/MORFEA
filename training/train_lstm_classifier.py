@@ -243,7 +243,9 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
             rpf_dict[f"{training_name}_icm_{g}_precision"] = precision
             rpf_dict[f"{training_name}_icm_{g}_f1"] = f1
          
-        
+        te_confusion_mat = te_confusion_mat.numpy().astype(int)
+        icm_confusion_mat = icm_confusion_mat.numpy().astype(int)
+
         fig_te, ax_te = plt.subplots(figsize=(10, 10))
         disp = ConfusionMatrixDisplay(confusion_matrix=te_confusion_mat, display_labels= grade_options)
         disp.plot(cmap='Blues', ax=ax_te, values_format='d')
