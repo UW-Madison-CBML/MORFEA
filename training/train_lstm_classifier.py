@@ -13,6 +13,8 @@ from umap import UMAP
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from torch.optim.lr_scheduler import CosineAnnealingLR
+import matplotlib.pyplot as plt
+from sklearn.metrics import ConfusionMatrixDisplay
 from tqdm import tqdm
 import gc
 
@@ -228,14 +230,34 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
 
                 icm_confusion_mat += torch.einsum('ti,tj->ij', preds, targets)
                 
-        
+        rpf_dict = {}
         for i, g in enumerate(grade_options):
             recall, precision, f1 = recall_precision_f1(te_confusion_mat, i)
-            run.log({f"{training_name}_te_{g}_recall": recall,f"{training_name}_te_{g}_precision": precision,f"{training_name}_te_{g}_f1":f1})
+            rpf_dict[f"{training_name}_te_{g}_recall"] = recall
+            rpf_dict[f"{training_name}_te_{g}_precision"] = precision
+            rpf_dict[f"{training_name}_te_{g}_f1"] = f1
             #---------------------------------------------------------------------------------- 
             
             recall, precision, f1 = recall_precision_f1(icm_confusion_mat, i)
-            run.log({f"{training_name}_icm_{g}_recall": recall,f"{training_name}_icm_{g}_precision": precision,f"{training_name}_icm_{g}_f1":f1})
+            rpf_dict[f"{training_name}_icm_{g}_recall"] = recall
+            rpf_dict[f"{training_name}_icm_{g}_precision"] = precision
+            rpf_dict[f"{training_name}_icm_{g}_f1"] = f1
+         
+        
+        fig_te, ax_te = plt.subplots(figsize=(10, 10))
+        disp = ConfusionMatrixDisplay(confusion_matrix=te_confusion_mat, grade_options)
+        disp.plot(cmap='Blues', ax=ax_te, values_format='d')
+        plt.setp(ax_te.get_xticklabels(), rotation=45, ha='right') 
+
+        fig_icm, ax_icm = plt.subplots(figsize=(10, 10))
+        disp = ConfusionMatrixDisplay(confusion_matrix=icm_confusion_mat, grade_options)
+        disp.plot(cmap='Blues', ax=ax_icm, values_format='d')
+        plt.setp(ax_icm.get_xticklabels(), rotation=45, ha='right') 
+
+        run.log({"confusion_matrix_te": wandb.Image(fig_te), "confusion_matrix_icm": wandb.Image(fig_icm)} | rpf_dict)
+        
+        plt.close(fig_te); plt.close(fig_icm)
+
         #print(grade_options)
         #print("te confusion:"); print(te_confusion_mat)
         #print("icm confusion:"); print(icm_confusion_mat)
