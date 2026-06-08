@@ -83,8 +83,12 @@ class Encoder(nn.Module):
 
             # 32 -> 16 
             ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
-        )
 
+            # 16 -> 8
+            ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
+
+        )
+        self.final_resolution = 2 ** (7 - len([module for module in self.spatial_cnn.modules() if not isinstance(self.spatial_cnn, nn.Sequential)]))
         self.use_lstm = use_lstm
         """if not self.use_convlstm:
             self.convlstm = None 
@@ -100,7 +104,7 @@ class Encoder(nn.Module):
         
         self.dropout = nn.Dropout(0.1)
 
-        self.latent_compress = nn.Linear(self.hidden_channels * 16 * 16, latent_size)
+        self.latent_compress = nn.Linear(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size)
         if self.use_lstm:
             self.lstm_enc = nn.LSTM(latent_size, latent_size, batch_first=True)
         else:
@@ -150,7 +154,7 @@ class Decoder(nn.Module):
         self.latent_size = latent_size
         self.hidden_channels = hidden_channels
 
-        self.latent_expand = nn.Linear(latent_size, self.hidden_channels * 16 * 16)
+        #self.latent_expand = nn.Linear(latent_size, self.hidden_channels * 16 * 16)
 
         self.use_lstm = use_lstm
         """if not self.use_convlstm:
@@ -171,6 +175,9 @@ class Decoder(nn.Module):
     
         self.dropout = nn.Dropout(0.1)
         self.spatial_decoder = nn.Sequential(
+            # 8 -> 16
+            ResidualUpBlock(self.hidden_channels, self.hidden_channels),
+
             # 16 -> 32 
             ResidualUpBlock(self.hidden_channels, self.hidden_channels),
 
@@ -183,8 +190,11 @@ class Decoder(nn.Module):
             nn.Conv2d(self.hidden_channels, 1, kernel_size=3, padding=1),
             nn.Sigmoid()
         )
+        
+        self.initial_resolution = 2 ** (7 - len([module for module in self.spatial_decoder.modules() if not isinstance(self.spatial_decoder, nn.Sequential)]))
         self.lin1 = nn.Linear(latent_size,latent_size)
 
+        self.latent_expand = nn.Linear(latent_size, self.hidden_channels * self.initial_resolution * self.initial_resolution)
     def forward(self, z_seq):
         B, T, L = z_seq.shape
 
@@ -194,7 +204,7 @@ class Decoder(nn.Module):
             z_flat, _ = self.lstm_dec(z_flat)
         z_flat = self.dropout(z_flat) 
         z_expanded = F.relu(self.latent_expand(z_flat)) 
-        z_spatial = z_expanded.view(B, T, self.hidden_channels, 16, 16)  
+        z_spatial = z_expanded.view(B, T, self.hidden_channels, self.initial_resolution, self.initial_resolution)  
 
         """# ConvLSTM decodes temporal dimension
         if(self.use_convlstm):
