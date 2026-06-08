@@ -88,7 +88,7 @@ class Encoder(nn.Module):
             ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
 
         )
-        self.final_resolution = 2 ** (7 - len([module for module in self.spatial_cnn.modules() if not isinstance(self.spatial_cnn, nn.Sequential)]))
+        self.final_resolution = 8 #2 ** (7 - len([module for module in self.spatial_cnn.modules() if not isinstance(self.spatial_cnn, nn.Sequential)]))
         self.use_lstm = use_lstm
         """if not self.use_convlstm:
             self.convlstm = None 
@@ -191,7 +191,7 @@ class Decoder(nn.Module):
             nn.Sigmoid()
         )
         
-        self.initial_resolution = 2 ** (7 - len([module for module in self.spatial_decoder.modules() if not isinstance(self.spatial_decoder, nn.Sequential)]))
+        self.initial_resolution = 8 #2 ** (7 - len([module for module in self.spatial_decoder.modules() if not isinstance(self.spatial_decoder, nn.Sequential)]))
         self.lin1 = nn.Linear(latent_size,latent_size)
 
         self.latent_expand = nn.Linear(latent_size, self.hidden_channels * self.initial_resolution * self.initial_resolution)
@@ -204,6 +204,7 @@ class Decoder(nn.Module):
             z_flat, _ = self.lstm_dec(z_flat)
         z_flat = self.dropout(z_flat) 
         z_expanded = F.relu(self.latent_expand(z_flat)) 
+        assert z_expanded.shape == (B, T, self.hidden_channels * (self.initial_resolution ** 2)), f"BAD z_expanded shape: {z_expanded.shape}"
         z_spatial = z_expanded.view(B, T, self.hidden_channels, self.initial_resolution, self.initial_resolution)  
 
         """# ConvLSTM decodes temporal dimension
