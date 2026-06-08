@@ -69,20 +69,20 @@ class ResidualUpBlock(nn.Module):
 
 class Encoder(nn.Module):
 
-    def __init__(self, input_channels=1, num_layers=2, latent_size=4096, use_lstm=True):
+    def __init__(self, input_channels=1, num_layers=2, latent_size=4096, hidden_channels=64, use_lstm=True):
         super(Encoder, self).__init__()
 
         self.latent_size = latent_size
-
+        self.hidden_channels = hidden_channels
         self.spatial_cnn = nn.Sequential(
             # 128 -> 64 
-            ResidualBlock(input_channels, 64, downsample=True),
+            ResidualBlock(input_channels, self.hidden_channels, downsample=True),
 
             # 64 -> 32 
-            ResidualBlock(64, 64, downsample=True),
+            ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
 
             # 32 -> 16 
-            ResidualBlock(64, 64, downsample=True),
+            ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
         )
 
         self.use_lstm = use_lstm
@@ -100,7 +100,7 @@ class Encoder(nn.Module):
         
         self.dropout = nn.Dropout(0.1)
 
-        self.latent_compress = nn.Linear(64 * 16 * 16, latent_size)
+        self.latent_compress = nn.Linear(self.hidden_channels * 16 * 16, latent_size)
         if self.use_lstm:
             self.lstm_enc = nn.LSTM(latent_size, latent_size, batch_first=True)
         else:
@@ -145,11 +145,12 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
 
-    def __init__(self, latent_size=4096, num_layers=2, use_lstm=True):
+    def __init__(self, latent_size=4096, num_layers=2, hidden_channels=64, use_lstm=True):
         super(Decoder, self).__init__()
         self.latent_size = latent_size
+        self.hidden_channels = hidden_channels
 
-        self.latent_expand = nn.Linear(latent_size, 64 * 16 * 16)
+        self.latent_expand = nn.Linear(latent_size, self.hidden_channels * 16 * 16)
 
         self.use_lstm = use_lstm
         """if not self.use_convlstm:
@@ -171,16 +172,16 @@ class Decoder(nn.Module):
         self.dropout = nn.Dropout(0.1)
         self.spatial_decoder = nn.Sequential(
             # 16 -> 32 
-            ResidualUpBlock(64, 64),
+            ResidualUpBlock(self.hidden_channels, self.hidden_channels),
 
             # 32 -> 64 
-            ResidualUpBlock(64, 64),
+            ResidualUpBlock(self.hidden_channels, self.hidden_channels),
 
             # 64 -> 128 
-            ResidualUpBlock(64, 64),
+            ResidualUpBlock(self.hidden_channels, self.hidden_channels),
 
-            nn.Conv2d(64, 1, kernel_size=3, padding=1),
-            nn.Sigmoid()  # Assume pixels normalized to [0,1]
+            nn.Conv2d(self.hidden_channels, 1, kernel_size=3, padding=1),
+            nn.Sigmoid()
         )
         self.lin1 = nn.Linear(latent_size,latent_size)
 
@@ -193,7 +194,7 @@ class Decoder(nn.Module):
             z_flat, _ = self.lstm_dec(z_flat)
         z_flat = self.dropout(z_flat) 
         z_expanded = F.relu(self.latent_expand(z_flat)) 
-        z_spatial = z_expanded.view(B, T, 64, 16, 16)  
+        z_spatial = z_expanded.view(B, T, self.hidden_channels, 16, 16)  
 
         """# ConvLSTM decodes temporal dimension
         if(self.use_convlstm):
@@ -227,7 +228,8 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         dropout_rate=0.1,
         use_lstm=True,
         use_residual=True,
-        use_batchnorm=True
+        use_batchnorm=True,
+        hidden_channels=64
         ):
         super(ConvLSTMAutoencoder, self).__init__()
         self.use_classifier = use_classifier
@@ -238,6 +240,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         self.use_lstm = use_lstm
         self.use_residual = use_residual
         self.use_batchnorm = use_batchnorm
+        self.hidden_channels = hidden_channels
         if(config != None):
             if isinstance(config, dict):
                 self.use_classifier = config.get('use_classifier', use_classifier)
@@ -247,6 +250,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
                 self.use_lstm = config.get('use_lstm', use_lstm)
                 self.use_residual = config.get('use_residual', use_residual)
                 self.use_batchnorm = config.get('use_batchnorm', use_batchnorm)
+                self.hidden_channels = config.get('hidden_channels', hidden_channels)
             else:
                 self.use_classifier = config.use_classifier
                 self.latent_size = config.latent_size
@@ -255,15 +259,18 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
                 self.use_lstm = config.use_lstm
                 self.use_residual = config.use_residual
                 self.use_batchnorm = config.use_batchnorm
+                self.hidden_channels = config.hidden_channels
 
         self.encoder = Encoder(
             latent_size=self.latent_size,
-            use_lstm=self.use_lstm
+            use_lstm=self.use_lstm,
+            hidden_channels = self.hidden_channels
         )
 
         self.decoder = Decoder(
             latent_size=self.latent_size,
-            use_lstm=self.use_lstm
+            use_lstm=self.use_lstm,
+            hidden_channels = self.hidden_channels
         )
 
 
