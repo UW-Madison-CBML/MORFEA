@@ -33,3 +33,4 @@ scikit-learn-extra
 seaborn
 ruff
 iisignature
+pytorch-msssim

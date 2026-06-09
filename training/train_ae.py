@@ -44,6 +44,7 @@ from train_lstm_classifier import train_on as train_lstm_classifier_on
 from export_kanakasabapathy_latents import export_kanakasabapathy
 
 from dataset_ivf_embryo import read_gray, normalize_video
+from pytorch_msssim import MS_SSIM
 class RunningStats:
     def __init__(self):
         self.n = 0
@@ -157,77 +158,20 @@ def save_and_push_model(model, repo_name, required_files, model_config=None):
             print(f"Warning: {local_file} not found, skipping upload")
 
     print(f"Successfully pushed all files to {repo_name}")
-def gaussian_kernel(size=11, sigma=1.5):
-    coords = torch.arange(size, dtype=torch.float32)
-    coords -= size // 2
-    g = torch.exp(-(coords ** 2) / (2 * sigma ** 2))
-    g /= g.sum()
-    return g.unsqueeze(0) * g.unsqueeze(1)
-
-# TODO just find a library with someone else's implementation
-def ssim(img1, img2, kernel_size=11, sigma=1.5, C1=0.01**2, C2=0.03**2):
-    kernel = gaussian_kernel(kernel_size, sigma).to(img1.device)
-    kernel = kernel.unsqueeze(0).unsqueeze(0)  # (1, 1, k, k)
-    
-    mu1 = F.conv2d(img1, kernel, padding=kernel_size//2)
-    mu2 = F.conv2d(img2, kernel, padding=kernel_size//2)
-    
-    mu1_sq = mu1 ** 2
-    mu2_sq = mu2 ** 2
-    mu1_mu2 = mu1 * mu2
-    
-    sigma1_sq = F.conv2d(img1 * img1, kernel, padding=kernel_size//2) - mu1_sq
-    sigma2_sq = F.conv2d(img2 * img2, kernel, padding=kernel_size//2) - mu2_sq
-    sigma12 = F.conv2d(img1 * img2, kernel, padding=kernel_size//2) - mu1_mu2
-    
-    ssim_map = ((2 * mu1_mu2 + C1) * (2 * sigma12 + C2)) / \
-               ((mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2))
-    
-    return ssim_map.mean()
 
 
-def ms_ssim(img1, img2, kernel_size=11, sigma=1.5, weights=None, levels=5):
-    if weights is None:
-        weights = torch.tensor([0.0448, 0.2856, 0.3001, 0.2363, 0.1333],
-                              device=img1.device)[:levels]
+def reconstruction_loss(x_rec, x_true, ms_ssim_module, loss_type ="l1", loss_weight=0.5, ms_ssim_weight=0.5):
     
-    kernel = gaussian_kernel(kernel_size, sigma).to(img1.device)
-    kernel = kernel.unsqueeze(0).unsqueeze(0).repeat(img1.shape[1], 1, 1, 1)
-    
-    mcs_list = []
-    
-    for i in range(levels):
-        if i == levels - 1:
-            ssim_val = ssim(img1, img2, kernel_size, sigma)
-        else:
-            mu1 = F.conv2d(img1, kernel, padding=kernel_size//2, groups=img1.shape[1])
-            mu2 = F.conv2d(img2, kernel, padding=kernel_size//2, groups=img1.shape[1])
-            
-            sigma1_sq = F.conv2d(img1**2, kernel, padding=kernel_size//2, groups=img1.shape[1]) - mu1**2
-            sigma2_sq = F.conv2d(img2**2, kernel, padding=kernel_size//2, groups=img1.shape[1]) - mu2**2
-            sigma12 = F.conv2d(img1*img2, kernel, padding=kernel_size//2, groups=img1.shape[1]) - mu1*mu2
-            
-            C2 = 0.03**2
-            cs = (2 * sigma12 + C2) / (sigma1_sq + sigma2_sq + C2)
-            mcs_list.append(cs.mean())
-            
-            img1 = F.avg_pool2d(img1, 2)
-            img2 = F.avg_pool2d(img2, 2)
-    
-    ms_ssim_val = torch.prod(torch.stack([mcs ** w for mcs, w in zip(mcs_list, weights[:-1])]))
-    ms_ssim_val = (ssim_val ** weights[-1]) * ms_ssim_val
-    
-    return ms_ssim_val
-
-def reconstruction_loss(x_rec, x_true, l1_weight=0.5, ms_ssim_weight=0.5):
     B, T, C, H, W = x_rec.shape
     
     x_rec_flat = x_rec.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
     x_true_flat = x_true.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
     
+    x_true_flat, x_rec_flat = F.normalize(torch.stack([x_true_flat, x_rec_flat],dim=0),dim=0) 
+     
     l1_loss = F.l1_loss(x_rec, x_true)
     
-    ms_ssim_val = ms_ssim(x_rec_flat, x_true_flat)
+    ms_ssim_val = ms_ssim_module(x_rec_flat, x_true_flat)
     ms_ssim_loss = 1 - ms_ssim_val
     
     total_loss = l1_weight * l1_loss + ms_ssim_weight * ms_ssim_loss
@@ -383,7 +327,7 @@ def train_lstm(
     )
     
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, len(loader) * epochs) if warm_restarts else torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
-
+    ms_ssim_module = MS_SSIM(data_range=1, size_average=True, channel=1)
     for epoch in range(epochs):
         print(f"epoch {epoch}")
         print(torch.cuda.memory_summary(device=DEVICE, abbreviated=False))
@@ -428,28 +372,9 @@ def train_lstm(
 
                 plt.close(fig)
 
-            if loss_type == "l1":
-                rec_loss, rec_metrics = reconstruction_loss(
-                    embryo_recon, embryo_vol, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight
-                )
-            elif loss_type == "mse":
-                B, T, C, H, W = embryo_recon.shape
-                x_rec_flat = embryo_recon.view(B * T, C, H, W)
-                x_true_flat = embryo_vol.view(B * T, C, H, W)
-
-                mse_loss = F.mse_loss(embryo_recon, embryo_vol)
-                ms_ssim_val = ms_ssim(x_rec_flat, x_true_flat)
-                ms_ssim_loss = 1 - ms_ssim_val
-
-                rec_loss = rec_weight * mse_loss + ms_ssim_weight * ms_ssim_loss
-                rec_metrics = {
-                    "mse_loss": mse_loss.item(),
-                    "ms_ssim_loss": ms_ssim_loss.item(),
-                    "ms_ssim_value": ms_ssim_val.item()
-                }
-            else:
-                raise ValueError(f"Invalid loss_type: {loss_type}. Must be 'l1' or 'mse'")
-
+            rec_loss, rec_metrics = reconstruction_loss(
+                embryo_recon, embryo_vol, ms_ssim_module, loss_type = loss_type, loss_weight=rec_weight, ms_ssim_weight=ms_ssim_weight
+            )
             if temporal_weight > 0:
                 smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
                 loss = rec_loss + smooth_loss
