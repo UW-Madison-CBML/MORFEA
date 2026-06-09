@@ -330,8 +330,7 @@ def train_lstm(
     print(
         f"trainable params: {trainable_params} || all params: {all_params} || trainable%: {100 * trainable_params / all_params}"
     )
-    run.log({"train_params":trainable_params})
-    run.log({"params":all_params})
+    run.log({"train_params":trainable_params,"params":all_params})
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
 
     df = pd.read_csv(os.path.abspath("index.csv"))
@@ -610,8 +609,7 @@ def train_lstm(
         val_log_std_dict = {
             f"val_{key}_std": value.std_dev for key, value in val_metrics.items()
         }
-        run.log(val_log_dict)
-        run.log(val_log_std_dict)
+        run.log(val_log_dict | val_log_std_dict)
 
 
         cebra_time_model = CEBRA(model_architecture="offset10-model-mse",
@@ -719,6 +717,7 @@ def train_lstm(
         # export the kanakasabapathy latents
         
         metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model)
+        print(metadata_df.groupby("TE").agg(["size"]))
         model.train()
         # spoof the ICM grades
         metadata_df['ICM'] = metadata_df["TE"]
@@ -748,7 +747,7 @@ def train_lstm(
         kanakasabapathy_mask = kanakasabapathy_df["embryo_id"].isin(VAL_EMBRYOS)
         kanakasabapathy_val_df = kanakasabapathy_df[kanakasabapathy_mask]
         kanakasabapathy_df = kanakasabapathy_df[~kanakasabapathy_mask]
-        train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.0003, "icm_lr":0.0003}, False, "kanakasabapathy", run, batch_size=128, epochs=30)
+        train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.003, "icm_lr":0.003}, False, "kanakasabapathy", run, batch_size=128, epochs=30)
 
 
             
