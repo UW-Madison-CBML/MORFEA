@@ -84,7 +84,8 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
     query = z_seq[:, :-1, :].reshape(-1,L)
     positive_key = z_seq[:, 1:, :].reshape(-1,L)
 
-    negative_keys = z_seq.roll(shifts=T//2, dims=1)[:, :-1, :].reshape(-1,1,L) # for unpaired we add the buffer dim 1 cause there's only a single negative key to compare with here
+    negative_keys = z_seq.roll(shifts=1, dims=0)[:, :-1, :].reshape(-1,1,L) # roll along batch dim
+    # for unpaired we add the buffer dim 1 cause there's only a single negative key to compare with here
 
     output = loss(query, positive_key, negative_keys) 
     return weight * output
@@ -717,7 +718,7 @@ def train_lstm(
         # export the kanakasabapathy latents
         
         metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model)
-        print(metadata_df.groupby("TE").agg(["size"]))
+        
         model.train()
         # spoof the ICM grades
         metadata_df['ICM'] = metadata_df["TE"]
@@ -732,7 +733,7 @@ def train_lstm(
         comparison = np.concatenate((vol_img, recon_img), axis=1)
 
         images = wandb.Image(comparison, caption="kanakasabapathy_recon_val")
-        run.log({"kanakasabapathy_recon_val": images})
+        run.log({"kanakasabapathy_recon_val": images,"kanakasabapathy_grade_sizes": wandb.Table(dataframe=metadata_df.groupby("TE").size())})
 
         # train the lstm model on the kanakasabapathy latents and log the loss to wandb
         kanakasabapathy_lats_df = pd.DataFrame(kanakasabapathy_lats, index=metadata_df.index, columns=[f"z_{i}" for i in range(kanakasabapathy_lats.shape[1])])
