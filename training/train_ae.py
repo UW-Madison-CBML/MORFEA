@@ -44,7 +44,7 @@ from train_lstm_classifier import train_on as train_lstm_classifier_on
 from export_kanakasabapathy_latents import export_kanakasabapathy
 
 from dataset_ivf_embryo import read_gray, normalize_video
-from pytorch_msssim import MS_SSIM
+from pytorch_msssim import MS_SSIM, SSIM
 class RunningStats:
     def __init__(self):
         self.n = 0
@@ -159,19 +159,32 @@ def save_and_push_model(model, repo_name, required_files, model_config=None):
 
     print(f"Successfully pushed all files to {repo_name}")
 
+_MS_SSIM_WEIGHTS_4 = torch.tensor([0.0448, 0.2856, 0.3001, 0.2363]) # first four weights from original Wang et al. paper
+_MS_SSIM_WEIGHTS_4 = _MS_SSIM_WEIGHTS_4 / _MS_SSIM_WEIGHTS_4.sum()
 
-def reconstruction_loss(x_rec, x_true, ms_ssim_module, loss_type ="l1", loss_weight=0.5, ms_ssim_weight=0.5):
+def ms_ssim(x_rec,x_true, ssim_module) -> torch.Tensor:
+    weights = _MS_SSIM_WEIGHTS_4.to(x_rec.device)
+
+    msssim_val = torch.ones(1, device=x_rec.device)
+    for weight in weights:
+        ssim_val = ssim_module(x_rec, x_true)
+        msssim_val = msssim_val * (ssim_val ** weight)
+        x_rec = F.avg_pool2d(x_rec, kernel_size=2)
+        x_true = F.avg_pool2d(x_true, kernel_size=2)
+
+    return msssim_val
+
+def reconstruction_loss(x_rec, x_true, ssim_module, loss_type ="l1", loss_weight=0.5, ms_ssim_weight=0.5):
     
     B, T, C, H, W = x_rec.shape
     
     x_rec_flat = x_rec.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
     x_true_flat = x_true.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
-    
-    x_true_flat, x_rec_flat = F.normalize(torch.stack([x_true_flat, x_rec_flat],dim=0),dim=0) 
+     
      
     l1_loss = F.l1_loss(x_rec, x_true)
-    
-    ms_ssim_val = ms_ssim_module(x_rec_flat, x_true_flat)
+    # no need to normalize, all images are already normalized. the model has a sigmoid to ensure [0,1] 
+    ms_ssim_val = ms_ssim(x_rec_flat, x_true_flat, ssim_module)
     ms_ssim_loss = 1 - ms_ssim_val
     
     total_loss = loss_weight * l1_loss + ms_ssim_weight * ms_ssim_loss
@@ -197,7 +210,7 @@ def train_lstm(
     lr=2e-4,
     epochs=25,
     warm_restarts=False,
-    image_size = 256
+    image_size = 128
     ):
     #hyperparameters:
 
@@ -291,8 +304,8 @@ def train_lstm(
     full_seq_df_val = full_seq_df[full_seq_val_mask] # just look at validation ICM embryos
     
     full_seq_df_train = full_seq_df[~full_seq_val_mask] # just look at validation ICM embryos
-    full_seq_dataset_val = IVFEmbryoDataset(full_seq_df_val, resize=256, norm="minmax01")
-    full_seq_dataset_train = IVFEmbryoDataset(full_seq_df_train, resize=256, norm="minmax01")
+    full_seq_dataset_val = IVFEmbryoDataset(full_seq_df_val, resize=128, norm="minmax01")
+    full_seq_dataset_train = IVFEmbryoDataset(full_seq_df_train, resize=128, norm="minmax01")
 
     loader = DataLoader(
         train_dataset,
@@ -328,7 +341,7 @@ def train_lstm(
     )
     
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, len(loader) * epochs) if warm_restarts else torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
-    ms_ssim_module = MS_SSIM(data_range=1, size_average=True, channel=1)
+    ssim_module = SSIM(win_size=4, win_sigma=1.5, data_range=1, size_average=True, channel=1)
     for epoch in range(epochs):
         print(f"epoch {epoch}")
         print(torch.cuda.memory_summary(device=DEVICE, abbreviated=False))
@@ -374,7 +387,7 @@ def train_lstm(
                 plt.close(fig)
 
             rec_loss, rec_metrics = reconstruction_loss(
-                embryo_recon, embryo_vol, ms_ssim_module, loss_type = loss_type, loss_weight=rec_weight, ms_ssim_weight=ms_ssim_weight
+                embryo_recon, embryo_vol, ssim_module, loss_type = loss_type, loss_weight=rec_weight, ms_ssim_weight=ms_ssim_weight
             )
             if temporal_weight > 0:
                 smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
@@ -426,10 +439,10 @@ def train_lstm(
                 }
 
                 # Add loss-specific metrics
-                if loss_type == "l1":
-                    log_dict["l1_loss"] = rec_metrics["l1_loss"]
-                elif loss_type == "mse":
-                    log_dict["mse_loss"] = rec_metrics["mse_loss"]
+                #if loss_type == "l1":
+                #    log_dict["l1_loss"] = rec_metrics["l1_loss"]
+                #elif loss_type == "mse":
+                #    log_dict["mse_loss"] = rec_metrics["mse_loss"]
 
                 run.log(log_dict)
 
@@ -468,7 +481,7 @@ def train_lstm(
             "use_classifier": False,
             "num_classes": 2,
             "use_latent_split": False,
-            "image_size": 256,
+            "image_size": 128,
             "dropout_rate": dropout_rate,
             "use_lstm": use_lstm,
             "use_residual": use_residual,
@@ -525,12 +538,13 @@ def train_lstm(
                 val_recon_flat = val_recon.view(B * T, C, H, W)
                 embryo_vol_flat = embryo_vol.view(B * T, C, H, W)
 
-                val_recon_flat, embryo_vol_flat = F.normalize(torch.stack([val_recon_flat, embryo_vol_flat],dim=0),dim=0) 
-                ms_ssim_val = ms_ssim_module(val_recon_flat, embryo_vol_flat)
+                # the recon and groud truth images are already normalized
+                ms_ssim_val = ms_ssim(val_recon_flat, embryo_vol_flat, ssim_module)
                 val_metrics['ssim'].push((1 - ms_ssim_val).item())
 
                 if T > 1:
                     val_metrics['temp'].push(temporal_smoothness_loss(val_lat).item())
+
         # Log to wandb with val_ prefix
         val_log_dict = {
             f"val_{key}": value.mean for key, value in val_metrics.items()
@@ -653,7 +667,7 @@ def train_lstm(
         # not necessary for kanakasabapathy
         #metadata_df = metadata_df.rename(columns={"Image":"embryo_id"})
         idx = np.random.randint(len(metadata_df))
-        vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 256)], "minmax01")[0]
+        vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 128)], "minmax01")[0]
         recon_img = imgs[idx]
 
         vol_img = (vol_img * 255).astype(np.uint8)
@@ -661,7 +675,7 @@ def train_lstm(
         comparison = np.concatenate((vol_img, recon_img), axis=1)
 
         images = wandb.Image(comparison, caption="kanakasabapathy_recon_val")
-        run.log({"kanakasabapathy_recon_val": images,"kanakasabapathy_grade_sizes": wandb.Table(dataframe=metadata_df.groupby("TE").size())})
+        run.log({"kanakasabapathy_recon_val": images,"kanakasabapathy_grade_sizes": wandb.Table(dataframe=metadata_df.groupby("TE").size(as_index=False))})
 
         # train the lstm model on the kanakasabapathy latents and log the loss to wandb
         kanakasabapathy_lats_df = pd.DataFrame(kanakasabapathy_lats, index=metadata_df.index, columns=[f"z_{i}" for i in range(kanakasabapathy_lats.shape[1])])
