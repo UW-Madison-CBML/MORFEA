@@ -81,12 +81,19 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
     diff8 = z_seq[:, 8:] - z_seq[:, :-8]  # (B, T-8, L)
     diff = torch.cat((diff1, diff2, diff4, diff8), axis=1) # (B, 4T-15, L)
     smooth_loss = (diff ** 2).mean()"""
+
     loss = InfoNCE(negative_mode='paired') 
     query = z_seq[:, :-1, :].reshape(-1,L)
     positive_key = z_seq[:, 1:, :].reshape(-1,L)
 
-    negative_keys = z_seq.roll(shifts=1, dims=0)[:, :-1, :].reshape(-1,1,L) # roll along batch dim
-    # for unpaired we add the buffer dim 1 cause there's only a single negative key to compare with here
+    batch_contrasts = z_seq.roll(shifts=1, dims=0)[:, :-1, :].reshape(-1,1,L) # roll along batch dim
+
+    #the idea here is to pick enough negative pairs to cancel out any noise
+    sequence_contrasts1 = z_seq.roll(shifts=T//2, dims=1)[:, :-1, :].reshape(-1,1,L)
+    sequence_contrasts2 = z_seq.roll(shifts=T//4, dims=1)[:, :-1, :].reshape(-1,1,L)
+    sequence_contrasts3 = z_seq.roll(shifts=-T//4, dims=1)[:, :-1, :].reshape(-1,1,L)
+
+    negative_keys = torch.cat([batch_contrasts,sequence_contrasts1, sequence_contrasts2, sequence_contrasts3], dim=1)     
 
     output = loss(query, positive_key, negative_keys) 
     return weight * output
