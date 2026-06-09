@@ -174,7 +174,7 @@ def reconstruction_loss(x_rec, x_true, ms_ssim_module, loss_type ="l1", loss_wei
     ms_ssim_val = ms_ssim_module(x_rec_flat, x_true_flat)
     ms_ssim_loss = 1 - ms_ssim_val
     
-    total_loss = l1_weight * l1_loss + ms_ssim_weight * ms_ssim_loss
+    total_loss = loss_weight * l1_loss + ms_ssim_weight * ms_ssim_loss
     
     return total_loss, {
         "l1_loss": l1_loss.item(),
@@ -196,7 +196,8 @@ def train_lstm(
     latent_size = 4096,
     lr=2e-4,
     epochs=25,
-    warm_restarts=False
+    warm_restarts=False,
+    image_size = 256
     ):
     #hyperparameters:
 
@@ -238,7 +239,7 @@ def train_lstm(
             "use_residual": use_residual,
             "use_batchnorm": use_batchnorm,
             "latent_size": latent_size,
-            "image_size": 128,
+            "image_size": image_size,
             "distributed": False,
             "warm_restarts":True,
         },
@@ -282,16 +283,16 @@ def train_lstm(
     mask = df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     val_df = df[mask]
     train_df = df[~mask]
-    train_dataset = IVFSequenceDataset(train_df, resize=128, norm="minmax01")
-    val_dataset = IVFSequenceDataset(val_df, resize=128, norm="minmax01")
+    train_dataset = IVFSequenceDataset(train_df, resize=image_size, norm="minmax01")
+    val_dataset = IVFSequenceDataset(val_df, resize=image_size, norm="minmax01")
     print("val size: ", str(len(val_df) / len(df)))
     full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})
     full_seq_val_mask = full_seq_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
     full_seq_df_val = full_seq_df[full_seq_val_mask] # just look at validation ICM embryos
     
     full_seq_df_train = full_seq_df[~full_seq_val_mask] # just look at validation ICM embryos
-    full_seq_dataset_val = IVFEmbryoDataset(full_seq_df_val, resize=128, norm="minmax01")
-    full_seq_dataset_train = IVFEmbryoDataset(full_seq_df_train, resize=128, norm="minmax01")
+    full_seq_dataset_val = IVFEmbryoDataset(full_seq_df_val, resize=256, norm="minmax01")
+    full_seq_dataset_train = IVFEmbryoDataset(full_seq_df_train, resize=256, norm="minmax01")
 
     loader = DataLoader(
         train_dataset,
@@ -467,7 +468,7 @@ def train_lstm(
             "use_classifier": False,
             "num_classes": 2,
             "use_latent_split": False,
-            "image_size": 128,
+            "image_size": 256,
             "dropout_rate": dropout_rate,
             "use_lstm": use_lstm,
             "use_residual": use_residual,
@@ -523,7 +524,9 @@ def train_lstm(
                 # MS-SSIM
                 val_recon_flat = val_recon.view(B * T, C, H, W)
                 embryo_vol_flat = embryo_vol.view(B * T, C, H, W)
-                ms_ssim_val = ms_ssim(val_recon_flat, embryo_vol_flat)
+
+                val_recon_flat, embryo_vol_flat = F.normalize(torch.stack([val_recon_flat, embryo_vol_flat],dim=0),dim=0) 
+                ms_ssim_val = ms_ssim_module(val_recon_flat, embryo_vol_flat)
                 val_metrics['ssim'].push((1 - ms_ssim_val).item())
 
                 if T > 1:
@@ -650,7 +653,7 @@ def train_lstm(
         # not necessary for kanakasabapathy
         #metadata_df = metadata_df.rename(columns={"Image":"embryo_id"})
         idx = np.random.randint(len(metadata_df))
-        vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 128)], "minmax01")[0]
+        vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 256)], "minmax01")[0]
         recon_img = imgs[idx]
 
         vol_img = (vol_img * 255).astype(np.uint8)

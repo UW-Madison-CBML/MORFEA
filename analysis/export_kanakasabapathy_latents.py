@@ -26,13 +26,13 @@ def export_kanakasabapathy(model):
     # now let's get the data set up
     
     image_abs_paths = paths
-    images_vol = np.stack([read_gray(path, 128) for path in image_abs_paths], axis=0)
+    images_vol = np.stack([read_gray(path, 256) for path in image_abs_paths], axis=0)
     
     # for consistency normalize in the same way as the video latent exports
     images_vol = normalize_video(images_vol, "minmax01")
     
-    images_tensor = torch.from_numpy(images_vol) # (B, 128, 128)
-    images_tensor = images_tensor.unsqueeze(1).unsqueeze(1) # insert a channel and time dim of 1: (B, 1, 1, 128, 128)
+    images_tensor = torch.from_numpy(images_vol) # (B, 256, 256)
+    images_tensor = images_tensor.unsqueeze(1).unsqueeze(1) # insert a channel and time dim of 1: (B, 1, 1, 256, 256)
     # normal size of video tensors is (64, 32, 1 ...) so ~2300 should work as one batch
     
     # ----------------------------------------------------------- 
@@ -45,7 +45,7 @@ def export_kanakasabapathy(model):
     with torch.no_grad():
         imgs, latents = model(images_tensor)
     latents = latents.cpu().squeeze(1).numpy() # squeeze out time dim of 1: (B, 512)
-    imgs = imgs.cpu().squeeze(1).squeeze(1).numpy() # (B, 128, 128)
+    imgs = imgs.cpu().squeeze(1).squeeze(1).numpy() # (B, 256, 256)
     gc.collect()
     torch.cuda.memory.empty_cache()
     model.train()

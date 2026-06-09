@@ -75,8 +75,11 @@ class Encoder(nn.Module):
         self.latent_size = latent_size
         self.hidden_channels = hidden_channels
         self.spatial_cnn = nn.Sequential(
-            # 128 -> 64 
+            # 256 -> 128
             ResidualBlock(input_channels, self.hidden_channels, downsample=True),
+
+            # 128 -> 64 
+            ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
 
             # 64 -> 32 
             ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
@@ -88,7 +91,7 @@ class Encoder(nn.Module):
             ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
 
         )
-        self.final_resolution = 8 #2 ** (7 - len([module for module in self.spatial_cnn.modules() if not isinstance(self.spatial_cnn, nn.Sequential)]))
+        self.final_resolution = 8 #2 ** (8 - len([module for module in self.spatial_cnn.modules() if not isinstance(self.spatial_cnn, nn.Sequential)]))
         self.use_lstm = use_lstm
         """if not self.use_convlstm:
             self.convlstm = None 
@@ -118,8 +121,6 @@ class Encoder(nn.Module):
         B, T, C, H, W = x.shape
 
         x = x.view(B * T, C, H, W)  # (B*T, 1, H, W)
-        if H != 128 or W != 128:
-            x = torch.nn.functional.interpolate(x, size=(128, 128), mode='bilinear', align_corners=True)
 
         x = self.spatial_cnn(x)      
         _, C2, H2, W2 = x.shape
@@ -187,11 +188,15 @@ class Decoder(nn.Module):
             # 64 -> 128 
             ResidualUpBlock(self.hidden_channels, self.hidden_channels),
 
+            # 128 -> 256
+            ResidualUpBlock(self.hidden_channels, self.hidden_channels),
+
+
             nn.Conv2d(self.hidden_channels, 1, kernel_size=3, padding=1),
             nn.Sigmoid()
         )
         
-        self.initial_resolution = 8 #2 ** (7 - len([module for module in self.spatial_decoder.modules() if not isinstance(self.spatial_decoder, nn.Sequential)]))
+        self.initial_resolution = 8 #2 ** (8 - len([module for module in self.spatial_decoder.modules() if not isinstance(self.spatial_decoder, nn.Sequential)]))
         self.lin1 = nn.Linear(latent_size,latent_size)
 
         self.latent_expand = nn.Linear(latent_size, self.hidden_channels * self.initial_resolution * self.initial_resolution)
@@ -218,7 +223,7 @@ class Decoder(nn.Module):
         B, T, C, H, W = h_seq.shape
         h_seq = h_seq.view(B * T, C, H, W)  # (B*T, hidden_dim, 16, 16)
         x_rec = self.spatial_decoder(h_seq)  # (B*T, 1, 128, 128)
-        x_rec = x_rec.view(B, T, 1, 128, 128)  # (B, T, 1, 128, 128)
+        x_rec = x_rec.view(B, T, 1, 256, 256)  # (B, T, 1, 128, 128)
 
         return x_rec
 
@@ -286,18 +291,11 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
 
 
     def forward(self, x, return_all=False, hidden=None):
-        B, T, C, orig_H, orig_W = x.shape
-
 
         z_seq = self.encoder(x)
 
         x_rec = self.decoder(z_seq)
 
-        # Resize back to original input size if needed
-        if orig_H != 128 or orig_W != 128:
-            x_rec_flat = x_rec.view(B * T, C, 128, 128)
-            x_rec_flat = torch.nn.functional.interpolate(x_rec_flat, size=(orig_H, orig_W), mode='bilinear', align_corners=True)
-            x_rec = x_rec_flat.view(B, T, C, orig_H, orig_W)
 
         return x_rec, z_seq
 
