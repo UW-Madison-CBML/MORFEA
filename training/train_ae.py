@@ -675,7 +675,7 @@ def train_lstm(
         comparison = np.concatenate((vol_img, recon_img), axis=1)
 
         images = wandb.Image(comparison, caption="kanakasabapathy_recon_val")
-        run.log({"kanakasabapathy_recon_val": images,"kanakasabapathy_grade_sizes": wandb.Table(dataframe=metadata_df.groupby("TE").size(as_index=False))})
+        run.log({"kanakasabapathy_recon_val": images,"kanakasabapathy_grade_sizes": wandb.Table(dataframe=metadata_df.groupby("TE",as_index=False).size())})
 
         # train the lstm model on the kanakasabapathy latents and log the loss to wandb
         kanakasabapathy_lats_df = pd.DataFrame(kanakasabapathy_lats, index=metadata_df.index, columns=[f"z_{i}" for i in range(kanakasabapathy_lats.shape[1])])
