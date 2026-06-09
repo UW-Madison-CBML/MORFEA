@@ -341,7 +341,7 @@ def train_lstm(
     )
     
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, len(loader) * epochs) if warm_restarts else torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
-    ssim_module = SSIM(win_size=4, win_sigma=1.5, data_range=1, size_average=True, channel=1)
+    ssim_module = SSIM(win_size=5, win_sigma=1.5, data_range=1, size_average=True, channel=1)
     for epoch in range(epochs):
         print(f"epoch {epoch}")
         print(torch.cuda.memory_summary(device=DEVICE, abbreviated=False))
