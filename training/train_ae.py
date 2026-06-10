@@ -88,12 +88,11 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
     positive_key = z_seq[:, 1:, :].reshape(-1,L)
 
     batch_contrasts = z_seq.roll(shifts=1, dims=0)[:, :-1, :].reshape(-1,1,L) # roll along batch dim
-
-    #the idea here is to pick enough negative pairs to cancel out any noise
-    sequence_contrasts1 = z_seq.roll(shifts=T//4, dims=1)[:, :-1, :].reshape(-1,1,L)
-    sequence_contrasts2 = z_seq.roll(shifts=-T//4, dims=1)[:, :-1, :].reshape(-1,1,L)
-
-    negative_keys = torch.cat([batch_contrasts,sequence_contrasts1, sequence_contrasts2], dim=1)     
+    # need to develop some sort of loss that is sequence independent
+    # so it's the fact that roll near the edge of the sequence will reach across. We just sequences of say 8 to look smooths, it doesn't matter how the two ends interect. The below will make it so that the two ends are not contrasted 
+    sequence_contrasts_left = torch.cat([z_seq[:,4:,:], z_seq[:,-4:,:]], dim=1)[:, :-1, :].reshape(-1,1,L) 
+    sequence_contrasts_right = torch.cat([z_seq[:,:4,:], z_seq[:,:-4,:],], dim=1)[:, :-1, :].reshape(-1,1,L) 
+    negative_keys = torch.cat([batch_contrasts, sequence_contrasts_left, sequence_contrasts_right], dim=1)
 
     output = loss(query, positive_key, negative_keys) 
     return weight * output
