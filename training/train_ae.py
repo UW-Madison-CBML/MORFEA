@@ -34,7 +34,8 @@ from torch.utils.data.distributed import DistributedSampler
 import os
 import time
 import umap
-import sklearn
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 from huggingface_hub import login
 import shutil
 import hashlib
@@ -89,11 +90,10 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
     batch_contrasts = z_seq.roll(shifts=1, dims=0)[:, :-1, :].reshape(-1,1,L) # roll along batch dim
 
     #the idea here is to pick enough negative pairs to cancel out any noise
-    sequence_contrasts1 = z_seq.roll(shifts=T//2, dims=1)[:, :-1, :].reshape(-1,1,L)
-    sequence_contrasts2 = z_seq.roll(shifts=T//4, dims=1)[:, :-1, :].reshape(-1,1,L)
-    sequence_contrasts3 = z_seq.roll(shifts=-T//4, dims=1)[:, :-1, :].reshape(-1,1,L)
+    sequence_contrasts1 = z_seq.roll(shifts=T//4, dims=1)[:, :-1, :].reshape(-1,1,L)
+    sequence_contrasts2 = z_seq.roll(shifts=-T//4, dims=1)[:, :-1, :].reshape(-1,1,L)
 
-    negative_keys = torch.cat([batch_contrasts,sequence_contrasts1, sequence_contrasts2, sequence_contrasts3], dim=1)     
+    negative_keys = torch.cat([batch_contrasts,sequence_contrasts1, sequence_contrasts2], dim=1)     
 
     output = loss(query, positive_key, negative_keys) 
     return weight * output
@@ -590,11 +590,12 @@ def train_lstm(
         
         #cebra_time_model.save("cebra_time_model.pt")
 
-
-        rand_img = np.random.randint(40, 64) 
+        trajs = []
+        image_dict = {} # collect all the plots for WandB logging
+        count = 0
         with torch.no_grad():
             for i, embryo_vol in enumerate(full_seq_loader_val):
-                if i % rand_img != 0:
+                if i % 10 != 0:
                     continue
                 embryo_vol = embryo_vol.to(DEVICE) 
                 embryo_recon, z_seq = model(embryo_vol)
@@ -606,20 +607,12 @@ def train_lstm(
                 ax.set_xlabel("Time Index")
                 ax.set_ylabel("Time Index")
                 plt.colorbar(im, ax=ax)
-                wandb.log({"temp_smoothness_val": wandb.Image(fig)})
+                image_dict[f"temp_smoothness_val_{count}"] = wandb.Image(fig)
 
                 plt.close(fig)                
                 
-                embedding = sklearn.decomposition.PCA(n_components=2).fit_transform(traj)
-                fig, ax = plt.subplots(figsize=(8, 6))
-                im = ax.scatter(embedding[:,0], embedding[:,1],c=np.linspace(0,1,embedding.shape[0]), cmap='viridis')
-
-                ax.set_xlabel("PCA 1")
-                ax.set_ylabel("PCA 2")
-                plt.colorbar(im, ax=ax)
-                wandb.log({"pca_val": wandb.Image(fig)})
-
-                plt.close(fig)                
+                trajs.append(traj) # add traj to list of all trajs for PCA calculation
+                          
                 
                 cebra_embedding = cebra_time_model.transform(traj, session_id=0) # i guess dont batch it?
                 fig, ax = plt.subplots(figsize=(8, 6))
@@ -630,7 +623,7 @@ def train_lstm(
                 ax.set_ylabel("Cebra 2")
                 ax.set_zlabel("Cebra 3")
                 plt.colorbar(im, ax=ax)
-                wandb.log({"cebra_val": wandb.Image(fig)})
+                image_dict[f"cebra_val_{count}"] =  wandb.Image(fig)
 
                 plt.close(fig) 
                 # look at some validation recons
@@ -643,13 +636,29 @@ def train_lstm(
                 comparison = np.concatenate((vol_img, recon_img), axis=1)
      
                 images = wandb.Image(comparison, caption="embryo_recon_val")
-                run.log({"reconstruction_val": images})
+                image_dict[f"reconstruction_val_{count}"] = images
+                count += 1
         
-        rand_img = np.random.randint(40, 64) 
+        pca = PCA(n_components=2).fit(StandardScaler.fit_transform(np.concatenate(trajs, axis=0)))
+        count = 0 
+        for traj in trajs: 
+            embedding = pca.transform(traj) 
+            fig, ax = plt.subplots(figsize=(8, 6))
+            im = ax.scatter(embedding[:,0], embedding[:,1],c=np.linspace(0,1,embedding.shape[0]), cmap='viridis')
+
+            ax.set_xlabel("PCA 1")
+            ax.set_ylabel("PCA 2")
+            plt.colorbar(im, ax=ax)
+            image_dict[f"pca_val_{count}"] = wandb.Image(fig)
+
+            plt.close(fig)  
+            count += 1
+        
         del cebra_time_model
+        count = 0 # build a count for 0 indexing
         with torch.no_grad():
             for i, embryo_vol in enumerate(full_seq_loader_train):
-                if i % rand_img != 0:
+                if i % 10 != 0:
                     continue
                 embryo_vol = embryo_vol.to(DEVICE) 
                 _, z_seq = model(embryo_vol)
@@ -661,9 +670,10 @@ def train_lstm(
                 ax.set_xlabel("Time Index")
                 ax.set_ylabel("Time Index")
                 plt.colorbar(im, ax=ax)
-                wandb.log({"temp_smoothness_train": wandb.Image(fig)})
+                image_dict[f"temp_smoothness_train_{count}"] = wandb.Image(fig)
 
                 plt.close(fig)   
+                count += 1
         # export the kanakasabapathy latents
         
         metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model)
@@ -671,19 +681,20 @@ def train_lstm(
         model.train()
         # spoof the ICM grades
         metadata_df['ICM'] = metadata_df["TE"]
-        # not necessary for kanakasabapathy
-        #metadata_df = metadata_df.rename(columns={"Image":"embryo_id"})
-        idx = np.random.randint(len(metadata_df))
-        vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 128)], "minmax01")[0]
-        recon_img = imgs[idx]
 
-        vol_img = (vol_img * 255).astype(np.uint8)
-        recon_img = (recon_img * 255).astype(np.uint8)
-        comparison = np.concatenate((vol_img, recon_img), axis=1)
+        for i in range(5):
+            idx = (i * 20000) % len(imgs)
+            vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 128)], "minmax01")[0]
+            recon_img = imgs[idx]
 
-        images = wandb.Image(comparison, caption="kanakasabapathy_recon_val")
-        run.log({"kanakasabapathy_recon_val": images,"kanakasabapathy_grade_sizes": wandb.Table(dataframe=metadata_df.groupby("TE",as_index=False).size())})
+            vol_img = (vol_img * 255).astype(np.uint8)
+            recon_img = (recon_img * 255).astype(np.uint8)
+            comparison = np.concatenate((vol_img, recon_img), axis=1)
 
+            images = wandb.Image(comparison, caption="kanakasabapathy_recon_val")
+            image_dict[f"kanakasabapathy_recon_val_{idx}"] = images
+
+        run.log(image_dict | {"kanakasabapathy_grade_sizes": wandb.Table(dataframe=metadata_df.groupby("TE",as_index=False).size())})
         # train the lstm model on the kanakasabapathy latents and log the loss to wandb
         kanakasabapathy_lats_df = pd.DataFrame(kanakasabapathy_lats, index=metadata_df.index, columns=[f"z_{i}" for i in range(kanakasabapathy_lats.shape[1])])
         
@@ -697,7 +708,7 @@ def train_lstm(
         kanakasabapathy_mask = kanakasabapathy_df["embryo_id"].isin(VAL_EMBRYOS)
         kanakasabapathy_val_df = kanakasabapathy_df[kanakasabapathy_mask]
         kanakasabapathy_df = kanakasabapathy_df[~kanakasabapathy_mask]
-        train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.003, "icm_lr":0.003}, False, "kanakasabapathy", run, batch_size=128, epochs=30)
+        train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "kanakasabapathy", run, batch_size=128, epochs=30)
 
 
             
