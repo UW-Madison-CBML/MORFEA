@@ -242,9 +242,9 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
             rpf_dict[f"{training_name}_icm_{g}_recall"] = recall
             rpf_dict[f"{training_name}_icm_{g}_precision"] = precision
             rpf_dict[f"{training_name}_icm_{g}_f1"] = f1
-         
-        te_confusion_mat = te_confusion_mat.numpy().astype(int)
-        icm_confusion_mat = icm_confusion_mat.numpy().astype(int)
+        # need to flip these around so the confusionmatrixdisplay labels will be correct
+        te_confusion_mat = np.transpose(te_confusion_mat.numpy().astype(int))
+        icm_confusion_mat = np.transpose(icm_confusion_mat.numpy().astype(int))
 
         fig_te, ax_te = plt.subplots(figsize=(10, 10))
         disp = ConfusionMatrixDisplay(confusion_matrix=te_confusion_mat, display_labels= grade_options)
@@ -256,14 +256,10 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         disp.plot(cmap='Blues', ax=ax_icm, values_format='d')
         plt.setp(ax_icm.get_xticklabels(), rotation=45, ha='right') 
 
-        run.log({"confusion_matrix_te": wandb.Image(fig_te), "confusion_matrix_icm": wandb.Image(fig_icm)} | rpf_dict)
+        run.log({"confusion_matrix_te": wandb.Image(fig_te), "confusion_matrix_icm": wandb.Image(fig_icm)} | rpf_dict | {f"{training_name}_te_acc_mean": te_acc_stats.mean, f"{training_name}_te_acc_std":te_acc_stats.std_dev, f"{training_name}_icm_acc_mean":icm_acc_stats.mean, f"{training_name}_icm_acc_std":icm_acc_stats.std_dev})
         
         plt.close(fig_te); plt.close(fig_icm)
 
-        #print(grade_options)
-        #print("te confusion:"); print(te_confusion_mat)
-        #print("icm confusion:"); print(icm_confusion_mat)
-        run.log({f"{training_name}_te_acc_mean": te_acc_stats.mean, f"{training_name}_te_acc_std":te_acc_stats.std_dev, f"{training_name}_icm_acc_mean":icm_acc_stats.mean, f"{training_name}_icm_acc_std":icm_acc_stats.std_dev})
         gc.collect()
         torch.cuda.empty_cache()
 
