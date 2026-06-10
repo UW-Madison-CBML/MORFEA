@@ -639,7 +639,7 @@ def train_lstm(
                 image_dict[f"reconstruction_val_{count}"] = images
                 count += 1
         
-        pca = PCA(n_components=2).fit(StandardScaler.fit_transform(np.concatenate(trajs, axis=0)))
+        pca = PCA(n_components=2).fit(StandardScaler().fit_transform(np.concatenate(trajs, axis=0)))
         count = 0 
         for traj in trajs: 
             embedding = pca.transform(traj) 
