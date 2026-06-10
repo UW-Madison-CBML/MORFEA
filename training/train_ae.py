@@ -348,7 +348,7 @@ def train_lstm(
     )
     
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, len(loader) * epochs) if warm_restarts else torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
-    ssim_module = SSIM(win_size=5, win_sigma=1.5, data_range=1, size_average=True, channel=1)
+    ssim_module = SSIM(win_size=3, win_sigma=1.5, data_range=1, size_average=True, channel=1)
     for epoch in range(epochs):
         print(f"epoch {epoch}")
         print(torch.cuda.memory_summary(device=DEVICE, abbreviated=False))
@@ -638,7 +638,7 @@ def train_lstm(
                 images = wandb.Image(comparison, caption="embryo_recon_val")
                 image_dict[f"reconstruction_val_{count}"] = images
                 count += 1
-        
+        # make sure to normalize mean and std dev before PCA 
         pca = PCA(n_components=2).fit(StandardScaler().fit_transform(np.concatenate(trajs, axis=0)))
         count = 0 
         for traj in trajs: 
