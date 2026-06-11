@@ -34,5 +34,7 @@ request_memory = 64GB
 request_disk = 128GB
 request_gpus = 1
 
-
-queue ablation from ablation.txt
+# For non-DAG use
+#queue ablation from ablation.txt
+# For DAG use
+queue 1 
