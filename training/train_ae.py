@@ -73,6 +73,7 @@ from info_nce import InfoNCE, info_nce
 def temporal_smoothness_loss(z_seq, weight=0.1):
     if z_seq.size(1) < 2:
         return torch.tensor(0.0, device=z_seq.device)
+    weight = torch.tensor(weight, device=z_seq.device)
     B,T,L = z_seq.shape
     """ 
     # Compute difference between adjacent timesteps
@@ -89,11 +90,10 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
 
     batch_contrasts = z_seq.roll(shifts=1, dims=0)[:, :-1, :].reshape(-1,1,L) # roll along batch dim
     # need to develop some sort of loss that is sequence independent
-    # so it's the fact that roll near the edge of the sequence will reach across. We just sequences of say 8 to look smooths, it doesn't matter how the two ends interect. The below will make it so that the two ends are not contrasted 
-    """sequence_contrasts_left = [torch.cat([z_seq[:,i:,:], z_seq[:,-i:,:]], dim=1)[:, :-1, :].reshape(-1,1,L) for i in range(2,8)]
-    sequence_contrasts_right = [torch.cat([z_seq[:,:i,:], z_seq[:,:-i,:],], dim=1)[:, :-1, :].reshape(-1,1,L) for i in range(2,8)]
-    negative_keys = torch.cat([batch_contrasts] + sequence_contrasts_left + sequence_contrasts_right, dim=1)"""
-    negative_keys = batch_contrasts
+    # so it's the fact that roll near the edge of the sequence will reach across. We just want sequences of say 8 to look smooths, it doesn't matter how the two ends interect. The below will make it so that the two ends are not contrasted 
+    sequence_contrasts_left = torch.cat([z_seq[:,:T//4], z_seq[:,-T//4:]], dim=1)[:, :-1, :].reshape(-1,1,L)
+    sequence_contrasts_right = torch.cat([z_seq[:,T//4:], z_seq[:,:-T//4]], dim=1)[:, :-1, :].reshape(-1,1,L)
+    negative_keys = torch.cat([batch_contrasts, sequence_contrasts_left, sequence_contrasts_right], dim=1)
 
     output = loss(query, positive_key, negative_keys) 
     return weight * output
@@ -626,8 +626,8 @@ def train_lstm(
                 image_dict[f"cebra_val_{count}"] =  wandb.Image(fig)
 
                 plt.close(fig) 
-                # look at some validation recons
-                rand_idx = np.random.randint(embryo_vol.shape[1]) 
+                # look at some validation recons, do it like this so it's deterministic
+                rand_idx = (20000 * i) % embryo_vol.shape[1]
                 vol_img = embryo_vol[0, rand_idx, 0].cpu().detach().numpy()
                 recon_img = embryo_recon[0, rand_idx, 0].cpu().detach().numpy()
 
