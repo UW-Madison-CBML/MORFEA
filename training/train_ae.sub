@@ -35,6 +35,6 @@ request_disk = 128GB
 request_gpus = 1
 
 # For non-DAG use
-#queue ablation from ablation.txt
+queue ablation from ablation.txt
 # For DAG use
-queue 1 
+#queue 1 

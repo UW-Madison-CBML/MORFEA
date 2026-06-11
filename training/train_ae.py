@@ -261,7 +261,7 @@ def train_lstm(
             "latent_size": latent_size,
             "image_size": image_size,
             "distributed": False,
-            "warm_restarts":True,
+            "warm_restarts":warm_restarts,
         },
     )
 
@@ -283,7 +283,10 @@ def train_lstm(
         use_residual=use_residual,
         use_batchnorm=use_batchnorm
     )
-
+    artifact = wandb.Artifact(name="scripts", type="model_file")
+    artifact.add_file(os.path.abspath("train_ae.py"))
+    artifact.add_file(os.path.abspath("ae_model.py"))
+    run.log_artifact(artifact)
     VAL_EMBRYOS = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"}).dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
     torch.cuda.init()
     model = model.to(DEVICE)
@@ -300,14 +303,14 @@ def train_lstm(
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
 
     df = pd.read_csv(os.path.abspath("index.csv"))
-    mask = df["cell_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
+    mask = df["cell_id"].isin(VAL_EMBRYOS)
     val_df = df[mask]
     train_df = df[~mask]
     train_dataset = IVFSequenceDataset(train_df, resize=image_size, norm="minmax01")
     val_dataset = IVFSequenceDataset(val_df, resize=image_size, norm="minmax01")
     print("val size: ", str(len(val_df) / len(df)))
     full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})
-    full_seq_val_mask = full_seq_df["embryo_id"].str.contains("|".join(VAL_EMBRYOS), regex=True)
+    full_seq_val_mask = full_seq_df["embryo_id"].isin(VAL_EMBRYOS)
     full_seq_df_val = full_seq_df[full_seq_val_mask] # just look at validation ICM embryos
     
     full_seq_df_train = full_seq_df[~full_seq_val_mask] # just look at validation ICM embryos
@@ -348,7 +351,7 @@ def train_lstm(
     )
     
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, len(loader) * epochs) if warm_restarts else torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
-    ssim_module = SSIM(win_size=3, win_sigma=1.5, data_range=1, size_average=True, channel=1)
+    ssim_module = SSIM(win_size=7, win_sigma=1.5, data_range=1, size_average=True, channel=1)
     for epoch in range(epochs):
         print(f"epoch {epoch}")
         print(torch.cuda.memory_summary(device=DEVICE, abbreviated=False))
@@ -680,7 +683,7 @@ def train_lstm(
         
         model.train()
         # spoof the ICM grades
-        metadata_df['ICM'] = metadata_df["TE"]
+        metadata_df['ICM'] = metadata_df['TE']
 
         for i in range(5):
             idx = (i * 20000) % len(imgs)
