@@ -1,34 +1,24 @@
 # swin.sub
    
 docker_image = jenslundsgaard/ivf-training:v3.0
-#docker_image = pytorch/pytorch:2.9.0-cuda12.8-cudnn9-runtime
-#docker_image = pytorch/pytorch:1.1.0-cuda10.0-cudnn7.5-runtime
+
 universe = docker
-# Specify your executable (single binary or a script that runs several
-#  commands) and arguments to be passed to jobs. 
-#  $(Process) will be a integer number for each job, starting with "0"
-#  and increasing for the relevant number of jobs.
+
 shell = ./swin.sh $(ablation)
    		
-# Specify the name of the log, standard error, and standard output (or
-# "screen output") files. Wherever you see $(Cluster), HTCondor will insert the 
-#  queue number assigned to this set of jobs at the time of submission.
 log = swin_$(Cluster)_$(Process).log
 error = swin_$(Cluster)_$(Process).err
 output = swin_$(Cluster)_$(Process).out
 should_transfer_files = YES
 when_to_transfer_output = ON_EXIT_OR_EVICT
 Requirements = (Target.HasCHTCStaging == true)
-#require_gpus = (DriverVersion >= 10.1)
-# Transfer our executable script
-transfer_input_files = swin.sh, swin.py, ../api_keys.txt, dataset_ivf.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv
+
+transfer_input_files = swin.sh, swin.py, ../api_keys.txt, ../training/dataset_ivf.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, ../training/dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv
 gpus_minimum_capability = 7.0
 requirements= Machine=="bhaskargpu4000.chtc.wisc.edu"
  
 +GPUModel = "NVIDIA H200"
-#transfer_output_files = model_weights.pth 
-# Requirements (e.g., operating system) your job needs, what amount of
-# compute resources each job will need on the computer where it runs.
+
 request_cpus = 16
 request_memory = 64GB
 request_disk = 128GB
