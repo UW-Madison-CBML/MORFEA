@@ -1,25 +1,25 @@
 import requests
 import torch
 from PIL import Image
-from dataset_ivf import read_gray, normalize_video
 
-from transformers import AutoImageProcessor, AutoModelForImageClassification
+import timm
 
+def main():
+    # Hyperparameters
+    lr = 3e-4
+    batch_size = 64
+    
+    # download model with timm
+    model = timm.create_model("swin_tiny_patch4_window7_224", pretrained=True, num_classes=18)
+    model.to(DEVICE)
+    
+    with torch.cuda.amp.autocast(enabled=(DEVICE == "cuda")):
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+    scaler.scale(loss).backward()
+    scaler.step(optimizer)
+    scaler.update()
+    
 
-image_processor = AutoImageProcessor.from_pretrained(
-    "microsoft/swinv2-tiny-patch4-window8-256",
-)
-model = AutoModelForImageClassification.from_pretrained(
-    "microsoft/swinv2-tiny-patch4-window8-256",
-    device_map="auto"
-)
-
-image = Image.open()
-inputs = image_processor(image, return_tensors="pt").to(model.device)
-
-with torch.no_grad():
-  logits = model(**inputs).logits
-
-predicted_class_id = logits.argmax(dim=-1).item()
-predicted_class_label = model.config.id2label[predicted_class_id]
-print(f"The predicted class label is: {predicted_class_label}")
+if __name__ == "__main__":
+    main()
