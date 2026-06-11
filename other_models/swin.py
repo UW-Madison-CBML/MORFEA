@@ -1,6 +1,7 @@
 import requests
 import torch
 from PIL import Image
+from dataset_ivf import read_gray, normalize_video
 
 from transformers import AutoImageProcessor, AutoModelForImageClassification
 
@@ -13,8 +14,7 @@ model = AutoModelForImageClassification.from_pretrained(
     device_map="auto"
 )
 
-url = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/pipeline-cat-chonk.jpeg"
-image = Image.open(requests.get(url, stream=True).raw)
+image = Image.open()
 inputs = image_processor(image, return_tensors="pt").to(model.device)
 
 with torch.no_grad():
