@@ -91,8 +91,8 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
     batch_contrasts = z_seq.roll(shifts=1, dims=0)[:, :-1, :].reshape(-1,1,L) # roll along batch dim
     # need to develop some sort of loss that is sequence independent
     # so it's the fact that roll near the edge of the sequence will reach across. We just want sequences of say 8 to look smooths, it doesn't matter how the two ends interect. The below will make it so that the two ends are not contrasted 
-    sequence_contrasts_left = torch.cat([z_seq[:,:T//4], z_seq[:,-T//4:]], dim=1)[:, :-1, :].reshape(-1,1,L)
-    sequence_contrasts_right = torch.cat([z_seq[:,T//4:], z_seq[:,:-T//4]], dim=1)[:, :-1, :].reshape(-1,1,L)
+    sequence_contrasts_left = torch.cat([z_seq[:,  (T//4):],z_seq[:, -(T//4):]], dim=1)[:, :-1, :].reshape(-1,1,L)
+    sequence_contrasts_right = torch.cat([z_seq[:,:(T//4)], z_seq[:,:-(T//4)]], dim=1)[:, :-1, :].reshape(-1,1,L)
     negative_keys = torch.cat([batch_contrasts, sequence_contrasts_left, sequence_contrasts_right], dim=1)
 
     output = loss(query, positive_key, negative_keys) 
