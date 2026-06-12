@@ -134,9 +134,9 @@ def main(model_name, features, lr=0.001):
  
     dataset = StageDataset(df, "embryo_dataset_annotations", features)
     dataset_val = StageDataset(val_df, "embryo_dataset_annotations", features, return_embryo_id=True, return_whole_seqs=True)
-    #weights = get_class_weights(os.path.abspath("embryo_dataset_annotations"), df.groupby("embryo_id").size().reset_index(name='counts'), dataset.phases).to(DEVICE)
+    #weights = get_class_weights(os.path.abspath("embryo_dataset_annotations"), df.groupby("embryo_id").size().reset_index(name='counts'), StageDataset.PHASES).to(DEVICE)
     crit = torch.nn.CrossEntropyLoss()
-    model = StageModel(input_size = len(dataset.lat_cols), num_classes=len(dataset_val.phases))
+    model = StageModel(input_size = len(dataset.lat_cols), num_classes=len(StageDataset.PHASES))
     torch.backends.cudnn.enabled = False
     trainable_params = 0
     all_params = 0
@@ -195,11 +195,11 @@ def main(model_name, features, lr=0.001):
         acc_top_2_stats = RunningStats()
         acc_top_5_stats = RunningStats()
 
-        f1_stats = {phase: RunningStats() for phase in dataset_val.phases}
-        recall_stats = {phase: RunningStats() for phase in dataset_val.phases}
-        precision_stats = {phase: RunningStats() for phase in dataset_val.phases}
+        f1_stats = {phase: RunningStats() for phase in StageDataset.PHASES}
+        recall_stats = {phase: RunningStats() for phase in StageDataset.PHASES}
+        precision_stats = {phase: RunningStats() for phase in StageDataset.PHASES}
         
-        sum_confusion_mat = np.zeros((len(dataset_val.phases), len(dataset_val.phases)))
+        sum_confusion_mat = np.zeros((len(StageDataset.PHASES), len(StageDataset.PHASES)))
 
         all_preds = []
         all_labels = []
@@ -225,7 +225,7 @@ def main(model_name, features, lr=0.001):
 
                     acc_top_1= (pred == label).sum().item()/label.shape[0]
                     acc_top_1_stats.push(acc_top_1)
-                    label_one_hots = F.one_hot(label, num_classes=len(dataset_val.phases))
+                    label_one_hots = F.one_hot(label, num_classes=len(StageDataset.PHASES))
                     _, top_2_indices = emissions_seq.topk(2, dim=-1)
                     _, top_5_indices = emissions_seq.topk(5, dim=-1)
 
@@ -260,7 +260,7 @@ def main(model_name, features, lr=0.001):
                         ax.set_ylabel('Phase')
                         ax.set_xlabel('Timestep')
                         ax.set_title(model_name + " " + embryo_id)
-                        legend_elements = [Patch(facecolor=cmap(i), label=phase) for i, phase in enumerate(dataset_val.phases)]
+                        legend_elements = [Patch(facecolor=cmap(i), label=phase) for i, phase in enumerate(StageDataset.PHASES)]
                         ax.legend(handles=legend_elements, title="Phases") 
                         run.log({"pred_vs_truth": wandb.Image(fig)}) 
                         plt.close(fig)
@@ -271,24 +271,24 @@ def main(model_name, features, lr=0.001):
                 sum_confusion_mat = sum_confusion_mat + confusion_mat.numpy() 
                 for i in range(model.num_classes):
                     recall, precision, f1 = recall_precision_f1(confusion_mat, i) 
-                    f1_stats[dataset_val.phases[i]].push(f1)
-                    recall_stats[dataset_val.phases[i]].push(recall)
-                    precision_stats[dataset_val.phases[i]].push(precision)
-        for phase in dataset_val.phases:
+                    f1_stats[StageDataset.PHASES[i]].push(f1)
+                    recall_stats[StageDataset.PHASES[i]].push(recall)
+                    precision_stats[StageDataset.PHASES[i]].push(precision)
+        for phase in StageDataset.PHASES:
             run.log({f"{phase} recall": recall_stats[phase].mean, f"{phase} recall std": recall_stats[phase].std_dev, 
                 f"{phase} f1": f1_stats[phase].mean, f"{phase} f1 std": f1_stats[phase].std_dev, 
                 f"{phase} precision": precision_stats[phase].mean, f"{phase} precision std": precision_stats[phase].std_dev})
 
         sum_confusion_mat = sum_confusion_mat.astype(int)
         fig, ax = plt.subplots(figsize=(10, 10))
-        disp = ConfusionMatrixDisplay(confusion_matrix=sum_confusion_mat, display_labels=dataset_val.phases)
+        disp = ConfusionMatrixDisplay(confusion_matrix=sum_confusion_mat, display_labels=StageDataset.PHASES)
         disp.plot(cmap='Blues', ax=ax, values_format='d')
         plt.setp(ax.get_xticklabels(), rotation=45, ha='right') 
         run.log({"confusion_matrix": wandb.Image(fig), "confusion_matrix_table": wandb.plot.confusion_matrix(
             probs=None,
             y_true=torch.cat(all_labels).numpy(),
             preds=torch.cat(all_preds).numpy(),
-            class_names=dataset_val.phases,
+            class_names=StageDataset.PHASES,
         )}) 
         plt.close(fig)
 
@@ -308,9 +308,9 @@ def main(model_name, features, lr=0.001):
         f1s = precision_recall_df["f1"]
         f1_errs = precision_recall_df["f1_std"]
 
-        ax.bar(dataset_val.phases, f1s)
+        ax.bar(StageDataset.PHASES, f1s)
 
-        ax.errorbar(dataset_val.phases, f1s, yerr=f1_errs, fmt="none", color="black", capsize=5)
+        ax.errorbar(StageDataset.PHASES, f1s, yerr=f1_errs, fmt="none", color="black", capsize=5)
 
         ax.tick_params(axis='x', labelrotation=45)
 
