@@ -261,8 +261,9 @@ def train_lstm(
         },
     )
 
-    login(os.getenv("HF_KEY"))
-
+    #login(os.getenv("HF_KEY"))
+    with open("api_keys.txt") as f:
+        login(token=f.read().strip())
     torch.cuda.init()
     model = ConvLSTMAutoencoder(
         None,

@@ -30,7 +30,6 @@ class ImageGradeDataset(Dataset):
 
 
 class ImageStageDataset(Dataset):
-
     PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
     @staticmethod
     def add_group_annotations(group, annotations_dir):
