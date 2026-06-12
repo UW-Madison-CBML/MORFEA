@@ -1,4 +1,5 @@
 contourpy==1.3.0
+timm
 wandb
 cycler==0.12.1
 fonttools==4.60.1
