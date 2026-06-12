@@ -1,7 +1,6 @@
 import requests
 import torch
 from PIL import Image
-
 import timm
 
 def main():

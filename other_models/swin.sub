@@ -1,6 +1,7 @@
 # swin.sub
    
-docker_image = jenslundsgaard/ivf-training:v3.0
+# >= 3.1 has timm
+docker_image = jenslundsgaard/ivf-training:v3.1 
 
 universe = docker
 
