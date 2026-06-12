@@ -91,6 +91,8 @@ def add_annotations(group_name, group, annotations_dir, features):
     return group
 
 class StageDataset(Dataset):
+    PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
+
     def __init__(self, latents_df, annotations_dir, features, return_embryo_id=False, return_whole_seqs=False): # preparing latents_df outside of the class i.e. from .csv .npy in latents/
         self.latents_df = latents_df
         self.return_whole_seqs = return_whole_seqs 
@@ -107,7 +109,6 @@ class StageDataset(Dataset):
         self.seqlength = 64
         
 
-        self.phases = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
         self.lat_cols = [column for column in self.df.columns if column.startswith("z_")] # need to recalculate lat cols as the actual features in the training sequences
 
     def __getitem__(self, idx):
