@@ -89,10 +89,10 @@ class Encoder(nn.Module):
             ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
 
             # 16 -> 8
-            ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
+            #ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
 
         )
-        self.final_resolution = 8 #2 ** (8 - len([module for module in self.spatial_cnn.modules() if not isinstance(self.spatial_cnn, nn.Sequential)]))
+        self.final_resolution = 16 #2 ** (8 - len([module for module in self.spatial_cnn.modules() if not isinstance(self.spatial_cnn, nn.Sequential)]))
         self.use_lstm = use_lstm
         """if not self.use_convlstm:
             self.convlstm = None 
@@ -178,7 +178,7 @@ class Decoder(nn.Module):
         self.dropout = nn.Dropout(0.1)
         self.spatial_decoder = nn.Sequential(
             # 8 -> 16
-            ResidualUpBlock(self.hidden_channels, self.hidden_channels),
+            #ResidualUpBlock(self.hidden_channels, self.hidden_channels),
 
             # 16 -> 32 
             ResidualUpBlock(self.hidden_channels, self.hidden_channels),
@@ -197,7 +197,7 @@ class Decoder(nn.Module):
             nn.Sigmoid()
         )
         
-        self.initial_resolution = 8 #2 ** (8 - len([module for module in self.spatial_decoder.modules() if not isinstance(self.spatial_decoder, nn.Sequential)]))
+        self.initial_resolution = 16 #2 ** (8 - len([module for module in self.spatial_decoder.modules() if not isinstance(self.spatial_decoder, nn.Sequential)]))
         self.lin1 = nn.Linear(latent_size,latent_size)
 
         self.latent_expand = nn.Linear(latent_size, self.hidden_channels * self.initial_resolution * self.initial_resolution)
