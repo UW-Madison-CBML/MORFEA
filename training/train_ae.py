@@ -95,7 +95,7 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
     return weight * output
 
 
-def save_and_push_model(model, repo_name, required_files, model_config=None):
+def save_and_push_model(model, repo_name, required_files, hf_token,model_config=None):
     os.makedirs(repo_name, exist_ok=True)
     device = next(model.parameters()).device
     clean_state_dict = {k: v.cpu().clone() for k, v in model.state_dict().items()}
@@ -128,7 +128,7 @@ def save_and_push_model(model, repo_name, required_files, model_config=None):
     if model.decoder.lstm_dec is not None and model.encoder.lstm_enc is not None:
         model.encoder.lstm_enc.flatten_parameters()
         model.decoder.lstm_dec.flatten_parameters()
-    api = HfApi()
+    api = HfApi(token=hf_token)
 
     config_file = os.path.join(repo_name, "config.json")
     if os.path.exists(config_file):
@@ -260,10 +260,13 @@ def train_lstm(
             "warm_restarts":warm_restarts,
         },
     )
+    hf_token = os.getenv("HF_TOKEN")
+    assert hf_token is not None, "hf_token is none"
+    try:
+        login(token=hf_token, add_to_git_credential=False)
+    except Exception as e:
+        print(f"{e}: bad login")
 
-    #login(os.getenv("HF_KEY"))
-    with open("api_keys.txt") as f:
-        login(token=f.read().strip())
     torch.cuda.init()
     model = ConvLSTMAutoencoder(
         None,
@@ -521,7 +524,7 @@ def train_lstm(
             use_lstm=use_lstm,use_residual=use_residual,use_batchnorm=use_batchnorm)
 
         model_clone.load_state_dict(model.state_dict())
-        save_and_push_model(model_clone, model_name +"-"+ date_label, required_files, model_config=hf_config)
+        save_and_push_model(model_clone, model_name +"-"+ date_label, required_files, hf_token, model_config=hf_config)
         val_metrics = {
             'mse': RunningStats(),
             'l1': RunningStats(),
