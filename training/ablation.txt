@@ -1,2 +1,1 @@
-lstm --loss-type mse --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.017 --size 512 --name morfea1 --lr 0.0002 --epochs 5
-lstm --loss-type mse --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.013 --size 512 --name morfea2 --lr 0.0002 --epochs 5
+lstm --loss-type mse --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.013 --size 512 --name morfea2 --lr 0.0002 --epochs 30
