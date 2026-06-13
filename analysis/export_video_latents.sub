@@ -38,5 +38,5 @@ request_disk = 80GB
 request_gpus = 1
 
 
-#queue models from export_video_latents.txt
-queue 1
+queue model from export_video_latents.txt
+#queue 1
