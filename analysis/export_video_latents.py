@@ -36,8 +36,7 @@ def addAnnotations(group_name, group, annotations_dir):
     return group
 
 
-def export_latents_to_csv(model_name=""
-                          index_csv="index_embryo.csv",limit=None):
+def export_latents_to_csv(model_name="", index_csv="index_embryo.csv",limit=None):
     hf_token = os.getenv("HF_TOKEN") or os.getenv("HF_KEY")
     if hf_token:
         login(hf_token)
