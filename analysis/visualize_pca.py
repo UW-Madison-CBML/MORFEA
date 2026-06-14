@@ -19,6 +19,7 @@ from umap import UMAP
 from sklearn.preprocessing import StandardScaler
 import math
 from visualize_cebra import plot_sequences
+from tqdm import tqdm
 
 PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
 GRADES = ["NA", "C", "B", "A"]
@@ -50,15 +51,15 @@ def main(model_name, image_name, grade_args, phase_args):
     # latents df is also metadata for the cebra embeddings
     latents_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv"))
     latents_np = np.load(os.path.join("latents", f"{model_name}.npy"))
-    pca = UMAP(n_components=3)
+    pca = PCA(n_components=3)
     standard_scaler = StandardScaler()
     pca_lats = pca.fit_transform(standard_scaler.fit_transform(latents_np))
     pca_df = pd.DataFrame(pca_lats, columns = PCA_COLS, index=latents_df.index)
-    umap = UMAP(n_components=3)
-    standard_scaler = StandardScaler()
-    umap_lats = umap.fit_transform(latents_np)
-    umap_df = pd.DataFrame(umap_lats, columns = UMAP_COLS, index=latents_df.index)
-    df = pd.concat([latents_df,pca_df, umap_df], axis=1)
+    #umap = UMAP(n_components=3)
+    #standard_scaler = StandardScaler()
+    #umap_lats = umap.fit_transform(latents_np)
+    #umap_df = pd.DataFrame(umap_lats, columns = UMAP_COLS, index=latents_df.index)
+    df = pd.concat([latents_df,pca_df], axis=1)
     if("NA" not in grade_args):
         df = df.dropna(subset=[GRADE])
     else:
@@ -66,7 +67,7 @@ def main(model_name, image_name, grade_args, phase_args):
 
     df = df[df['phase'].str.contains("|".join(phase_args),regex=True)]
     print(model_name) 
-    max_imgs = -1
+    max_imgs = 20
     # do one colored by grades
     seqs = []
     c = []
@@ -88,9 +89,9 @@ def main(model_name, image_name, grade_args, phase_args):
             c.append([GRADE_COLORS[GRADES.index(g)]] * len(group))
             names.append(name)
             
-    plot_sequences(seqs, f"grade_{image_name}", c=c, cmap=None, cbar_label="Grade", folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=True)
+    plot_sequences(seqs, f"grade_{image_name}", c=c, cmap="grade", cbar_label="Grade", folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=False)
     # do a bunch per grade using diff colormaps
-    for g, embryo_groups, names in zip(grade_args, embryo_grade_groups, embryo_grade_groups_names):
+    for g, embryo_groups, names in tqdm(zip(grade_args, embryo_grade_groups, embryo_grade_groups_names)):
         #--------------------------------
         # time
         seqs = []
@@ -100,7 +101,7 @@ def main(model_name, image_name, grade_args, phase_args):
             c.append(group['time_step'].to_numpy()/group['time_step'].max()) # since we are removing some phases we need to use ground_truth time not inherent order of df
             
             
-        plot_sequences(seqs, f"time_{g}_{image_name}",c=c, cbar_label="Time", folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=True)
+        plot_sequences(seqs, f"time_{g}_{image_name}",c=c, cbar_label="Time", folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=False)
         #--------------------------------
         # phase
         seqs = []
@@ -109,7 +110,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(group[PCA_COLS].to_numpy())
             c.append([PHASES.index(p) for p in group['phase']])
             
-        plot_sequences(seqs, f"phase_{g}_{image_name}", c=c, cmap="phase", cbar_label="Phase", folder="pca_plots", axlabel="PCA",axis_off=True, individ_names= names)
+        plot_sequences(seqs, f"phase_{g}_{image_name}", c=c, cmap="phase", cbar_label="Phase", folder="pca_plots", axlabel="PCA",axis_off=False, individ_names= names)
         #--------------------------------
         # curvature
         seqs = []
@@ -119,7 +120,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(calculate_curvatures(seq, offset=13))
             
-        plot_sequences(seqs, f"curv_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA",axis_off=True, individ_names=names)
+        plot_sequences(seqs, f"curv_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA",axis_off=False, individ_names=names)
         #--------------------------------
         # acceleration
         seqs = []
@@ -129,7 +130,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(get_acc(seq))
             
-        plot_sequences(seqs, f"acc_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA",axis_off=True, individ_names = names)
+        plot_sequences(seqs, f"acc_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA",axis_off=False, individ_names = names)
 
         #--------------------------------
         # velocity
@@ -140,9 +141,10 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(get_vel(seq))
             
-        plot_sequences(seqs, f"umap_vel_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA", axis_off=True, individ_names = names)
+        plot_sequences(seqs, f"vel_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA", axis_off=False, individ_names = names)
     # --------------------------------------------
     # --------------------------------------------
+    return
     # UMAP
     seqs = []
     c = []
