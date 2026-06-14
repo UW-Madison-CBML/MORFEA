@@ -38,6 +38,9 @@ def get_phases(embryo_id, seq_len):
     
     return np.array([PHASES.index(phase) for phase in new_column]) 
 def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, cbar_label="Time", log_scale=False, folder="cebra_plots", axlabel="Cebra", axis_off = False, individ_names = None):
+    GRADES = ["NA", "C", "B", "A"]
+    GRADE_COLORS = ["#888888", "#FF0000", "#FFFF00", "#00FF00"]
+
     if(c is None):
         c = [np.linspace(0,1,len(seq)) for seq in seqs]
     x_list = [x for seq in seqs for x in seq[:, 0]]
@@ -78,6 +81,9 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         if(cmap == "phase"):
             legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(PHASES)]
             individ_fig.legend(handles=legend_elements, title="Phases") 
+        elif(cmap == "grade"):
+            legend_elements = [Patch(facecolor=gc, label=g) for gc, g in zip(GRADE_COLORS, GRADES)]
+            individ_fig.legend(handles=legend_elements, title="Grades") 
         else:
             cbar_ax = individ_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
             if individ_im is not None:
@@ -106,12 +112,13 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
     if(cmap == "phase"):
         legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(PHASES)]
         grid_fig.legend(handles=legend_elements, title="Phases") 
+    elif(cmap == "grade"):
+        legend_elements = [Patch(facecolor=gc, label=g) for gc, g in zip(GRADE_COLORS, GRADES)]
+        grid_fig.legend(handles=legend_elements, title="Grades") 
     else:
         cbar_ax = grid_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
         if grid_im is not None:
             grid_fig.colorbar(grid_im, cax=cbar_ax, label=cbar_label)
-    if(axis_off):
-       grad_ax.set_axis_off()
     grid_fig.savefig(os.path.join(folder,f"grid-{f_name}.png"))
     plt.close(grid_fig)   
     
@@ -125,6 +132,9 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
     if(cmap == "phase"):
         legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(PHASES)]
         group_fig.legend(handles=legend_elements, title="Phases") 
+    elif(cmap == "grade"):
+        legend_elements = [Patch(facecolor=gc, label=g) for gc, g in zip(GRADE_COLORS, GRADES)]
+        group_fig.legend(handles=legend_elements, title="Grades") 
     else:
         cbar_ax = group_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
         if group_im is not None:
