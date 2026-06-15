@@ -44,3 +44,7 @@ class ViTLSTMAE(torch.nn.Module):
         x_rec = x_rec.reshape(B,T, 224,224)[:,:,None,:,:] # B,T, 1, 224,224
         return x_rec, latents
         
+if __name__ == "__main__":
+    model = ViTLSTMAE()
+    image = torch.randn((1,1,1,224,224))
+    recon, latent = model(image)
