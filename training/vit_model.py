@@ -13,7 +13,7 @@ class ViTLSTMAE(torch.nn.Module):
         self.lin2 = torch.nn.Linear(32, 16)
         self.dropout = torch.nn.Dropout(0.2)
         if(self.use_lstm):
-            self.lstm = torch.nn.LSTM(self.latent_dim, self.latent_dim, batch_first=True)
+            self.lstm = torch.nn.LSTM(self.latent_dim_per_token * self.num_tokens, self.latent_dim_per_token * self.num_tokens, batch_first=True)
         self.positional_embedding = torch.nn.Embedding(self.num_tokens, 16)
         decoder_layer = torch.nn.TransformerDecoderLayer(d_model=16, nhead=8)
         self.transformer_dec = torch.nn.TransformerDecoder(decoder_layer, num_layers=6, norm=torch.nn.BatchNorm()) # TODO what norm to use here
@@ -30,7 +30,7 @@ class ViTLSTMAE(torch.nn.Module):
         embeddings = F.relu(self.lin1(embeddings)) # B*T,196, 32
         
         embeddings = F.relu(self.lin2(embeddings)) # B*T,196, 16
-        embeddings = embeddings.reshape(B,T,self.num_tokens * self.latent_dim_per_token) # unflatten the batch and sequence dims, and flatten the token and embedding dim
+        embeddings = embeddings.reshape(B,T, self.num_tokens * self.latent_dim_per_token) # unflatten the batch and sequence dims, and flatten the token and embedding dim
         if(self.use_lstm):
             latents, (_,_) = self.lstm(embeddings) # get the final LSTM sequence
         else:
