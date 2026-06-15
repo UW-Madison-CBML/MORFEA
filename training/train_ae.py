@@ -228,7 +228,7 @@ def train_vit(
         config={
             "lr": lr,
             "batch_size":batch_size,
-            "architecture": "ViT LSTM AE"
+            "architecture": "ViT LSTM AE",
             "dataset": "https://zenodo.org/records/7912264",
             "epochs": epochs,
             "train_split": "not ICM graded",
