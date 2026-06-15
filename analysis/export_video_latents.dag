@@ -1,9 +1,9 @@
 JOB A export_video_latents.sub
-VARS A model="notemp-2026-03-12"
+VARS A model="notemp-2026-06-15"
 JOB B export_video_latents.sub
-VARS B model="control-2026-03-12"
+VARS B model="morfea-2026-06-15"
 JOB C export_video_latents.sub
-VARS C model="nolstm-2026-03-12"
+VARS C model="nolstm-2026-06-15"
 
 
 PARENT A CHILD B
