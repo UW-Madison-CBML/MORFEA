@@ -2,13 +2,33 @@
 import torch
 import torchvision
 import torch.nn.functional as F
+class ViTEncoder(torch.nn.Module):
+    def __init__(self,pretrained):
+        super().__init__()
+        vit = torchvision.models.vit_b_16(weights='IMAGENET1K_V1' if pretrained else None) # get the model
+        # steal model components
+        self.patch_embed = vit.conv_proj
+        self.encoder = vit.encoder
+        self.class_token = vit.class_token
+        self.seq_length = vit.seq_length  
+
+    def forward(self, x):
+        x = self.patch_embed(x)
+        x = x.flatten(2).transpose(1, 2)
+        cls = self.class_token.expand(x.shape[0], -1, -1)  
+        x = torch.cat([cls, x], dim=1) 
+        x = self.encoder(x)
+        return x
+
 class ViTLSTMAE(torch.nn.Module):
     def __init__(self, pretrained = False, latent_dim_per_token = 16, use_lstm = True):
         super().__init__()
         self.num_tokens = 196
         self.latent_dim_per_token = latent_dim_per_token
         self.use_lstm = use_lstm
-        self.vit_enc = torchvision.models.vit_b_16(weights='DEFAULT' if pretrained else None) # TODO this ViT is very small
+        self.vit_enc = ViTEncoder(pretrained) # TODO this ViT is very small
+        # remove the classification head just use transformer itself
+        self.vit_enc.heads = torch.nn.Identity()
         self.lin1 = torch.nn.Linear(768, 32)
         self.lin2 = torch.nn.Linear(32, 16)
         self.dropout = torch.nn.Dropout(0.2)
@@ -16,15 +36,16 @@ class ViTLSTMAE(torch.nn.Module):
             self.lstm = torch.nn.LSTM(self.latent_dim_per_token * self.num_tokens, self.latent_dim_per_token * self.num_tokens, batch_first=True)
         self.positional_embedding = torch.nn.Embedding(self.num_tokens, 16)
         decoder_layer = torch.nn.TransformerDecoderLayer(d_model=16, nhead=8)
-        self.transformer_dec = torch.nn.TransformerDecoder(decoder_layer, num_layers=6, norm=torch.nn.BatchNorm()) # TODO what norm to use here
+        self.transformer_dec = torch.nn.TransformerDecoder(decoder_layer, num_layers=6) # TODO what norm to use here
         self.lin3 = torch.nn.Linear(16, 256) # patches of 16x16
 
         
 
     def forward(self, x):
         B,T,C,H,W =  x.shape # B, T, 1, 224,224
-        x_flat_seq = x.view(B*T,1,224,224) 
-        transformed = self.vit_enc(x) # B*T, 197, 768
+        x_flat_seq = x.view(B*T,1,224,224).repeat(1,3,1,1) # TODO don't do this
+        transformed = self.vit_enc(x_flat_seq) # B*T, 197, 768
+        print(transformed.shape)
         embeddings = transformed[:,1:,:] # B*T, 196, 768
         #num_tokens = embedding.shape[1]
         embeddings = F.relu(self.lin1(embeddings)) # B*T,196, 32
@@ -36,8 +57,9 @@ class ViTLSTMAE(torch.nn.Module):
         else:
             latents = embeddings
         latents_flat = latents.reshape(B*T, self.num_tokens, self.latent_dim_per_token) # reflatten batch and time dims, bring out token dim
-        latents_flat = latents.permute(1,0,2) # transformer decoder needs batch second
-        pos_enc = self.positional_embedding(torch.arange(self.num_tokens, device = x.device)[None,:]).repeat(B*T,1) # B*T, self.num_tokens, latent_dim_per_token
+        print(latents_flat.shape)
+        latents_flat = latents_flat.permute(1,0,2) # transformer decoder needs batch second
+        pos_enc = self.positional_embedding(torch.arange(self.num_tokens, device = x.device)[None,:]).repeat(B*T,1,1) # B*T, self.num_tokens, latent_dim_per_token
         pos_enc = pos_enc.permute(1,0,2) # need batch first
         x_rec = self.transformer_dec(pos_enc, latents_flat) # 196, B*T, 16
         x_rec = x_rec.permute(1, 0, 2) 
@@ -50,3 +72,4 @@ if __name__ == "__main__":
     model = ViTLSTMAE()
     image = torch.randn((1,1,1,224,224))
     recon, latent = model(image)
+    
