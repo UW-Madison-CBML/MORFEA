@@ -14,7 +14,7 @@ class VITDataset(Dataset):
         self.resize = resize
         self.transforms = v2.Compose([
             v2.CenterCrop(10),
-            v2.resize((resize,resize)),
+            v2.Resize((resize,resize)),
             v2.Normalize(mean=[0.485], std=[0.229]),
             v2.ToDtype(torch.float32, scale=True),
         ])
