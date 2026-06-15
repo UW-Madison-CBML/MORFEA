@@ -1,3 +1,1 @@
-lstm --loss-type mse --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.0 --size 512 --name notemp --lr 0.0002 --epochs 30
-lstm --loss-type mse --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.15 --size 512 --name no-lstm --lr 0.0002 --epochs 30 --no-lstm
-lstm --loss-type mse --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.15 --size 512 --name morfea --lr 0.0002 --epochs 30
+vit --loss-type mse --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.0 --size 512 --name vittest --lr 0.0002 --epochs 30

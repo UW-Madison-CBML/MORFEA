@@ -7,7 +7,7 @@ import os
 from torchvision.transforms import v2
 from torchvision.tv_tensors import Video
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-class VITSqeuenceDataset(Dataset):
+class VITDataset(Dataset):
     def __init__(self, df, resize=224, norm="minmax01"):
         #self.df = pd.read_csv(index_csv)
         self.df = df
