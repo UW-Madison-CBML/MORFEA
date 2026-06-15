@@ -161,7 +161,7 @@ def ms_ssim_4_scale(x_rec,x_true, ssim_module) -> torch.Tensor:
 
     return msssim_val
 
-def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l2_weight=0.5, ms_ssim_weight=0.3, vgg_weight=0.2):
+def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=0.5, ms_ssim_weight=0.3, vgg_weight=0.2):
     B, T, C, H, W = x_rec.shape
     
     x_rec_flat = x_rec.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
@@ -178,7 +178,7 @@ def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l2_weight=0.
     vgg = torchvision.models.vgg16(pretrained=True).features[:16].eval()
     perceptual_loss = F.mse_loss(vgg(x_rec_flat), vgg(x_true_flat))
      
-    total_loss = l2_weight * l2_loss + ms_ssim_weight * ms_ssim_loss + vgg_weight * perceptual_loss
+    total_loss = l1_weight * l1_loss + ms_ssim_weight * ms_ssim_loss + vgg_weight * perceptual_loss
     
     return total_loss, {
         "l1_loss": l1_loss.item(),
@@ -238,7 +238,6 @@ def train_vit(
             "temporal_weight": temporal_weight,
             "dropout_rate": dropout_rate,
             "use_lstm": use_lstm,
-            "use_residual": use_residual,
             "use_batchnorm": use_batchnorm,
             "latent_size": latent_size,
             "image_size": image_size,
@@ -564,6 +563,7 @@ def train_lstm(
     
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, len(loader) * epochs) if warm_restarts else torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
     ssim_module = SSIM(win_size=7, win_sigma=1.5, data_range=1, size_average=True, channel=1)
+    ms_ssim_module = MS_SSIM(data_range=1, size_average=True, channel=1)
     for epoch in range(epochs):
         print(f"epoch {epoch}")
         print(torch.cuda.memory_summary(device=DEVICE, abbreviated=False))
@@ -609,7 +609,7 @@ def train_lstm(
                 plt.close(fig)
 
             rec_loss, rec_metrics = reconstruction_loss(
-                embryo_recon, embryo_vol, ssim_module, loss_type = loss_type, loss_weight=rec_weight, ms_ssim_weight=ms_ssim_weight
+                embryo_recon, embryo_vol, ssim_module, ms_ssim_module
             )
             if temporal_weight > 0:
                 smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
@@ -761,7 +761,7 @@ def train_lstm(
                 embryo_vol_flat = embryo_vol.view(B * T, C, H, W)
 
                 # the recon and groud truth images are already normalized
-                ms_ssim_val = ms_ssim(val_recon_flat, embryo_vol_flat, ssim_module)
+                ms_ssim_val = ms_ssim_4_scale(val_recon_flat, embryo_vol_flat, ssim_module)
                 val_metrics['ssim'].push((1 - ms_ssim_val).item())
 
                 if T > 1:
