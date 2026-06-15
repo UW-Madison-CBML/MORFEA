@@ -1,7 +1,7 @@
 # class for new ViT models (both with LSTM and 3d attention?)
 import torch
 import torchvision
-import torch.nn.functionl as F
+import torch.nn.functional as F
 class ViTLSTMAE(torch.nn.Module):
     def __init__(self, pretrained = False, latent_dim_per_token = 16, use_lstm = True):
         super().__init__()
