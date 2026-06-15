@@ -137,7 +137,6 @@ def main(model_name, features, lr=0.001):
     #weights = get_class_weights(os.path.abspath("embryo_dataset_annotations"), df.groupby("embryo_id").size().reset_index(name='counts'), StageDataset.PHASES).to(DEVICE)
     crit = torch.nn.CrossEntropyLoss()
     model = StageModel(input_size = len(dataset.lat_cols), num_classes=len(StageDataset.PHASES))
-    torch.backends.cudnn.enabled = False
     trainable_params = 0
     all_params = 0
     for _, param in model.named_parameters():

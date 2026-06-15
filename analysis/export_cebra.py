@@ -11,11 +11,10 @@ from cebra import CEBRA
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {DEVICE}")
 
-torch.backends.cudnn.enabled = False
 
 def export_latents_to_csv(model_name):
     cebra_time_model = CEBRA(model_architecture="offset10-model-mse",
-                        batch_size=512,
+                        batch_size=1024,
                         learning_rate=1e-5,
                         temperature=13,
                         output_dimension=3,

@@ -1,1 +1,1 @@
---model-name control-2026-03-12 --run-name cvda --curvature --acceleration --velocity --distance-mat
+--model-name morfea2-2026-06-12 --run-name cvda --curvature --acceleration --velocity --distance-mat
