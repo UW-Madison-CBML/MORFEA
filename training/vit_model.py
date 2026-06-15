@@ -8,14 +8,15 @@ class ViTLSTMAE(torch.nn.Module):
         self.latent_dim_dim_per_token = latent_dim_per_token
         self.use_lstm = use_lstm
         self.vit_enc = torchvision.models.vit_b_16(weights='DEFAULT' if pretrained else None) # TODO this ViT is very small
-        self.lin1 = self.linear(768, 32)
-        self.lin2 = self.linear(32, 16)
+        self.lin1 = torch.nn.Linear(768, 32)
+        self.lin2 = torch.nn.Linear(32, 16)
         self.dropout = torch.nn.Dropout(0.2)
         if(self.use_lstm):
             self.lstm = torch.nn.LSTM(self.latent_dim, self.latent_dim, batch_first=True)
         self.positional_embedding = torch.nn.Embedding(self.num_tokens, 16)
         decoder_layer = torch.nn.TransformerDecoderLayer(d_model=16, nhead=8)
         self.transformer_dec = torch.nn.TransformerDecoder(decoder_layer, num_layers=6, norm=torch.nn.BatchNorm()) # TODO what norm to use here
+        self.lin3 = torch.nn.Linear(16, 256)# patches of 16x16
 
         
 
