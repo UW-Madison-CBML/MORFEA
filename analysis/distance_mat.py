@@ -7,6 +7,7 @@ import matplotlib.patches as mpatches
 import matplotlib.ticker as ticker
 from matplotlib.colors import ListedColormap
 import matplotlib.colors as mcolors
+import matplotlib
 
 PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
 def get_mat(traj, embryo_id, model_name, annotations_dir):
@@ -19,7 +20,7 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
     df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
     for i, row in df.iterrows():
         start, end = int(row["stage_begin"]), int(row["stage_end"])
-        phase_matrix[start:end+1, :] = PHASES.index(row["stage_id"])
+        phase_matrix[start:end+1, :] = PHASES.index(row["stage_id"]) 
     mask = np.triu(np.ones_like(phase_matrix, dtype=bool), k=1)
     phase_matrix_lower = np.ma.masked_where(mask, phase_matrix)
     fig, ax = plt.subplots(figsize=(10, 8)) # Slightly wider for the legend
@@ -28,15 +29,14 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
     tab20_colors = plt.cm.tab20.colors 
     custom_cmap = ListedColormap(tab20_colors)
 
+    bounds = np.arange(len(PHASES) + 1)
 
-    bounds = np.arange(len(PHASES) + 1) - 0.5
-    norm = mcolors.BoundaryNorm(bounds, custom_cmap.N)
+    norm = matplotlib.colors.BoundaryNorm(bounds, custom_cmap.N)
     im_phase = ax.imshow(phase_matrix_lower, 
                      cmap=custom_cmap, 
-                     interpolation='none', 
-                     norm=norm)
+                     interpolation='none', norm=norm)
     patches = [
-        mpatches.Patch(color=custom_cmap(PHASES.index(row['stage_id'])/18), label=row['stage_id'])
+        mpatches.Patch(color=custom_cmap.colors[PHASES.index(row['stage_id'])], label=row['stage_id'])
         for i, row in df.iterrows()
     ]
     ax.legend(handles=patches, bbox_to_anchor=(1.25, 1), loc='upper left', title="Phases")
@@ -48,9 +48,11 @@ def get_mat(traj, embryo_id, model_name, annotations_dir):
     ax.xaxis.set_minor_locator(ticker.MultipleLocator(32, offset=-0.5))
     ax.yaxis.set_minor_locator(ticker.MultipleLocator(32, offset=-0.5))
     ax.grid(True, which='minor', color='white', linestyle='-', linewidth=0.8, alpha=0.6, zorder=1)"""
-    plt.colorbar(im_dist, ax=ax, label='Distance', shrink=0.8)
-    plt.savefig(os.path.join(output_dir, f'{embryo_id}_matrix.png'), dpi=300, bbox_inches='tight')
+    fig.colorbar(im_dist, ax=ax, label='Distance', shrink=0.8)
+    fig.savefig(os.path.join(output_dir, f'{embryo_id}_matrix.png'), dpi=300, bbox_inches='tight')
+    print(embryo_id)
     plt.close(fig)
+    return
     fig, ax = plt.subplots(figsize=(8, 6))
     im_dist = ax.imshow(dist_matrix, cmap='viridis', interpolation='none')
     im_phase = ax.imshow(phase_matrix_lower, cmap='Set3', interpolation='none', alpha=1)
