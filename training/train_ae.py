@@ -343,10 +343,9 @@ def train_vit(
         start_time = time.perf_counter()
         end_time = time.perf_counter()
         for index, embryo_vol in enumerate(pbar):
-            print("embryo_vol.shape 344: ", embryo_vol.shape)
             optimizer.zero_grad()
             t0 = time.perf_counter()
-            embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, 500, 500)
+            embryo_vol = embryo_vol.to(DEVICE)
             t1 = time.perf_counter()
             embryo_recon, embryo_lat = model(embryo_vol)
             t2 = time.perf_counter()

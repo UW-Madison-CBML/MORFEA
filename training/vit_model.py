@@ -21,7 +21,7 @@ class ViTEncoder(torch.nn.Module):
         return x
 
 class ViTLSTMAE(torch.nn.Module):
-    def __init__(self, pretrained = False, latent_dim_per_token = 16, use_lstm = True):
+    def __init__(self, pretrained = True, latent_dim_per_token = 16, use_lstm = True):
         super().__init__()
         self.num_tokens = 196
         self.latent_dim_per_token = latent_dim_per_token
@@ -49,7 +49,7 @@ class ViTLSTMAE(torch.nn.Module):
         embeddings = transformed[:,1:,:] # B*T, 196, 768
         #num_tokens = embedding.shape[1]
         embeddings = F.relu(self.lin1(embeddings)) # B*T,196, 32
-        
+        embedding = self.dropout(embeddings) 
         embeddings = F.relu(self.lin2(embeddings)) # B*T,196, 16
         embeddings = embeddings.reshape(B,T, self.num_tokens * self.latent_dim_per_token) # unflatten the batch and sequence dims, and flatten the token and embedding dim
         if(self.use_lstm):
@@ -60,7 +60,7 @@ class ViTLSTMAE(torch.nn.Module):
         print(latents_flat.shape)
         latents_flat = latents_flat.permute(1,0,2) # transformer decoder needs batch second
         pos_enc = self.positional_embedding(torch.arange(self.num_tokens, device = x.device)[None,:]).repeat(B*T,1,1) # B*T, self.num_tokens, latent_dim_per_token
-        pos_enc = pos_enc.permute(1,0,2) # need batch first
+        pos_enc = pos_enc.permute(1,0,2) # need batch second
         x_rec = self.transformer_dec(pos_enc, latents_flat) # 196, B*T, 16
         x_rec = x_rec.permute(1, 0, 2) 
         x_rec = F.relu(self.lin3(x_rec)).reshape(B*T,14,14,16,16) # B*T, 196, 256
@@ -68,6 +68,57 @@ class ViTLSTMAE(torch.nn.Module):
         x_rec = x_rec.reshape(B,T, 224,224)[:,:,None,:,:] # B,T, 1, 224,224
         return x_rec, latents
         
+class SmallViTLSTMAE(torch.nn.Module):
+    def __init__(self, pretrained = True, latent_dim=256, use_lstm = True):
+        super().__init__()
+        self.num_tokens = 196
+        self.latent_dim = latent_dim
+        self.use_lstm = use_lstm
+        self.vit_enc = ViTEncoder(pretrained) # TODO this ViT is very small
+        # remove the classification head just use transformer itself
+        self.vit_enc.heads = torch.nn.Identity()
+        self.lin1 = torch.nn.Linear(768, 512)
+        self.dropout = torch.nn.Dropout(0.2)
+        self.lin2 = torch.nn.Linear(512, self.latent_dim)
+        if(self.use_lstm):
+            self.lstm = torch.nn.LSTM(self.latent_dim, self.latent_dim, batch_first=True)
+        self.positional_embedding = torch.nn.Embedding(self.num_tokens, self.latent_dim)
+        decoder_layer = torch.nn.TransformerDecoderLayer(d_model=self.latent_dim, nhead=8)
+        self.transformer_dec = torch.nn.TransformerDecoder(decoder_layer, num_layers=6) # TODO what norm to use here
+        self.lin3 = torch.nn.Linear(self.latent_dim, 256) # patches of 16x16
+
+        
+
+    def forward(self, x):
+        B,T,C,H,W =  x.shape # B, T, 1, 224,224
+        x_flat_seq = x.view(B*T,1,224,224).repeat(1,3,1,1) # TODO don't do this
+        transformed = self.vit_enc(x_flat_seq) # B*T, 197, 768
+        print(transformed.shape)
+        embeddings = transformed[:,0,:] # B*T, 768
+        #num_tokens = embedding.shape[1]
+        embeddings = F.relu(self.lin1(embeddings)) # B*T, 512
+        embedding = self.dropout(embeddings) 
+        embeddings = F.relu(self.lin2(embeddings)) # B*T, 512
+        embeddings = embeddings.reshape(B,T, self.latent_dim) # unflatten the batch and sequence dims, and flatten the token and embedding dim
+        if(self.use_lstm):
+            latents, (_,_) = self.lstm(embeddings) # get the final LSTM sequence
+        else:
+            latents = embeddings
+        latents_flat = latents.reshape(B*T, self.latent_dim) # reflatten batch and time dims, bring out token dim
+        print(latents_flat.shape)
+        latents_flat = latents_flat.permute(1,0) # transformer decoder needs batch second
+        padding = torch.zeros((self.num_tokens, B*T, self.latent_dim), device = x.device) 
+        tokens = torch.cat([latents_flat[None,:,:], padding],dim =0)
+        pos_enc = self.positional_embedding(torch.arange(self.num_tokens + 1, device = x.device)[None,:]).repeat(B*T,1,1) # B*T, self.num_tokens + 1, latent_dim
+        pos_enc = pos_enc.permute(1,0,2) # need batch second
+        x_rec = self.transformer_dec(pos_enc, latents_flat)[1:] # 196, B*T, self.latent_dim
+        x_rec = x_rec.permute(1, 0, 2) # B*T, 196, self.latent_dim
+        x_rec = F.relu(self.lin3(x_rec)) # B*T, 196, 256
+        x_rec = x_rec.reshape(B*T,14,14,16,16)
+        x_rec = x_rec.permute(0, 1,3,2,4).reshape(B*T, 224, 224)
+        x_rec = x_rec.reshape(B,T, 224,224)[:,:,None,:,:] # B,T, 1, 224,224
+        return x_rec, latents
+      
 if __name__ == "__main__":
     model = ViTLSTMAE()
     image = torch.randn((1,1,1,224,224))
