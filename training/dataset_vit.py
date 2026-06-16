@@ -23,6 +23,7 @@ class VITDataset(Dataset):
         img = Image.open(path)
         if img is None:
             raise FileNotFoundError(path)
+        img = img.resize((224,224))
         return np.array(img, dtype="float32")
 
     def __getitem__(self, idx):
@@ -37,7 +38,8 @@ class VITDataset(Dataset):
         embryo_vol = np.stack(embryo_frames, axis=0)  
         embryo_vol = embryo_vol[:,None, :, :] 
 
-        return self.transforms(torch.from_numpy(embryo_vol))
+        #return self.transforms(torch.from_numpy(embryo_vol))
+        return torch.from_numpy(embryo_vol)
 
     def __len__(self):
         return len(self.df)
