@@ -69,7 +69,7 @@ class ViTLSTMAE(torch.nn.Module):
         return x_rec, latents
         
 class SmallViTLSTMAE(torch.nn.Module):
-    def __init__(self, pretrained = True, latent_dim=256, use_lstm = True):
+    def __init__(self, pretrained = True, latent_dim=512, use_lstm = True):
         super().__init__()
         self.num_tokens = 196
         self.latent_dim = latent_dim
@@ -107,7 +107,7 @@ class SmallViTLSTMAE(torch.nn.Module):
         print(latents_flat.shape)
         #padding = torch.zeros((self.num_tokens, B*T, self.latent_dim), device = x.device) 
         #latents_flat = F.relu(self.decoder_up(latents_flat))
-        tokens = latents_flat[None,:,:].contiguous() # 1 + 196, B*T, 256
+        tokens = latents_flat[None,:,:].contiguous() # 1, B*T, 256, all 196 positional tokens with cross attend with this
         pos_enc = self.positional_embedding(torch.arange(self.num_tokens, device = x.device)[:,None]).expand(-1,B*T,-1).contiguous() # B*T, self.num_tokens + 1, latent_dim
         x_rec = self.transformer_dec(pos_enc, tokens) # 196, B*T, self.latent_dim
         x_rec = x_rec.permute(1, 0, 2) # B*T, 196, self.latent_dim

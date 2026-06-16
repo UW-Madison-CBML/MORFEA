@@ -208,7 +208,7 @@ def train_vit(
     
     #epochs = 30
     #lr = 2e-4
-    batch_size = 32
+    batch_size = 8
     #warm_restarts = False
     # ------------------------------------------------------
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
