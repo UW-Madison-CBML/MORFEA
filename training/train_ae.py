@@ -174,9 +174,11 @@ def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=0.
     else:
         ms_ssim_val = ms_ssim_4_scale(x_rec_flat, x_true_flat, ssim_module)
     ms_ssim_loss = 1 - ms_ssim_val
-
+    x_rec_3_col = x_rec_flat.repeat(1,3,1,1)
+    x_true_3_col = x_true_flat.repeat(1,3,1,1)
     vgg = torchvision.models.vgg16(pretrained=True).features[:16].eval()
-    perceptual_loss = F.mse_loss(vgg(x_rec_flat), vgg(x_true_flat))
+    vgg = vgg.to("cuda")
+    perceptual_loss = F.mse_loss(vgg(x_rec_3_col), vgg(x_true_3_col))
      
     total_loss = l1_weight * l1_loss + ms_ssim_weight * ms_ssim_loss + vgg_weight * perceptual_loss
     
@@ -279,8 +281,8 @@ def train_vit(
     mask = df["cell_id"].isin(VAL_EMBRYOS)
     val_df = df[mask]
     train_df = df[~mask]
-    train_dataset = VITDataset(train_df, resize=image_size)
-    val_dataset = VITDataset(val_df, resize=image_size)
+    train_dataset = VITDataset(train_df, resize=224)
+    val_dataset = VITDataset(val_df, resize=224)
     print("val size: ", str(len(val_df) / len(df)))
     full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})
     full_seq_val_mask = full_seq_df["embryo_id"].isin(VAL_EMBRYOS)
@@ -341,6 +343,7 @@ def train_vit(
         start_time = time.perf_counter()
         end_time = time.perf_counter()
         for index, embryo_vol in enumerate(pbar):
+            print("embryo_vol.shape 344: ", embryo_vol.shape)
             optimizer.zero_grad()
             t0 = time.perf_counter()
             embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, 500, 500)
@@ -369,7 +372,7 @@ def train_vit(
 
                 plt.close(fig)
 
-            rec_loss = reconstruction_loss(
+            rec_loss, _ = reconstruction_loss(
                 embryo_recon, embryo_vol, ssim_module, ms_ssim_module
             )
             if temporal_weight > 0:
