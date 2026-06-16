@@ -83,6 +83,7 @@ class SmallViTLSTMAE(torch.nn.Module):
         if(self.use_lstm):
             self.lstm = torch.nn.LSTM(self.latent_dim, self.latent_dim, batch_first=True)
         self.positional_embedding = torch.nn.Embedding(self.num_tokens, self.latent_dim)
+        self.decoder_up = torch.nn.Linear(self.latent_dim, self.latent_dim)
         decoder_layer = torch.nn.TransformerDecoderLayer(d_model=self.latent_dim, nhead=8)
         self.transformer_dec = torch.nn.TransformerDecoder(decoder_layer, num_layers=6) # TODO what norm to use here
         self.lin3 = torch.nn.Linear(self.latent_dim, 256) # patches of 16x16
@@ -90,14 +91,12 @@ class SmallViTLSTMAE(torch.nn.Module):
         
 
     def forward(self, x):
-        B,T,C,H,W =  x.shape # B, T, 1, 224,224
-        x_flat_seq = x.view(B*T,1,224,224).repeat(1,3,1,1) # TODO don't do this
+        B,T, C,H,W =  x.shape # B, T, 1, 224,224
+        x_flat_seq = x.reshape(B*T,1,224,224).expand(-1,3,-1,-1).contiguous() # TODO don't do this
         transformed = self.vit_enc(x_flat_seq) # B*T, 197, 768
-        print(transformed.shape)
         embeddings = transformed[:,0,:] # B*T, 768
-        #num_tokens = embedding.shape[1]
         embeddings = F.relu(self.lin1(embeddings)) # B*T, 512
-        embedding = self.dropout(embeddings) 
+        embeddings = self.dropout(embeddings) 
         embeddings = F.relu(self.lin2(embeddings)) # B*T, 512
         embeddings = embeddings.reshape(B,T, self.latent_dim) # unflatten the batch and sequence dims, and flatten the token and embedding dim
         if(self.use_lstm):
@@ -106,16 +105,16 @@ class SmallViTLSTMAE(torch.nn.Module):
             latents = embeddings
         latents_flat = latents.reshape(B*T, self.latent_dim) # reflatten batch and time dims, bring out token dim
         print(latents_flat.shape)
-        latents_flat = latents_flat.permute(1,0) # transformer decoder needs batch second
-        padding = torch.zeros((self.num_tokens, B*T, self.latent_dim), device = x.device) 
-        tokens = torch.cat([latents_flat[None,:,:], padding],dim =0)
-        pos_enc = self.positional_embedding(torch.arange(self.num_tokens + 1, device = x.device)[None,:]).repeat(B*T,1,1) # B*T, self.num_tokens + 1, latent_dim
-        pos_enc = pos_enc.permute(1,0,2) # need batch second
-        x_rec = self.transformer_dec(pos_enc, latents_flat)[1:] # 196, B*T, self.latent_dim
+        #padding = torch.zeros((self.num_tokens, B*T, self.latent_dim), device = x.device) 
+        #latents_flat = F.relu(self.decoder_up(latents_flat))
+        tokens = latents_flat[None,:,:].contiguous() # 1 + 196, B*T, 256
+        pos_enc = self.positional_embedding(torch.arange(self.num_tokens, device = x.device)[:,None]).expand(-1,B*T,-1).contiguous() # B*T, self.num_tokens + 1, latent_dim
+        x_rec = self.transformer_dec(pos_enc, tokens) # 196, B*T, self.latent_dim
         x_rec = x_rec.permute(1, 0, 2) # B*T, 196, self.latent_dim
         x_rec = F.relu(self.lin3(x_rec)) # B*T, 196, 256
-        x_rec = x_rec.reshape(B*T,14,14,16,16)
-        x_rec = x_rec.permute(0, 1,3,2,4).reshape(B*T, 224, 224)
+        x_rec = x_rec.reshape(B*T, 14,14, 16,16)
+        x_rec = x_rec.permute(0, 1, 3, 2, 4) # B*T, 14, 16, 14, 16
+        x_rec = x_rec.reshape(B*T, 224, 224)
         x_rec = x_rec.reshape(B,T, 224,224)[:,:,None,:,:] # B,T, 1, 224,224
         return x_rec, latents
       

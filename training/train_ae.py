@@ -1,5 +1,5 @@
 import numpy as np
-from vit_model import ViTLSTMAE
+from vit_model import ViTLSTMAE, SmallViTLSTMAE
 import torchvision
 import pandas as pd
 import torch
@@ -161,7 +161,7 @@ def ms_ssim_4_scale(x_rec,x_true, ssim_module) -> torch.Tensor:
 
     return msssim_val
 
-def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=0.5, ms_ssim_weight=0.3, vgg_weight=0.2):
+def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
     B, T, C, H, W = x_rec.shape
     
     x_rec_flat = x_rec.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
@@ -208,7 +208,7 @@ def train_vit(
     
     #epochs = 30
     #lr = 2e-4
-    batch_size = 8
+    batch_size = 32
     #warm_restarts = False
     # ------------------------------------------------------
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -255,7 +255,7 @@ def train_vit(
         print(f"{e}: bad login")
 
     torch.cuda.init()
-    model = ViTLSTMAE()
+    model = SmallViTLSTMAE()
     artifact = wandb.Artifact(name="scripts", type="model_file")
     artifact.add_file(os.path.abspath("train_ae.py"))
     artifact.add_file(os.path.abspath("vit_model.py"))
