@@ -281,8 +281,8 @@ def train_vit(
     mask = df["cell_id"].isin(VAL_EMBRYOS)
     val_df = df[mask]
     train_df = df[~mask]
-    train_dataset = VITDataset(train_df, resize=224)
-    val_dataset = VITDataset(val_df, resize=224)
+    train_dataset = IVFSequenceDataset(train_df, resize=224)
+    val_dataset = IVFSequenceDataset(val_df, resize=224)
     print("val size: ", str(len(val_df) / len(df)))
     full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})
     full_seq_val_mask = full_seq_df["embryo_id"].isin(VAL_EMBRYOS)
