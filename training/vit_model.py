@@ -104,7 +104,7 @@ class SmallViTLSTMAE(torch.nn.Module):
         else:
             latents = embeddings
         latents_flat = latents.reshape(B*T, self.latent_dim) # reflatten batch and time dims, bring out token dim
-        print(latents_flat.shape)
+
         #padding = torch.zeros((self.num_tokens, B*T, self.latent_dim), device = x.device) 
         #latents_flat = F.relu(self.decoder_up(latents_flat))
         tokens = latents_flat[None,:,:].contiguous() # 1, B*T, 256, all 196 positional tokens with cross attend with this
