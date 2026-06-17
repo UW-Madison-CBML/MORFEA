@@ -110,10 +110,10 @@ class SmallViTLSTMAE(torch.nn.Module):
         tokens = latents_flat[None,:,:].contiguous() # 1, B*T, 256, all 196 positional tokens with cross attend with this
         pos_enc = self.positional_embedding(torch.arange(self.num_tokens, device = x.device)[:,None]).expand(-1,B*T,-1).contiguous() # B*T, self.num_tokens + 1, latent_dim
         x_rec = self.transformer_dec(pos_enc, tokens) # 196, B*T, self.latent_dim
-        x_rec = x_rec.permute(1, 0, 2) # B*T, 196, self.latent_dim
+        x_rec = x_rec.permute(1, 0, 2).contiguous() # B*T, 196, self.latent_dim
         x_rec = F.relu(self.lin3(x_rec)) # B*T, 196, 256
         x_rec = x_rec.reshape(B*T, 14,14, 16,16)
-        x_rec = x_rec.permute(0, 1, 3, 2, 4) # B*T, 14, 16, 14, 16
+        x_rec = x_rec.permute(0, 1, 3, 2, 4).contiguous() # B*T, 14, 16, 14, 16
         x_rec = x_rec.reshape(B*T, 224, 224)
         x_rec = x_rec.reshape(B,T, 224,224)[:,:,None,:,:] # B,T, 1, 224,224
         return x_rec, latents

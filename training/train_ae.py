@@ -161,7 +161,7 @@ def ms_ssim_4_scale(x_rec,x_true, ssim_module) -> torch.Tensor:
 
     return msssim_val
 
-def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
+def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=0.5, ms_ssim_weight=0.3, vgg_weight=0.2):
     B, T, C, H, W = x_rec.shape
     
     x_rec_flat = x_rec.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
@@ -342,7 +342,7 @@ def train_vit(
         count = 0
         start_time = time.perf_counter()
         end_time = time.perf_counter()
-        for index, embryo_vol in enumerate(pbar):
+        for index, (embryo_vol,_,_) in enumerate(pbar):
             optimizer.zero_grad()
             t0 = time.perf_counter()
             embryo_vol = embryo_vol.to(DEVICE)
