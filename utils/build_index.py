@@ -78,60 +78,33 @@ def sample_frames_from_dataset(root_path, num_samples=100):
 
 
 def build_empty_well_sequences_map(empty_images_list, root_path):
-    """
-    Build a mapping from empty image paths to their containing sequences.
-    For each empty image, finds the cell directory it belongs to and stores
-    all sequential frames from that directory.
-
-    Returns:
-        dict: mapping from empty image path to list of sequential frames
-    """
     empty_to_sequence = {}
     root = Path(root_path)
 
     for empty_path_str in tqdm(empty_images_list, desc="Building empty well sequences"):
         empty_path = Path(empty_path_str)
 
-        # Find the cell directory this image belongs to
-        # Assuming structure: root_path/cell_id/image.jpg
         if not empty_path.exists():
             continue
 
-        # Get the parent directory (cell directory)
         cell_dir = empty_path.parent
 
-        # Get all frames in this cell directory
         frames = list_frames(cell_dir)
 
         if not frames:
             continue
 
-        # Find the index of this empty image in the sequence
         try:
             empty_idx = frames.index(empty_path)
         except ValueError:
-            # Image not found in sorted list, skip
             continue
 
-        # Store the sequence for this empty image
         empty_to_sequence[empty_path_str] = frames
 
     return empty_to_sequence
 
 
 def get_empty_well_sequence(empty_images_list, empty_to_sequence, seq_len):
-    """
-    Pick a random empty well image and extract a sequence containing it.
-
-    Args:
-        empty_images_list: list of empty image paths
-        empty_to_sequence: dict mapping empty images to their full sequences
-        seq_len: length of sequence to extract
-
-    Returns:
-        list of paths forming a sequence, or None if unable to create sequence
-    """
-    # Shuffle and try to find a valid sequence
     random.shuffle(empty_images_list)
 
     for empty_path in empty_images_list:
@@ -152,22 +125,18 @@ def get_empty_well_sequence(empty_images_list, empty_to_sequence, seq_len):
             # Not enough frames in this sequence
             continue
 
-        # Try to center the empty image in the sequence
         start_idx = max(0, empty_idx - seq_len // 2)
         end_idx = start_idx + seq_len
 
-        # Adjust if we go past the end
         if end_idx > len(frames):
             end_idx = len(frames)
             start_idx = end_idx - seq_len
 
-        # Extract sequence
         seq = frames[start_idx:end_idx]
 
         if len(seq) == seq_len:
             return [str(p) for p in seq]
 
-    # Fallback: if no valid sequence found, return None
     return None
 
 
@@ -180,12 +149,10 @@ def main():
     empty_images = load_empty_image_paths(EMPTY_IMAGE_PATHS_FILE)
     print(f"Loaded {len(empty_images)} empty well images")
 
-    # Build mapping from empty images to their sequences
     print(f"Building empty well sequence mappings...")
     empty_to_sequence = build_empty_well_sequences_map(empty_images, DATASET_ROOT)
     print(f"Built sequences for {len(empty_to_sequence)} empty images")
 
-    # Sample temporal contrastive frames from the dataset
     print(f"Sampling frames for temporal contrastive learning...")
     dataset_frames = sample_frames_from_dataset(DATASET_ROOT, num_samples=5000)
     print(f"Found {len(dataset_frames)} total frames in dataset")
@@ -200,15 +167,12 @@ def main():
         for start in range(0, len(frames)-T+1, WINDOW_STRIDE):
             seq = frames[start:start+T]
 
-            # Get a proper empty well sequence
             empty_seq = get_empty_well_sequence(empty_images, empty_to_sequence, T)
 
-            # Fallback to random empty images if sequence creation fails
             if empty_seq is None:
                 np.random.shuffle(empty_images)
                 empty_seq = empty_images[:T]
 
-            # Sample random frames for temporal contrastive learning
             np.random.shuffle(dataset_frames)
 
             rows.append({
@@ -219,7 +183,6 @@ def main():
                 "sample_paths": "|".join([str(p) for p in dataset_frames[:T]])
             })
 
-    # Create DataFrame and save to CSV using pandas
     df = pd.DataFrame(rows)
     df.to_csv(OUT_CSV, index=False)
 

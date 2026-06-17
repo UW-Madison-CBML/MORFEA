@@ -6,7 +6,8 @@ from PIL import Image, ImageFile
 import os
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 class IVFSequenceDataset(Dataset):
-    def __init__(self, df, resize=500, norm="minmax01"):
+    def __init__(self, df, crop=45, resize=500, norm="minmax01"):
+        self.crop=crop
         #self.df = pd.read_csv(index_csv)
         self.df = df
         self.resize = resize
@@ -18,7 +19,11 @@ class IVFSequenceDataset(Dataset):
             raise FileNotFoundError(path)
         # Resize if needed
         if self.resize is not None:
+            # crop
+            img = img.crop((self.crop,self.crop,500-self.crop,500-self.crop))
+            #resize
             img = img.resize((self.resize, self.resize), Image.BILINEAR)
+            
         return np.array(img, dtype="float32")
 
     def _normalize_video(self, vol):
@@ -38,24 +43,12 @@ class IVFSequenceDataset(Dataset):
             raise ValueError(f"Row {idx} has missing path data")
 
         embryo_paths = row["embryo_paths"].split("|")
-        empty_well_paths = row["empty_well_paths"].split("|")
-        sample_paths = row["sample_paths"].split("|")
-
         embryo_frames = [self._read_gray(p) for p in embryo_paths]
         embryo_vol = np.stack(embryo_frames, axis=0)  
         embryo_vol = self._normalize_video(embryo_vol)
         embryo_vol = embryo_vol[:,None, :, :] 
 
-        empty_well_frames = [self._read_gray(p) for p in empty_well_paths]
-        empty_well_vol = np.stack(empty_well_frames, axis=0)  
-        empty_well_vol = self._normalize_video(empty_well_vol)
-        empty_well_vol = empty_well_vol[:,None, :, :]        
-
-        sample_frames = [self._read_gray(p) for p in sample_paths]
-        sample_vol = np.stack(sample_frames, axis=0)  
-        sample_vol = self._normalize_video(sample_vol)
-        sample_vol = sample_vol[:,None, :, :]
-        return torch.from_numpy(embryo_vol), torch.from_numpy(empty_well_vol),  torch.from_numpy(sample_vol) 
+        return torch.from_numpy(embryo_vol)
 
     def __len__(self):
         return len(self.df)

@@ -15,9 +15,9 @@ class VITDataset(Dataset):
         self.norm = norm
         self.transforms = v2.Compose([
             v2.ToDtype(torch.float32),
-            v2.CenterCrop(400),
+            v2.CenterCrop(440),
             v2.Resize((resize,resize)),
-            v2.Normalize(mean=[0.485], std=[0.229]),
+            v2.Normalize(mean=[0.0], std=[1]),
         ])
 
     def _read_gray(self, path):
@@ -38,7 +38,7 @@ class VITDataset(Dataset):
 
         embryo_vol = embryo_vol[:,None, :, :] 
 
-        return self.transforms(torch.from_numpy(embryo_vol)),torch.from_numpy(embryo_vol)
+        return self.transforms(torch.from_numpy(embryo_vol))
 
     def __len__(self):
         return len(self.df)
