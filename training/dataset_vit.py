@@ -15,7 +15,7 @@ class VITDataset(Dataset):
         self.norm = norm
         self.transforms = v2.Compose([
             v2.ToDtype(torch.float32),
-            v2.CenterCrop(10),
+            v2.CenterCrop(400),
             v2.Resize((resize,resize)),
             v2.Normalize(mean=[0.485], std=[0.229]),
         ])
@@ -29,9 +29,7 @@ class VITDataset(Dataset):
     
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        if pd.isna(row["embryo_paths"]) or pd.isna(row["empty_well_paths"]) or pd.isna(row["sample_paths"]):
-            print(f"Row {idx} has missing path data: ", row.to_string(index = False))
-            raise ValueError(f"Row {idx} has missing path data")
+        
 
         embryo_paths = row["embryo_paths"].split("|")
 
@@ -40,10 +38,31 @@ class VITDataset(Dataset):
 
         embryo_vol = embryo_vol[:,None, :, :] 
 
-        return self.transforms(torch.from_numpy(embryo_vol))
+        return self.transforms(torch.from_numpy(embryo_vol)),torch.from_numpy(embryo_vol)
 
     def __len__(self):
         return len(self.df)
 
 
-   
+
+if __name__ == "__main__":
+    import os
+    import matplotlib.pyplot as plt
+    from torch.utils.data import DataLoader
+    index_df = pd.read_csv(os.path.abspath("index.csv"))
+    dataset = VITDataset(index_df)
+    print(dataset.df.head())
+    loader = DataLoader(dataset, 
+        batch_size=1,
+        shuffle=False,
+        num_workers=1,
+        pin_memory=False,
+        drop_last=False 
+    )
+    for embryo1,embryo2 in loader:
+        plt.imshow(embryo1.squeeze()[0].numpy())
+        plt.show()
+        plt.imshow(embryo2.squeeze()[0].numpy())
+        plt.show()
+    
+    
