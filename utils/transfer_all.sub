@@ -1,0 +1,17 @@
+
+# transfer everything in staging to research drive
+# transfer_all.sub
+shell = echo "moved"
+		
+log = transfer_all_$(Cluster)_$(Process).log
+error = transfer_all_$(Cluster)_$(Process).err
+output = transfer_all_$(Cluster)_$(Process).out
+
+transfer_input_files = file:///staging/groups/bhaskar_group/ivf/../../../../staging/groups/bhaskar_group/ivf/signatures.tar.gz
+transfer_output_files = ../../../../staging/groups/bhaskar_group/ivf/signatures.tar.gz
+transfer_output_remaps = "../../../../staging/groups/bhaskar_group/ivf/signatures.tar.gz = pelican://chtc.wisc.edu/researchdrive/dbhaskar3/CHTC/ivf/../../../../staging/groups/bhaskar_group/ivf/signatures.tar.gz"
+ 
+request_cpus = 1
+request_memory = 8GB 
+request_disk = 8GB
+queue 1
