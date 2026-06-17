@@ -1,5 +1,5 @@
 import numpy as np
-from vit_model import ViTLSTMAE, SmallViTLSTMAE
+from vit_model import ViTLSTMAE, SmallViTLSTMAE, ConvViTLSTMAE
 import torchvision
 import pandas as pd
 import torch
@@ -161,7 +161,7 @@ def ms_ssim_4_scale(x_rec,x_true, ssim_module) -> torch.Tensor:
 
     return msssim_val
 
-def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=0.0, ms_ssim_weight=1.0, vgg_weight=0.0):
+def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
     B, T, C, H, W = x_rec.shape
     
     x_rec_flat = x_rec.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
@@ -208,7 +208,7 @@ def train_vit(
     
     #epochs = 30
     #lr = 2e-4
-    batch_size = 8
+    batch_size = 16
     #warm_restarts = False
     # ------------------------------------------------------
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -255,7 +255,7 @@ def train_vit(
         print(f"{e}: bad login")
 
     torch.cuda.init()
-    model = SmallViTLSTMAE()
+    model = ConvViTLSTMAE()
     artifact = wandb.Artifact(name="scripts", type="model_file")
     artifact.add_file(os.path.abspath("train_ae.py"))
     artifact.add_file(os.path.abspath("vit_model.py"))
@@ -326,6 +326,8 @@ def train_vit(
     )
     
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, len(loader) * epochs) if warm_restarts else torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
+    scaler = torch.amp.GradScaler()
+
     # criteria
     ssim_module = SSIM(win_size=7, win_sigma=1.5, data_range=1, size_average=True, channel=1)
     ms_ssim_module = MS_SSIM(data_range=1, size_average=True, channel=1)
@@ -342,19 +344,34 @@ def train_vit(
         count = 0
         start_time = time.perf_counter()
         end_time = time.perf_counter()
-        for index, (embryo_vol,_,_) in enumerate(pbar):
+        for index, embryo_vol in enumerate(pbar):
             optimizer.zero_grad()
             t0 = time.perf_counter()
             embryo_vol = embryo_vol.to(DEVICE)
             t1 = time.perf_counter()
-            embryo_recon, embryo_lat = model(embryo_vol)
-            t2 = time.perf_counter()
+            with torch.autocast(device_type=DEVICE.type):
+                embryo_recon, embryo_lat = model(embryo_vol)
+                t2 = time.perf_counter()
+                rec_loss, _ = reconstruction_loss(
+                    embryo_recon, embryo_vol, ssim_module, ms_ssim_module
+                )
+                if temporal_weight > 0:
+                    smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
+                    loss = rec_loss + smooth_loss
+                else:
+                    smooth_loss = torch.tensor(0.0, device=DEVICE)
+                    loss = rec_loss
             if(index % 47 == 0):
-                vol_img = embryo_vol[0, -1, 0].cpu().detach().numpy()
-                recon_img = embryo_recon[0, -1, 0].cpu().detach().numpy()
+                vol_img = embryo_vol[0, -1, 0].detach().cpu().numpy()
+                recon_img = embryo_recon[0, -1, 0].float().detach().cpu().numpy()
+                if((vol_img < -0.01).any()):
+                    print("gt image has negative")
+                if((recon_img < -0.01).any()):
+                    print("reconstruction has negative")
 
                 vol_img = (vol_img * 255).astype(np.uint8)
                 recon_img = (recon_img * 255).astype(np.uint8)
+
                 comparison = np.concatenate((vol_img, recon_img), axis=1)
      
                 images = wandb.Image(comparison, caption="Embryo vs Recon comparison")
@@ -371,35 +388,29 @@ def train_vit(
 
                 plt.close(fig)
 
-            rec_loss, _ = reconstruction_loss(
-                embryo_recon, embryo_vol, ssim_module, ms_ssim_module
-            )
-            if temporal_weight > 0:
-                smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
-                loss = rec_loss + smooth_loss
-            else:
-                smooth_loss = torch.tensor(0.0, device=DEVICE)
-                loss = rec_loss
 
             if torch.isnan(loss) or torch.isinf(loss):
                 print(f"NaN/Inf detected, skipping batch")
                 continue
 
-            loss.backward()
+            scaler.scale(loss).backward()
             t3 = time.perf_counter()
             total_norm = 0
             for p in model.parameters():
                 if p.grad is not None:
                     param_norm = p.grad.data.norm(2)
                     total_norm += param_norm.item() ** 2
+
             total_norm = total_norm ** 0.5
 
             if total_norm > 100:
                 print(f"Warning: Large gradient norm: {total_norm:.2f}")
-
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
+            scaler.unscale_(optimizer)
+ 
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5) 
+            scaler.step(optimizer)
+            scaler.update()
             scheduler.step()
-            optimizer.step()
             end_time = time.perf_counter()
             if (index % 5 == 0):
                 run.log({
