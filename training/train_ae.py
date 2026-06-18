@@ -170,9 +170,9 @@ def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.
     l1_loss = F.l1_loss(x_rec, x_true)
 
     #if(H > 160 and W > 160):
-    #    ms_ssim_val = ms_ssim_module(x_rec_flat, x_true_flat)
+    ms_ssim_val = ms_ssim_module(x_rec_flat, x_true_flat)
     #else:
-    ms_ssim_val = ms_ssim_4_scale(x_rec_flat, x_true_flat, ssim_module)
+    #ms_ssim_val = ms_ssim_4_scale(x_rec_flat, x_true_flat, ssim_module)
     ms_ssim_loss = 1 - ms_ssim_val
     x_rec_3_col = x_rec_flat.repeat(1,3,1,1)
     x_true_3_col = x_true_flat.repeat(1,3,1,1)
@@ -200,7 +200,7 @@ def train_vit(
     latent_size = 4096,
     lr=2e-4,
     epochs=25,
-    warm_restarts=False,
+    warm_restarts=True,
     image_size = 128
     ):
     #hyperparameters:
@@ -208,7 +208,7 @@ def train_vit(
     
     #epochs = 30
     #lr = 2e-4
-    batch_size = 8
+    batch_size = 16
     #warm_restarts = False
     # ------------------------------------------------------
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -352,8 +352,9 @@ def train_vit(
             with torch.autocast(device_type=DEVICE.type):
                 embryo_recon, embryo_lat = model(embryo_vol)
                 t2 = time.perf_counter()
+                # def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
                 rec_loss, _ = reconstruction_loss(
-                    embryo_recon, embryo_vol, ssim_module, ms_ssim_module
+                    embryo_recon, embryo_vol, ssim_module, ms_ssim_module, l1_weight=0.0, ms_ssim_weight=1.0, vgg_weight=0.0
                 )
                 if temporal_weight > 0:
                     smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
