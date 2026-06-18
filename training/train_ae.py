@@ -161,7 +161,7 @@ def ms_ssim_4_scale(x_rec,x_true, ssim_module) -> torch.Tensor:
 
     return msssim_val
 
-def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
+def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=0.0, ms_ssim_weight=1.0, vgg_weight=0.0):
     B, T, C, H, W = x_rec.shape
     
     x_rec_flat = x_rec.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
@@ -169,10 +169,10 @@ def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.
      
     l1_loss = F.l1_loss(x_rec, x_true)
 
-    if(H > 160 and W > 160):
-        ms_ssim_val = ms_ssim_module(x_rec_flat, x_true_flat)
-    else:
-        ms_ssim_val = ms_ssim_4_scale(x_rec_flat, x_true_flat, ssim_module)
+    #if(H > 160 and W > 160):
+    #    ms_ssim_val = ms_ssim_module(x_rec_flat, x_true_flat)
+    #else:
+    ms_ssim_val = ms_ssim_4_scale(x_rec_flat, x_true_flat, ssim_module)
     ms_ssim_loss = 1 - ms_ssim_val
     x_rec_3_col = x_rec_flat.repeat(1,3,1,1)
     x_true_3_col = x_true_flat.repeat(1,3,1,1)

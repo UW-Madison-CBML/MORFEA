@@ -151,7 +151,7 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
 
-    def __init__(self, latent_size=4096, num_layers=2, hidden_channels=64, initial_resolution=16, use_lstm=True):
+    def __init__(self, latent_size=4096, num_layers=2, hidden_channels=64, initial_resolution=16,final_size=128, use_lstm=True):
         super(Decoder, self).__init__()
         self.latent_size = latent_size
         self.hidden_channels = hidden_channels
@@ -201,6 +201,7 @@ class Decoder(nn.Module):
         self.lin1 = nn.Linear(latent_size,latent_size)
 
         self.latent_expand = nn.Linear(latent_size, self.hidden_channels * self.initial_resolution * self.initial_resolution)
+        self.final_size = final_size
     def forward(self, z_seq):
         B, T, L = z_seq.shape
 
@@ -224,7 +225,7 @@ class Decoder(nn.Module):
         B, T, C, H, W = h_seq.shape
         h_seq = h_seq.view(B * T, C, H, W)  # (B*T, hidden_dim, 16, 16)
         x_rec = self.spatial_decoder(h_seq)  # (B*T, 1, 128, 128)
-        x_rec = x_rec.view(B, T, C, H, W)  # (B, T, 1, 128, 128)
+        x_rec = x_rec.view(B, T, 1, self.final_size, self.final_size)  # (B, T, 1, 128, 128)
 
         return x_rec
 
