@@ -129,11 +129,11 @@ class ConvViTLSTMAE(torch.nn.Module):
         self.lin2 = torch.nn.Linear(768, self.latent_dim)
         if(self.use_lstm):
             self.lstm = torch.nn.LSTM(self.latent_dim, self.latent_dim, batch_first=True)
-        self.decoder = Decoder(latent_dim = self.latent_dim, initial_resolution = 28, use_lstm=self.use_lstm) # 28 = 224/8
+        self.decoder = Decoder(latent_size = self.latent_dim, initial_resolution = 28, final_size=224, use_lstm = self.use_lstm) # 28 = 224/8
                 
 
     def forward(self, x):
-        B,T, C,H,W =  x.shape # B, T, 1, 224,224
+        B,T, C,H,W = x.shape # B, T, 1, 224,224
         x_flat_seq = x.reshape(B*T,1,224,224).expand(-1,3,-1,-1).contiguous() # TODO don't do this
         transformed = self.vit_enc(x_flat_seq) # B*T, 197, 768
         embeddings = transformed[:,0,:] # B*T, 768
@@ -145,8 +145,10 @@ class ConvViTLSTMAE(torch.nn.Module):
             latents, (_,_) = self.lstm(embeddings) # get the final LSTM sequence
         else:
             latents = embeddings
+        print(latents.shape)
 
-        x_rec = self.decoder(x) # B,T, 1, 224, 224
+        x_rec = self.decoder(latents) # B,T, L
+        print(x_rec.shape)
         return x_rec, latents
              
 if __name__ == "__main__":
