@@ -1,1 +1,1 @@
-vit --loss-type mse --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.0 --size 512 --name vittest --lr 0.002 --epochs 3
+vit --loss-type mse --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.15 --size 512 --name vittest --lr 0.002 --epochs 10

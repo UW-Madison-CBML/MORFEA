@@ -145,10 +145,8 @@ class ConvViTLSTMAE(torch.nn.Module):
             latents, (_,_) = self.lstm(embeddings) # get the final LSTM sequence
         else:
             latents = embeddings
-        print(latents.shape)
 
-        x_rec = self.decoder(latents) # B,T, L
-        print(x_rec.shape)
+        x_rec = self.decoder(latents) # B,T,L
         return x_rec, latents
              
 if __name__ == "__main__":

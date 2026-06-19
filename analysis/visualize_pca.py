@@ -110,7 +110,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(group[PCA_COLS].to_numpy())
             c.append([PHASES.index(p) for p in group['phase']])
             
-        plot_sequences(seqs, f"phase_{g}_{image_name}", c=c, cmap="phase", cbar_label="Phase", folder="pca_plots", axlabel="PCA",axis_off=False, individ_names= names)
+        plot_sequences(seqs, f"phase_{g}_{image_name}", c=c, cmap="phase", cbar_label="Phase", folder="pca_plots", axlabel="PCA", axis_off=True, individ_names= names)
         #--------------------------------
         # curvature
         seqs = []
@@ -120,7 +120,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(calculate_curvatures(seq, offset=13))
             
-        plot_sequences(seqs, f"curv_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA",axis_off=False, individ_names=names)
+        plot_sequences(seqs, f"curv_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA",axis_off=True, individ_names=names)
         #--------------------------------
         # acceleration
         seqs = []
