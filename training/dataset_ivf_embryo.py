@@ -7,13 +7,14 @@ from PIL import Image, ImageFile
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-def read_gray(path, resize):
+def read_gray(path, resize, crop):
     img = Image.open(path).convert('L')
 
     if img is None:
         raise FileNotFoundError(path)
 
     if resize is not None:
+        img = img.crop((crop,crop, 500-crop, 500-crop))
         img = img.resize((resize, resize), Image.BILINEAR)
 
     return np.array(img, dtype="float32")
@@ -29,7 +30,8 @@ def normalize_video(vol, norm):
     return vol
 
 class IVFEmbryoDataset(Dataset):
-    def __init__(self, df, resize=128, norm="minmax01", max_frames=None):
+    def __init__(self, df, crop=45, resize=128, norm="minmax01", max_frames=None):
+        self.crop = crop
         self.df = df
         self.resize = resize
         self.norm = norm
@@ -48,7 +50,7 @@ class IVFEmbryoDataset(Dataset):
         if self.max_frames is not None and len(embryo_paths) > self.max_frames:
             embryo_paths = embryo_paths[:self.max_frames]
 
-        embryo_frames = [read_gray(p, self.resize) for p in embryo_paths]
+        embryo_frames = [read_gray(p, self.resize, self.crop) for p in embryo_paths]
         embryo_vol = np.stack(embryo_frames, axis=0)  # (T, H, W)
 
         embryo_vol = normalize_video(embryo_vol, self.norm)

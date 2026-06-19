@@ -161,32 +161,32 @@ def ms_ssim_4_scale(x_rec,x_true, ssim_module) -> torch.Tensor:
 
     return msssim_val
 
-def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
+def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, mse_weight=0.0, l1_weight=0.0, ms_ssim_weight=0.0, vgg_weight=0.0):
+    loss = torch.tensor(0.0, device=x_rec.device)
     B, T, C, H, W = x_rec.shape
     
     x_rec_flat = x_rec.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
     x_true_flat = x_true.view(B * T, C, H, W)  # (B*T, 1, 128, 128)
+    if mse_weight > 0.0:
+        loss = loss + mse_weight * F.mse_loss(x_rec, x_true)
+    if l1_weight > 0.0:
+        loss = loss + l1_weight * F.l1_loss(x_rec, x_true)
+    if ms_ssim_weight > 0.0:
+        if(H > 160 and W > 160):
+            ms_ssim_val = ms_ssim_module(x_rec_flat, x_true_flat)
+        else:
+            ms_ssim_val = ms_ssim_4_scale(x_rec_flat, x_true_flat, ssim_module)
+        loss = loss + ms_ssim_weight * (1 - ms_ssim_val)
+    if vgg_weight > 0.0:
+        x_rec_3_col = x_rec_flat.repeat(1,3,1,1)
+        x_true_3_col = x_true_flat.repeat(1,3,1,1)
+        vgg = torchvision.models.vgg16(pretrained=True).features[:16].eval()
+        vgg = vgg.to("cuda")
+        perceptual_loss = F.mse_loss(vgg(x_rec_3_col), vgg(x_true_3_col))
+        loss = loss + vgg_weight * perceptual_loss
      
-    l1_loss = F.l1_loss(x_rec, x_true)
-
-    #if(H > 160 and W > 160):
-    ms_ssim_val = ms_ssim_module(x_rec_flat, x_true_flat)
-    #else:
-    #ms_ssim_val = ms_ssim_4_scale(x_rec_flat, x_true_flat, ssim_module)
-    ms_ssim_loss = 1 - ms_ssim_val
-    x_rec_3_col = x_rec_flat.repeat(1,3,1,1)
-    x_true_3_col = x_true_flat.repeat(1,3,1,1)
-    vgg = torchvision.models.vgg16(pretrained=True).features[:16].eval()
-    vgg = vgg.to("cuda")
-    perceptual_loss = F.mse_loss(vgg(x_rec_3_col), vgg(x_true_3_col))
-     
-    total_loss = l1_weight * l1_loss + ms_ssim_weight * ms_ssim_loss + vgg_weight * perceptual_loss
     
-    return total_loss, {
-        "l1_loss": l1_loss.item(),
-        "ms_ssim_loss": ms_ssim_loss.item(),
-        "vgg": perceptual_loss.item()
-    }
+    return loss, {}
 
 def train_vit(
     loss_type="l1",
@@ -349,26 +349,26 @@ def train_vit(
             t0 = time.perf_counter()
             embryo_vol = embryo_vol.to(DEVICE)
             t1 = time.perf_counter()
-            with torch.autocast(device_type=DEVICE.type):
-                embryo_recon, embryo_lat = model(embryo_vol)
-                t2 = time.perf_counter()
-                # def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
-                rec_loss, _ = reconstruction_loss(
-                    embryo_recon, embryo_vol, ssim_module, ms_ssim_module, l1_weight=0.0, ms_ssim_weight=1.0, vgg_weight=0.0
-                )
-                if temporal_weight > 0:
-                    smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
-                    loss = rec_loss + smooth_loss
-                else:
-                    smooth_loss = torch.tensor(0.0, device=DEVICE)
-                    loss = rec_loss
+            #with torch.autocast(device_type=DEVICE.type):
+            embryo_recon, embryo_lat = model(embryo_vol)
+            t2 = time.perf_counter()
+            # def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
+            rec_loss, _ = reconstruction_loss(
+                embryo_recon, embryo_vol, ssim_module, ms_ssim_module, ms_ssim_weight=ms_ssim_weight, mse_weight=rec_weight
+            )
+            if temporal_weight > 0:
+                smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
+                loss = rec_loss + smooth_loss
+            else:
+                smooth_loss = torch.tensor(0.0, device=DEVICE)
+                loss = rec_loss
             if(index % 47 == 0):
-                vol_img = embryo_vol[0, -1, 0].detach().cpu().numpy()
+                vol_img = embryo_vol[0, -1, 0].float().detach().cpu().numpy()
                 recon_img = embryo_recon[0, -1, 0].float().detach().cpu().numpy()
-                if((vol_img < -0.01).any()):
-                    print("gt image has negative")
-                if((recon_img < -0.01).any()):
-                    print("reconstruction has negative")
+                if(((vol_img < 0) | (vol_img > 1)).any()):
+                    print(f"gt image has negative: [{vol_img.min()}, {vol_img.max()}]")
+                if(((recon_img < 0) | (recon_img > 1)).any()):
+                    print(f"reconstruction is out of range: [{recon_img.min()}, {recon_img.max()}]")
 
                 vol_img = (vol_img * 255).astype(np.uint8)
                 recon_img = (recon_img * 255).astype(np.uint8)
@@ -394,7 +394,7 @@ def train_vit(
                 print(f"NaN/Inf detected, skipping batch")
                 continue
 
-            scaler.scale(loss).backward()
+            loss.backward()
             t3 = time.perf_counter()
             total_norm = 0
             for p in model.parameters():
@@ -406,11 +406,9 @@ def train_vit(
 
             if total_norm > 100:
                 print(f"Warning: Large gradient norm: {total_norm:.2f}")
-            scaler.unscale_(optimizer)
  
             torch.nn.utils.clip_grad_norm_(model.parameters(), 5) 
-            scaler.step(optimizer)
-            scaler.update()
+            optimizer.step()
             scheduler.step()
             end_time = time.perf_counter()
             if (index % 5 == 0):
@@ -524,7 +522,7 @@ def train_lstm(
     print(
         f"trainable params: {trainable_params} || all params: {all_params} || trainable%: {100 * trainable_params / all_params}"
     )
-    run.log({"train_params":trainable_params,"params":all_params})
+    run.log({"train_params": trainable_params, "params": all_params})
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
 
     df = pd.read_csv(os.path.abspath("index.csv"))
@@ -621,9 +619,9 @@ def train_lstm(
                 wandb.log({"temp_smoothness": wandb.Image(fig)})
 
                 plt.close(fig)
-
+            # def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
             rec_loss, rec_metrics = reconstruction_loss(
-                embryo_recon, embryo_vol, ssim_module, ms_ssim_module
+                embryo_recon, embryo_vol, ssim_module, ms_ssim_module, l1_weight=0.0, ms_ssim_weight=1.0, vgg_weight=0.0
             )
             if temporal_weight > 0:
                 smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
@@ -670,7 +668,6 @@ def train_lstm(
                     "loss": loss.item(),
                     "rec_loss": rec_loss.item(),
                     "smooth_loss": smooth_loss.item(),
-                    "ms_ssim": rec_metrics["ms_ssim_value"],
                     "lr": scheduler.get_last_lr()[0]
                 }
 
@@ -759,7 +756,7 @@ def train_lstm(
         }
         model.eval()  # Set model to evaluation mode
         with torch.no_grad():
-            for embryo_vol, _, _ in val_loader:
+            for embryo_vol in val_loader:
                 embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, H, W)
                 val_recon, val_lat = model(embryo_vol)
                 B, T, C, H, W = embryo_vol.shape
@@ -913,7 +910,7 @@ def train_lstm(
 
         for i in range(5):
             idx = (i * 20000) % len(imgs)
-            vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 128)], "minmax01")[0]
+            vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 128, 45)], "minmax01")[0]
             recon_img = imgs[idx]
 
             vol_img = (vol_img * 255).astype(np.uint8)

@@ -26,7 +26,7 @@ def export_kanakasabapathy(model):
     # now let's get the data set up
     
     image_abs_paths = paths
-    images_vol = np.stack([read_gray(path, 128) for path in image_abs_paths], axis=0)
+    images_vol = np.stack([read_gray(path, 128, 45) for path in image_abs_paths], axis=0)
     
     # for consistency normalize in the same way as the video latent exports
     images_vol = normalize_video(images_vol, "minmax01")
