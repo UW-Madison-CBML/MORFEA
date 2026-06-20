@@ -12,7 +12,7 @@ import os
 import gc
 GRADES = ["A", "B", "C"] # I believe it is this order since 0 seems most prominent
 
-def export_kanakasabapathy(model):
+def export_kanakasabapathy(model, image_size = 128):
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     images_3 = [os.path.join("kanakasabapathy","3",path) for path in os.listdir(os.path.join("kanakasabapathy","3"))]
     images_4 = [os.path.join("kanakasabapathy","4",path) for path in os.listdir(os.path.join("kanakasabapathy","4"))]
@@ -26,7 +26,7 @@ def export_kanakasabapathy(model):
     # now let's get the data set up
     
     image_abs_paths = paths
-    images_vol = np.stack([read_gray(path, 128, 45) for path in image_abs_paths], axis=0)
+    images_vol = np.stack([read_gray(path, image_size, 45) for path in image_abs_paths], axis=0)
     
     # for consistency normalize in the same way as the video latent exports
     images_vol = normalize_video(images_vol, "minmax01")

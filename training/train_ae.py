@@ -289,8 +289,8 @@ def train_vit(
     full_seq_df_val = full_seq_df[full_seq_val_mask] # just look at validation ICM embryos
     
     full_seq_df_train = full_seq_df[~full_seq_val_mask] # just look at validation ICM embryos
-    full_seq_dataset_val = IVFEmbryoDataset(full_seq_df_val, resize=128, norm="minmax01")
-    full_seq_dataset_train = IVFEmbryoDataset(full_seq_df_train, resize=128, norm="minmax01")
+    full_seq_dataset_val = IVFEmbryoDataset(full_seq_df_val, resize=224, norm="minmax01")
+    full_seq_dataset_train = IVFEmbryoDataset(full_seq_df_train, resize=224, norm="minmax01")
 
     loader = DataLoader(
         train_dataset,
@@ -417,6 +417,7 @@ def train_vit(
                     "model_forward_time": t2 - t1,
                     "grad_calc_time": t3 - t2,
                     "optimizer_step_time": end_time - t3,
+                    "loss": loss.detach().cpu().item()
                         })
         model_clone = ConvViTLSTMAE()
 
@@ -576,7 +577,7 @@ def train_vit(
                 count += 1
         # export the kanakasabapathy latents
         
-        metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model)
+        metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model, image_size=224)
         
         model.train()
         # spoof the ICM grades
@@ -584,7 +585,7 @@ def train_vit(
 
         for i in range(5):
             idx = (i * 20000) % len(imgs)
-            vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 128, 45)], "minmax01")[0]
+            vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 224, 45)], "minmax01")[0]
             recon_img = imgs[idx]
 
             vol_img = (vol_img * 255).astype(np.uint8)

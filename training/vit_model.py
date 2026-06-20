@@ -3,6 +3,8 @@ import torch
 import torchvision
 import torch.nn.functional as F
 from ae_model import Decoder
+
+from huggingface_hub import PyTorchModelHubMixin
 class ViTEncoder(torch.nn.Module):
     def __init__(self,pretrained):
         super().__init__()
@@ -117,13 +119,25 @@ class SmallViTLSTMAE(torch.nn.Module):
         x_rec = x_rec.reshape(B,T, 224,224)[:,:,None,:,:] # B,T, 1, 224,224
         return x_rec, latents
 
-class ConvViTLSTMAE(torch.nn.Module):
-    def __init__(self, pretrained = True, latent_dim=1024, use_lstm = True):
+class ConvViTLSTMAE(torch.nn.Module, PyTorchModelHubMixin):
+    def __init__(self, config=None, pretrained = True, latent_dim=1024, use_lstm = True):
         super().__init__()
+        # don't need either of these in config neither contains important information about the model
+        self.pretrained=pretrained
         self.num_tokens = 196
+        # these are relevant for model loading since they have to do with the model's shape
         self.latent_dim = latent_dim
         self.use_lstm = use_lstm
-        self.vit_enc = ViTEncoder(pretrained) # TODO this ViT is very small
+        #if(config is not None):
+        if config is not None:
+            if isinstance(config, dict):
+                self.latent_dim = config.get('latent_dim', latent_dim)
+                self.use_lstm = config.get('use_lstm', use_lstm)
+            else:
+                self.latent_dim = config.latent_dim
+                self.use_lstm = config.use_lstm
+
+        self.vit_enc = ViTEncoder(self.pretrained) # TODO this ViT is very small
         self.lin1 = torch.nn.Linear(768, 768)
         self.dropout = torch.nn.Dropout(0.2)
         self.lin2 = torch.nn.Linear(768, self.latent_dim)
