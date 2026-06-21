@@ -8,13 +8,13 @@ from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 def read_gray(path, resize, crop):
-    img = Image.open(path)
+    img = Image.open(path).convert("L")
 
     if img is None:
         raise FileNotFoundError(path)
-
-    if resize is not None:
+    if(crop > 0):
         img = img.crop((crop,crop, 500-crop, 500-crop))
+    if resize is not None:
         img = img.resize((resize, resize), Image.BILINEAR)
 
     return np.array(img, dtype="float32")

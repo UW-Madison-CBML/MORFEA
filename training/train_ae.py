@@ -419,6 +419,8 @@ def train_vit(
                     "optimizer_step_time": end_time - t3,
                     "loss": loss.detach().cpu().item()
                         })
+            if(index > 10):
+                break
         model_clone = ConvViTLSTMAE()
 
         model_clone.load_state_dict(model.state_dict())
@@ -585,7 +587,7 @@ def train_vit(
 
         for i in range(5):
             idx = (i * 20000) % len(imgs)
-            vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 224, 45)], "minmax01")[0]
+            vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 224, 0)], "minmax01")[0]
             recon_img = imgs[idx]
 
             vol_img = (vol_img * 255).astype(np.uint8)
