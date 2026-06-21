@@ -148,6 +148,7 @@ class ConvViTLSTMAE(torch.nn.Module, PyTorchModelHubMixin):
 
     def forward(self, x):
         B,T, C,H,W = x.shape # B, T, 1, 224,224
+        assert len(x.shape) == 5, f"expected 5 dims, got {x.shape}"
         x_flat_seq = x.reshape(B*T,1,224,224).expand(-1,3,-1,-1).contiguous() # TODO don't do this
         transformed = self.vit_enc(x_flat_seq) # B*T, 197, 768
         embeddings = transformed[:,0,:] # B*T, 768

@@ -26,13 +26,14 @@ def export_kanakasabapathy(model, image_size = 128):
     # now let's get the data set up
     
     image_abs_paths = paths
-    images_vol = np.stack([read_gray(path, image_size, 45) for path in image_abs_paths], axis=0)
+    images_vol = np.stack([read_gray(path, image_size, 0) for path in image_abs_paths], axis=0)
     
     # for consistency normalize in the same way as the video latent exports
     images_vol = normalize_video(images_vol, "minmax01")
     
     images_tensor = torch.from_numpy(images_vol) # (B, 128, 128)
-    images_tensor = images_tensor.unsqueeze(1).unsqueeze(1) # insert a channel and time dim of 1: (B, 1, 1, 128, 128)
+    images_tensor = images_tensor.unsqueeze(1) # insert a channel and time dim of 1: (B, 1, 1, 128, 128)
+    assert len(images_tensor.shape) == 5, f"expected 5 dim tensor, got {len(images_tensor.shape)}"
     # normal size of video tensors is (64, 32, 1 ...) so ~2300 should work as one batch
     
     # ----------------------------------------------------------- 
