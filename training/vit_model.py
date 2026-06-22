@@ -37,7 +37,7 @@ class ViTLSTMAE(torch.nn.Module):
         self.dropout = torch.nn.Dropout(0.2)
         if(self.use_lstm):
             self.lstm = torch.nn.LSTM(self.latent_dim_per_token * self.num_tokens, self.latent_dim_per_token * self.num_tokens, batch_first=True)
-        self.positional_embedding = torch.nn.Embedding(self.num_tokens, 16)
+        self.positional_embedding = torch.nn.Embedding(self.num_tokens, self.latent_dim_per_token)
         decoder_layer = torch.nn.TransformerDecoderLayer(d_model=16, nhead=8)
         self.transformer_dec = torch.nn.TransformerDecoder(decoder_layer, num_layers=6) # TODO what norm to use here
         self.lin3 = torch.nn.Linear(16, 256) # patches of 16x16
@@ -61,18 +61,17 @@ class ViTLSTMAE(torch.nn.Module):
             latents = embeddings
         latents_flat = latents.reshape(B*T, self.num_tokens, self.latent_dim_per_token) # reflatten batch and time dims, bring out token dim
         print(latents_flat.shape)
-        latents_flat = latents_flat.permute(1,0,2) # transformer decoder needs batch second
-        pos_enc = self.positional_embedding(torch.arange(self.num_tokens, device = x.device)[None,:]).repeat(B*T,1,1) # B*T, self.num_tokens, latent_dim_per_token
-        pos_enc = pos_enc.permute(1,0,2) # need batch second
+        latents_flat = latents_flat.permute(1,0,2).contiguous() # transformer decoder needs batch second
+        pos_enc = self.positional_embedding(torch.arange(self.num_tokens, device = x.device)[:, None]).repeat(1, B*T, 1) # B*T, self.num_tokens, latent_dim_per_token
         x_rec = self.transformer_dec(pos_enc, latents_flat) # 196, B*T, 16
-        x_rec = x_rec.permute(1, 0, 2) 
-        x_rec = F.relu(self.lin3(x_rec)).reshape(B*T,14,14,16,16) # B*T, 196, 256
-        x_rec = x_rec.permute(0, 1,3,2,4).reshape(B*T, 224, 224)
+        x_rec = x_rec.permute(1, 0, 2).contiguous()
+        x_rec = F.sigmoid(self.lin3(x_rec)).reshape(B*T,14,14,16,16) # B*T, 196, 256
+        x_rec = x_rec.permute(0, 1,3,2,4).contiguous().reshape(B*T, 224, 224)
         x_rec = x_rec.reshape(B,T, 224,224)[:,:,None,:,:] # B,T, 1, 224,224
         return x_rec, latents
         
 class SmallViTLSTMAE(torch.nn.Module):
-    def __init__(self, pretrained = True, latent_dim=1024, use_lstm = True):
+    def __init__(self, pretrained = True, latent_dim=768, use_lstm = True):
         super().__init__()
         self.num_tokens = 196
         self.latent_dim = latent_dim
@@ -86,9 +85,10 @@ class SmallViTLSTMAE(torch.nn.Module):
         self.positional_embedding = torch.nn.Embedding(self.num_tokens, self.latent_dim)
         self.decoder_up = torch.nn.Linear(self.latent_dim, self.latent_dim)
         decoder_layer = torch.nn.TransformerDecoderLayer(d_model=self.latent_dim, nhead=8)
-        self.transformer_dec = torch.nn.TransformerDecoder(decoder_layer, num_layers=6, norm=torch.nn.BatchNorm()) # TODO what norm to use here
+        self.transformer_dec = torch.nn.TransformerDecoder(decoder_layer, num_layers=6) # TODO what norm to use here
         self.lin3 = torch.nn.Linear(self.latent_dim, 256) # patches of 16x16
 
+        
         
 
     def forward(self, x):
@@ -112,11 +112,11 @@ class SmallViTLSTMAE(torch.nn.Module):
         pos_enc = self.positional_embedding(torch.arange(self.num_tokens, device = x.device)[:,None]).expand(-1,B*T,-1).contiguous() # self.num_tokens, B*T, latent_dim
         x_rec = self.transformer_dec(pos_enc, tokens) # 196, B*T, self.latent_dim
         x_rec = x_rec.permute(1, 0, 2).contiguous() # B*T, 196, self.latent_dim
-        x_rec = F.relu(self.lin3(x_rec)) # B*T, 196, 256
+        x_rec = F.sigmoid(self.lin3(x_rec)) # B*T, 196, 256
         x_rec = x_rec.reshape(B*T, 14,14, 16,16)
         x_rec = x_rec.permute(0, 1, 3, 2, 4).contiguous() # B*T, 14, 16, 14, 16
-        x_rec = x_rec.reshape(B*T, 224, 224)
-        x_rec = x_rec.reshape(B,T, 224,224)[:,:,None,:,:] # B,T, 1, 224,224
+        x_rec = x_rec.reshape(B*T, 224, 224)[:,None,:,:]
+        x_rec = x_rec.reshape(B,T,C,H,W)
         return x_rec, latents
 
 class ConvViTLSTMAE(torch.nn.Module, PyTorchModelHubMixin):
