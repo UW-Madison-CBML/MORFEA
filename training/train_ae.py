@@ -256,7 +256,7 @@ def train_vit(
         print(f"{e}: bad login")
 
     torch.cuda.init()
-    model = ViTLSTMAE()
+    model = SmallViTLSTMAE(pretrained=False)
     artifact = wandb.Artifact(name="scripts", type="model_file")
     artifact.add_file(os.path.abspath("train_ae.py"))
     artifact.add_file(os.path.abspath("vit_model.py"))
@@ -420,7 +420,7 @@ def train_vit(
                     "optimizer_step_time": end_time - t3,
                     "loss": loss.detach().cpu().item()
                         })
-        model_clone = ViTLSTMAE()
+        model_clone = SmallViTLSTMAE()
 
         model_clone.load_state_dict(model.state_dict())
         save_and_push_model(model_clone, model_name +"-"+ date_label, [], hf_token, model_config={})
