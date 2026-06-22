@@ -201,14 +201,15 @@ def train_vit(
     lr=2e-4,
     epochs=25,
     warm_restarts=True,
-    image_size = 128
+    image_size = 224,
+    vgg_weight=0.0
     ):
     #hyperparameters:
 
     
     #epochs = 30
     #lr = 2e-4
-    batch_size = 16
+    batch_size = 8
     #warm_restarts = False
     # ------------------------------------------------------
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -255,7 +256,7 @@ def train_vit(
         print(f"{e}: bad login")
 
     torch.cuda.init()
-    model = ConvViTLSTMAE()
+    model = ViTLSTMAE()
     artifact = wandb.Artifact(name="scripts", type="model_file")
     artifact.add_file(os.path.abspath("train_ae.py"))
     artifact.add_file(os.path.abspath("vit_model.py"))
@@ -419,9 +420,7 @@ def train_vit(
                     "optimizer_step_time": end_time - t3,
                     "loss": loss.detach().cpu().item()
                         })
-            if(index > 10):
-                break
-        model_clone = ConvViTLSTMAE()
+        model_clone = ViTLSTMAE()
 
         model_clone.load_state_dict(model.state_dict())
         save_and_push_model(model_clone, model_name +"-"+ date_label, [], hf_token, model_config={})
@@ -631,7 +630,8 @@ def train_lstm(
     lr=2e-4,
     epochs=25,
     warm_restarts=False,
-    image_size = 128
+    image_size = 128,
+    vgg_weight=0.0
     ):
     #hyperparameters:
 
@@ -1105,7 +1105,7 @@ def train_lstm(
 
         for i in range(5):
             idx = (i * 20000) % len(imgs)
-            vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 128, 45)], "minmax01")[0]
+            vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 128, 0)], "minmax01")[0]
             recon_img = imgs[idx]
 
             vol_img = (vol_img * 255).astype(np.uint8)
@@ -1156,6 +1156,10 @@ if __name__ == "__main__":
                       help="Weight for reconstruction loss (default: 0.5, set to 0 to disable)")
     parser.add_argument("--temporal-weight", type=float, default=0.1,
                       help="Weight for temporal smoothness loss (default: 0.1, set to 0 to disable)")
+    parser.add_argument("--vgg-weight", type=float, default=0.0,
+                      help="Weight for VGG recon weight")
+
+
     #model layer ablations
     parser.add_argument("--dropout-rate", type=float, default=0.1,
                       help="Dropout rate (default: 0.1, set to 0 to disable)")
@@ -1178,6 +1182,7 @@ if __name__ == "__main__":
             loss_type=args.loss_type,
             ms_ssim_weight=args.ms_ssim_weight,
             rec_weight=args.rec_weight,
+            vgg_weight = args.vgg_weight,
             temporal_weight=args.temporal_weight,
             dropout_rate=args.dropout_rate,
             use_lstm=not args.no_lstm,
@@ -1196,6 +1201,7 @@ if __name__ == "__main__":
             loss_type=args.loss_type,
             ms_ssim_weight=args.ms_ssim_weight,
             rec_weight=args.rec_weight,
+            vgg_weight=args.vgg_weight,
             temporal_weight=args.temporal_weight,
             dropout_rate=args.dropout_rate,
             use_lstm=not args.no_lstm,
