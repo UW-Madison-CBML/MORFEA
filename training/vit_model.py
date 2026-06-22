@@ -8,7 +8,7 @@ from huggingface_hub import PyTorchModelHubMixin
 class ViTEncoder(torch.nn.Module):
     def __init__(self,pretrained):
         super().__init__()
-        vit = torchvision.models.vit_b_16(weights='IMAGENET1K_V1' if pretrained else None) # get the model
+        vit = torchvision.models.vit_l_16(weights='IMAGENET1K_V1' if pretrained else None) # get the model
         # steal model components
         self.patch_embed = vit.conv_proj
         self.encoder = vit.encoder
@@ -71,15 +71,15 @@ class ViTLSTMAE(torch.nn.Module):
         return x_rec, latents
         
 class SmallViTLSTMAE(torch.nn.Module):
-    def __init__(self, pretrained = True, latent_dim=768, use_lstm = True):
+    def __init__(self, pretrained = True, latent_dim=1024, use_lstm = True):
         super().__init__()
         self.num_tokens = 196
         self.latent_dim = latent_dim
         self.use_lstm = use_lstm
         self.vit_enc = ViTEncoder(pretrained) # TODO this ViT is very small
-        self.lin1 = torch.nn.Linear(768, 768)
+        self.lin1 = torch.nn.Linear(1024, 1024)
         self.dropout = torch.nn.Dropout(0.2)
-        self.lin2 = torch.nn.Linear(768, self.latent_dim)
+        self.lin2 = torch.nn.Linear(1024, self.latent_dim)
         if(self.use_lstm):
             self.lstm = torch.nn.LSTM(self.latent_dim, self.latent_dim, batch_first=True)
         self.positional_embedding = torch.nn.Embedding(self.num_tokens, self.latent_dim)
