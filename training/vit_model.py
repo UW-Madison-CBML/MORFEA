@@ -163,7 +163,12 @@ class ConvViTLSTMAE(torch.nn.Module, PyTorchModelHubMixin):
 
         x_rec = self.decoder(latents) # B,T,L
         return x_rec, latents
-             
+class ViTMAE(torch.nn.Module):
+    def __init__(self, latent_dim_per_token):
+        super().__init__()
+    def forward(self, x):
+        
+
 if __name__ == "__main__":
     model = ViTLSTMAE()
     image = torch.randn((1,1,1,224,224))
