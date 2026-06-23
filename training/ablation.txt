@@ -1,1 +1,1 @@
-vit --loss-type mse --ms-ssim-weight 1.0 --rec-weight 0.0 --temporal-weight 0.1 --size 1024 --name bigvit --lr 0.0002 --epochs 10 --warm-restarts
+vit --loss-type mse --ms-ssim-weight 0.7 --rec-weight 0.3 --vgg-weight 0.0 --temporal-weight 0.0 --size 1024 --name vit --lr 0.00001 --epochs 30 --warm-restarts
