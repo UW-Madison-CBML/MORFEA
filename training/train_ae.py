@@ -75,7 +75,8 @@ VAL_EMBRYOS = []#"RS363-7", "CZ594-5","CJ261-10","RL747-8","TM272-9","LFA766-1",
 def temporal_smoothness_loss(z_seq, weight=0.1):
     if z_seq.size(1) < 2:
         return torch.tensor(0.0, device=z_seq.device)
-    output = F.mse_loss(z_seq[:,1:,:], z_seq[:,:-1,:])
+    diff = z_seq[:,1:,:] - z_seq[:,:-1,:]
+    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:])
     return weight * output
 
 
@@ -221,6 +222,8 @@ def train_vit(
     #torch.autograd.detect_anomaly(True)
     # Build loss description for logging
    
+    model = SmallViTLSTMAE()
+
     date_label = datetime.now().strftime("%Y-%m-%d")
 
     wandb.login(key=os.getenv("WANDB_KEY"))
@@ -231,7 +234,7 @@ def train_vit(
         config={
             "lr": lr,
             "batch_size":batch_size,
-            "architecture": "ViT LSTM AE",
+            "architecture": type(model).__name__,
             "dataset": "https://zenodo.org/records/7912264",
             "epochs": epochs,
             "train_split": "not ICM graded",
@@ -256,7 +259,6 @@ def train_vit(
         print(f"{e}: bad login")
 
     torch.cuda.init()
-    model = SmallViTLSTMAE(pretrained=False)
     artifact = wandb.Artifact(name="scripts", type="model_file")
     artifact.add_file(os.path.abspath("train_ae.py"))
     artifact.add_file(os.path.abspath("vit_model.py"))

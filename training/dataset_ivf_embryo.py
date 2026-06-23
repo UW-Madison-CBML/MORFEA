@@ -14,7 +14,7 @@ def read_gray(path, resize, crop):
         raise FileNotFoundError(path)
     if(crop > 0):
         img = img.crop((crop,crop, 500-crop, 500-crop))
-    if resize is not None:
+    if resize is not None and img.size != (resize, resize):
         img = img.resize((resize, resize), Image.BILINEAR)
 
     return np.array(img, dtype="float32")
