@@ -4,14 +4,24 @@ import numpy as np, pandas as pd, torch
 from torch.utils.data import Dataset
 from PIL import Image, ImageFile
 import os
+from torchvision.transforms import v2
+from torchvision.tv_tensors import Video
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 class IVFSequenceDataset(Dataset):
-    def __init__(self, df, crop=45, resize=500, norm="minmax01"):
+    def __init__(self, df, crop=45, resize=500, norm="minmax01", inference=False):
         self.crop=crop
         #self.df = pd.read_csv(index_csv)
         self.df = df
         self.resize = resize
         self.norm = norm
+        self.inference = inference
+        self.augment = v2.Compose([
+            v2.RandomHorizontalFlip(p=0.5),
+            v2.RandomVerticalFlip(p=0.5),
+            v2.RandomRotation([0,90,180,270], center=None),
+            v2.Lambda(lambda x: x.contiguous())
+        ])
+
 
     def _read_gray(self, path):
         img = Image.open(path)
@@ -37,6 +47,8 @@ class IVFSequenceDataset(Dataset):
         return vol
 
     def __getitem__(self, idx):
+        if self.inference:
+            idx = idx // 4
         row = self.df.iloc[idx]
         if pd.isna(row["embryo_paths"]) or pd.isna(row["empty_well_paths"]) or pd.isna(row["sample_paths"]):
             print(f"Row {idx} has missing path data: ", row.to_string(index = False))
@@ -47,11 +59,17 @@ class IVFSequenceDataset(Dataset):
         embryo_vol = np.stack(embryo_frames, axis=0)  
         embryo_vol = self._normalize_video(embryo_vol)
         embryo_vol = embryo_vol[:,None, :, :] 
-
-        return torch.from_numpy(embryo_vol)
+        torch_vol = torch.from_numpy(embryo_vol) 
+        if(self.inference):
+            return torch_vol
+        else:
+            return self.augment(Video(torch_vol))
+        # alternatively:
+        # return torch_vol, self.augment(Video(torch_vol))
+        # and remove the len*4 stuff
 
     def __len__(self):
-        return len(self.df)
+        return len(self.df) if self.inference else 4*len(self.df)
 
 if __name__ == "__main__":
 

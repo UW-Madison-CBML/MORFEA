@@ -4,7 +4,8 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 from PIL import Image, ImageFile
-
+from torchvision.transforms import v2
+from torchvision import tv_tensors
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 def read_gray(path, resize, crop):
@@ -36,6 +37,10 @@ class IVFEmbryoDataset(Dataset):
         self.resize = resize
         self.norm = norm
         self.max_frames = None
+        self.augment = v2.Compose([
+            v2.RandomHorizontalFlip(p=0.5),
+            v2.RandomHorizontalFlip(p=0.5),
+        ])
 
     
     def __getitem__(self, idx):
