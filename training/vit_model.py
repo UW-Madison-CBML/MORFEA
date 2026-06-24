@@ -163,13 +163,70 @@ class ConvViTLSTMAE(torch.nn.Module, PyTorchModelHubMixin):
 
         x_rec = self.decoder(latents) # B,T,L
         return x_rec, latents
+
+class TransformerBlock(nn.Module):
+    def __init__(self, dim, num_heads, mlp_ratio=4.0):
+        super().__init__()
+        self.norm1 = torch.nn.LayerNorm(dim)
+        self.attn = torch.nn.MultiheadAttention(dim, num_heads, batch_first=True)
+        self.norm2 = torch.nn.LayerNorm(dim)
+        hidden = int(dim * mlp_ratio)
+        self.mlp = nn.Sequential(
+            nn.Linear(dim, hidden), nn.GELU(), nn.Linear(hidden, dim)
+        )
+
+    def forward(self, x):
+        B,T,P,L =  x.shape
+        x = x.view(B*T,P,L)
+        h = self.norm1(x)
+        attn_out, _ = self.attn(h, h, h, need_weights=False)
+        x = x + attn_out
+        x = x + self.mlp(self.norm2(x))
+        x = x.view(B,T,P,L)
+        return x
+
 class ViTMAE(torch.nn.Module):
-    def patch(self, x):
+    def mask(self, x):
+        """
+        x: the patches pre masking
+        returns:
+            masked_patches: B,T,num_unmasked, self.patch_size ** 2; the masked patches without padding in between
+            mask: B,num_patches; type torch.bool; the boolean mask representing the patches that are unmasked (True) across batch dim (same across time dim) 
+            mask_indices: B,num_patches; type=torch.uint; the padded indices that index masked_patches telling where to gather them from in each sequence in the batch
+            recover_indices: B, num_unmasked; type=torch.uint; the indices of each unmasked patch indexing in x, for use with positional encoding
+        """
+        B,T,P,L = x.shape
+        random = torch.rand(B,P, device=x.device)
+        rand_indices = random.argsort(dim=1)
+        mask_indices = rand_indices[:,:self.num_unmasked].sort(dim=1)
+        padded_mask_indices = 
+        return torch.gather(x, 2, mask_indices[:,None,:].repeat(1,T,1)), torch.where(), mask_indices
+
+
+    def positional_encoding(x, mask=None):
+        if mask is not None:
+                     
+            return 
+        else:
+            return 
+
+    def patchify(self, x):
         B,T,C,H,W = x.shape
         assert C == 1, f"expected 1 channel got {C}"
         assert H == W and H == self.image_size, f"expected image size [{self.image_size}, {self.image_size}], got [{H},{W}]"
         x = x.squeeze(2)
-        return x.reshape(B, T, (self.image_size // self.patch_size)**2, self.patch_size, self.patch_size)
+        x = x.reshape(B,T,self.image_size//self.patch_size,self.patch_size, self.image_size//self.patch_size,self.patch_size)
+        x = x.permute(0,1,2,4,3,5).contiguous()
+        return x.reshape(B, T, (self.image_size // self.patch_size)**2, self.patch_size**2)
+
+    def unpatchify(self, x):
+        B,T,P,L = x.shape
+        assert P == (self.image_size // self.patch_size) ** 2 and L == self.patch_size ** 2, f"expected image size [{B},{T},{self.P == (self.image_size // self.patch_size) ** 2}, {L == self.patch_size ** 2}], got [{B},{T},{P},{L}]"
+        x = x.reshape(B,T,self.image_size/self.patch_size,self.image_size/self.patch_size,self.patch_size,self.patch_size)
+        x = x.permute(0,1,2,4,3,5).contiguous()
+        x = x.reshape(B,T,self.image_size, self.image_size)
+        return x.unsqueeze(2)
+
 
     
     def __init__(self, image_size=224, patch_size=16, latent_dim_per_token=64, num_unmasked=49):
@@ -179,20 +236,41 @@ class ViTMAE(torch.nn.Module):
         assert patch_size % image_size == 0, f"expected patch_size: {patch_size}, to divide image_size: {image_size}"
         self.patch_size = patch_size
         assert 0 <= num_unmasked and num_unmasked <= (self.image_size // self.patch_size) ** 2, f"expected num_unmasked: {num_unmasked} to be less than num_patches: {(self.image_size // self.patch_size) ** 2}"
+        self.num_unmasked = num_unmasked
         self.num_patches = (self.image_size // self.patch_size) ** 2
+        self.transformer_encoder = TransformerBlock(dim=64,n_heads=4)
+        self.transformer_decoder = TransformerBlock(dim=64,n_heads=4)
+        self.lin1 = torch.nn.Linear(self.patch_size**2,64)
+        self.lin2 = torch.nn.Linear(64,self.latent_dim_per_token)
+
+        self.lin3 = torch.nn.Linear(self.latent_dim_per_token, self.latent_dim_per_token)
+
+        self.lin4 = torch.nn.Linear(self.latent_dim_per_token, 64)
+        self.lin5 = torch.nn.Linear(64, self.patch_size**2)
+
         
           
     def forward(self, x):
         B,T,C,H,W = x.shape
-        patches = self.patch(x) # B,T,num_patches
-        masked_patches, mask = self.mask(patches) # B,T,num_unmasked, patch_size**2; B, num_patches-torch.bool
-        pos_enc = self.positional_encoding(mask)
+        patches = self.patchify(x) # B,T,num_patches
+        masked_patches, mask, mask_indices = self.mask(patches) # B,T,num_unmasked, patch_size**2; B, num_patches-torch.bool; B, num_unmasked-torch.int
+        pos_enc = self.positional_encoding(masked_patches, mask=mask)
         masked_patches = masked_patches + pos_enc
-        attended_patches = self.transformer_encoder(masked_patches) # B, T, num_unmasked, transformer_out
-        latent_patches = F.relu(self.lin1(attended_patches))
-        latent_patches = self.lin2(latent_patches)
+        masked_patches = F.relu(self.lin1(masked_patches))
+        attended_patches = self.transformer_encoder(masked_patches) # B, T, num_unmasked, patch_size**2
+        latent_patches = self.lin2(attended_patches)
         latents = latent_patches.reshape(B,T,self.num_unmasked * self.latent_dim_per_token)
-        padded_patches = torch.latent_patches# 
+        latent_patches = F.relu(self.lin3(latent_patches))
+        latents_patches_pad_0 = torch.cat([torch.zeros((B,T,1,self.latent_dim_per_token)),latent_patches],dim=2)
+        padded_patches = torch.gather(latent_patches_pad_0, 2, mask_indices[:,None,:].repeat(1,T,1))
+        dec_pos_enc = self.positional_encoding() 
+        patches_to_decode = padded_patches + dec_pos_enc 
+        patches_to_decode = F.relu(self.lin4(patches_to_decode))
+        recon_patches = self.transformer_decoder(patches_to_decode) 
+        recon_patches = self.lin5(recon_patches)
+        x_recon = self.unpatchify(recon_patches)
+        return F.sigmoid(x_recon)
+        
         
         
 
