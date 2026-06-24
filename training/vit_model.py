@@ -164,9 +164,36 @@ class ConvViTLSTMAE(torch.nn.Module, PyTorchModelHubMixin):
         x_rec = self.decoder(latents) # B,T,L
         return x_rec, latents
 class ViTMAE(torch.nn.Module):
-    def __init__(self, latent_dim_per_token):
+    def patch(self, x):
+        B,T,C,H,W = x.shape
+        assert C == 1, f"expected 1 channel got {C}"
+        assert H == W and H == self.image_size, f"expected image size [{self.image_size}, {self.image_size}], got [{H},{W}]"
+        x = x.squeeze(2)
+        return x.reshape(B, T, (self.image_size // self.patch_size)**2, self.patch_size, self.patch_size)
+
+    
+    def __init__(self, image_size=224, patch_size=16, latent_dim_per_token=64, num_unmasked=49):
         super().__init__()
+        self.image_size = image_size 
+        self.latent_dim_per_token = latent_dim_per_token
+        assert patch_size % image_size == 0, f"expected patch_size: {patch_size}, to divide image_size: {image_size}"
+        self.patch_size = patch_size
+        assert 0 <= num_unmasked and num_unmasked <= (self.image_size // self.patch_size) ** 2, f"expected num_unmasked: {num_unmasked} to be less than num_patches: {(self.image_size // self.patch_size) ** 2}"
+        self.num_patches = (self.image_size // self.patch_size) ** 2
+        
+          
     def forward(self, x):
+        B,T,C,H,W = x.shape
+        patches = self.patch(x) # B,T,num_patches
+        masked_patches, mask = self.mask(patches) # B,T,num_unmasked, patch_size**2; B, num_patches-torch.bool
+        pos_enc = self.positional_encoding(mask)
+        masked_patches = masked_patches + pos_enc
+        attended_patches = self.transformer_encoder(masked_patches) # B, T, num_unmasked, transformer_out
+        latent_patches = F.relu(self.lin1(attended_patches))
+        latent_patches = self.lin2(latent_patches)
+        latents = latent_patches.reshape(B,T,self.num_unmasked * self.latent_dim_per_token)
+        padded_patches = torch.latent_patches# 
+        
         
 
 if __name__ == "__main__":
