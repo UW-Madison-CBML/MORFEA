@@ -1639,6 +1639,23 @@ if __name__ == "__main__":
             warm_restarts=args.warm_restarts
 
         )
+    elif len(sys.argv) > 1 and sys.argv[1] == "vitmae":
+        train_vitmae(
+            loss_type=args.loss_type,
+            ms_ssim_weight=args.ms_ssim_weight,
+            rec_weight=args.rec_weight,
+            vgg_weight=args.vgg_weight,
+            temporal_weight=args.temporal_weight,
+            dropout_rate=args.dropout_rate,
+            use_lstm=not args.no_lstm,
+            use_batchnorm=not args.no_batchnorm,
+            model_name = args.name,
+            latent_size = args.size,
+            lr=args.lr,
+            epochs=args.epochs,
+            warm_restarts=args.warm_restarts
+
+        )
     else:
         print("bad model or no args")
 
