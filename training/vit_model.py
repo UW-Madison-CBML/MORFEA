@@ -193,22 +193,30 @@ class ViTMAE(torch.nn.Module):
             masked_patches: B,T,num_unmasked, self.patch_size ** 2; the masked patches without padding in between
             mask: B,num_patches; type torch.bool; the boolean mask representing the patches that are unmasked (True) across batch dim (same across time dim) 
             mask_indices: B,num_patches; type=torch.uint; the padded indices that index masked_patches telling where to gather them from in each sequence in the batch
-            recover_indices: B, num_unmasked; type=torch.uint; the indices of each unmasked patch indexing in x, for use with positional encoding
+            pos_indices: B, num_unmasked; type=torch.uint; the indices of each unmasked patch indexing in x, for use with positional encoding
         """
         B,T,P,L = x.shape
-        random = torch.rand(B,P, device=x.device)
+        noise = torch.rand(B,P, device=x.device)
         rand_indices = random.argsort(dim=1)
-        mask_indices = rand_indices[:,:self.num_unmasked].sort(dim=1)
-        padded_mask_indices = 
-        return torch.gather(x, 2, mask_indices[:,None,:].repeat(1,T,1)), torch.where(), mask_indices
+        pos_indices = rand_indices[:,:self.num_unmasked].sort(dim=1)
+        int_mask = F.one_hot(pos_indices, num_classes=self.num_patches).sum(dim=1)
+        assert ((int_mask == 0) | (int_mask == 1)).all(), "error somehow pos_indices is not unique"
+        mask = int_mask.to(torch.bool) 
+
+        mask_indices = torch.where(mask, mask.cumsum(dim=1), torch.tensor(-1,device=x.device, dtype=torch.int))
+        return torch.gather(x, 2, pos_indices[:,None,:].repeat(1,T,1)), mask, mask_indices, pos_indices
 
 
-    def positional_encoding(x, mask=None):
+    def positional_encoding(shape,device,indices=None):
+        B,T,P,_ = shape # B,T,P,64
+        assert P == self.num_patches, f"expected pos_enc shape[2] to be {self.num_patches}, got {P}"
+        pos_enc = self.embedding(torch.arange(P,device=device)) # P, 64
+        pos_enc = pos_enc[None,None,:,:].repeat(B,T,1,1)
         if mask is not None:
-                     
-            return 
+            assert indices.shape == (B,P), f"expected indices.shape = [{B},{P}], got {indices.shape}" 
+            return torch.gather(pos_enc, 2, indices[:,None,:].repeat(1,T,1))
         else:
-            return 
+            return pos_enc
 
     def patchify(self, x):
         B,T,C,H,W = x.shape
@@ -238,6 +246,7 @@ class ViTMAE(torch.nn.Module):
         assert 0 <= num_unmasked and num_unmasked <= (self.image_size // self.patch_size) ** 2, f"expected num_unmasked: {num_unmasked} to be less than num_patches: {(self.image_size // self.patch_size) ** 2}"
         self.num_unmasked = num_unmasked
         self.num_patches = (self.image_size // self.patch_size) ** 2
+        self.embedding = torch.nn.Embedding(self.num_patches, 64)
         self.transformer_encoder = TransformerBlock(dim=64,n_heads=4)
         self.transformer_decoder = TransformerBlock(dim=64,n_heads=4)
         self.lin1 = torch.nn.Linear(self.patch_size**2,64)
@@ -248,13 +257,24 @@ class ViTMAE(torch.nn.Module):
         self.lin4 = torch.nn.Linear(self.latent_dim_per_token, 64)
         self.lin5 = torch.nn.Linear(64, self.patch_size**2)
 
-        
+    def masked_loss(self, target, pred, mask):
+        """
+        target: B,T,P,L; patched target
+        pred: B,T,P,L; patched prediction / recon 
+        """
+        assert target.shape == pred.shape, f"expected target shape to match pred shape, got pred: {pred.shape}, target: {target.shape}"
+        assert mask.shape == (pred.shape[0],pred.shape[2]), f"expected mask.shape = [{pred.shape[0]}, {pred.shape[2]}], got {mask.shape}"
+        mask = mask[:,None,:].repeat(1, target.shape[1], 1)
+        loss = (pred - target) ** 2
+        loss = loss.mean(dim=-1) # B,T,P
+        loss = (loss * mask).sum() / mask.sum() 
+        return loss     
           
     def forward(self, x):
         B,T,C,H,W = x.shape
         patches = self.patchify(x) # B,T,num_patches
-        masked_patches, mask, mask_indices = self.mask(patches) # B,T,num_unmasked, patch_size**2; B, num_patches-torch.bool; B, num_unmasked-torch.int
-        pos_enc = self.positional_encoding(masked_patches, mask=mask)
+        masked_patches, mask, mask_indices, pos_indices = self.mask(patches) # B,T,num_unmasked, patch_size**2; B, num_patches-torch.bool; B, num_unmasked-torch.int
+        pos_enc = self.positional_encoding(patches.shape, x.device, mask=pos_indices)
         masked_patches = masked_patches + pos_enc
         masked_patches = F.relu(self.lin1(masked_patches))
         attended_patches = self.transformer_encoder(masked_patches) # B, T, num_unmasked, patch_size**2
@@ -263,19 +283,18 @@ class ViTMAE(torch.nn.Module):
         latent_patches = F.relu(self.lin3(latent_patches))
         latents_patches_pad_0 = torch.cat([torch.zeros((B,T,1,self.latent_dim_per_token)),latent_patches],dim=2)
         padded_patches = torch.gather(latent_patches_pad_0, 2, mask_indices[:,None,:].repeat(1,T,1))
-        dec_pos_enc = self.positional_encoding() 
+        dec_pos_enc = self.positional_encoding(padded_patches.shape, x.device) 
         patches_to_decode = padded_patches + dec_pos_enc 
         patches_to_decode = F.relu(self.lin4(patches_to_decode))
         recon_patches = self.transformer_decoder(patches_to_decode) 
-        recon_patches = self.lin5(recon_patches)
+        recon_patches = F.sigmoid(self.lin5(recon_patches))
         x_recon = self.unpatchify(recon_patches)
-        return F.sigmoid(x_recon)
-        
+        return x_recon, latents, mask, self.masked_loss(patches, recon_patches, mask)
         
         
 
 if __name__ == "__main__":
-    model = ViTLSTMAE()
+    model = ViTMAE()
     image = torch.randn((1,1,1,224,224))
     recon, latent = model(image)
     
