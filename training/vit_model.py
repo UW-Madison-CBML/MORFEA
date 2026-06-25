@@ -164,15 +164,15 @@ class ConvViTLSTMAE(torch.nn.Module, PyTorchModelHubMixin):
         x_rec = self.decoder(latents) # B,T,L
         return x_rec, latents
 
-class TransformerBlock(nn.Module):
+class TransformerBlock(torch.nn.Module):
     def __init__(self, dim, num_heads, mlp_ratio=4.0):
         super().__init__()
         self.norm1 = torch.nn.LayerNorm(dim)
         self.attn = torch.nn.MultiheadAttention(dim, num_heads, batch_first=True)
         self.norm2 = torch.nn.LayerNorm(dim)
         hidden = int(dim * mlp_ratio)
-        self.mlp = nn.Sequential(
-            nn.Linear(dim, hidden), nn.GELU(), nn.Linear(hidden, dim)
+        self.mlp = torch.nn.Sequential(
+            torch.nn.Linear(dim, hidden), torch.nn.GELU(), torch.nn.Linear(hidden, dim)
         )
 
     def forward(self, x):
@@ -197,8 +197,9 @@ class ViTMAE(torch.nn.Module):
         """
         B,T,P,L = x.shape
         noise = torch.rand(B,P, device=x.device)
-        rand_indices = random.argsort(dim=1)
-        pos_indices = rand_indices[:,:self.num_unmasked].sort(dim=1)
+        rand_indices = noise.argsort(dim=1)
+        pos_indices = rand_indices[:,:self.num_unmasked].sort(dim=1).indices
+        print(pos_indices)
         int_mask = F.one_hot(pos_indices, num_classes=self.num_patches).sum(dim=1)
         assert ((int_mask == 0) | (int_mask == 1)).all(), "error somehow pos_indices is not unique"
         mask = int_mask.to(torch.bool) 
@@ -207,12 +208,12 @@ class ViTMAE(torch.nn.Module):
         return torch.gather(x, 2, pos_indices[:,None,:].repeat(1,T,1)), mask, mask_indices, pos_indices
 
 
-    def positional_encoding(shape,device,indices=None):
+    def positional_encoding(self,shape,device,indices=None):
         B,T,P,_ = shape # B,T,P,64
         assert P == self.num_patches, f"expected pos_enc shape[2] to be {self.num_patches}, got {P}"
         pos_enc = self.embedding(torch.arange(P,device=device)) # P, 64
         pos_enc = pos_enc[None,None,:,:].repeat(B,T,1,1)
-        if mask is not None:
+        if indices is not None:
             assert indices.shape == (B,P), f"expected indices.shape = [{B},{P}], got {indices.shape}" 
             return torch.gather(pos_enc, 2, indices[:,None,:].repeat(1,T,1))
         else:
@@ -241,14 +242,14 @@ class ViTMAE(torch.nn.Module):
         super().__init__()
         self.image_size = image_size 
         self.latent_dim_per_token = latent_dim_per_token
-        assert patch_size % image_size == 0, f"expected patch_size: {patch_size}, to divide image_size: {image_size}"
+        assert image_size % patch_size == 0, f"expected patch_size: {patch_size}, to divide image_size: {image_size}"
         self.patch_size = patch_size
         assert 0 <= num_unmasked and num_unmasked <= (self.image_size // self.patch_size) ** 2, f"expected num_unmasked: {num_unmasked} to be less than num_patches: {(self.image_size // self.patch_size) ** 2}"
         self.num_unmasked = num_unmasked
         self.num_patches = (self.image_size // self.patch_size) ** 2
         self.embedding = torch.nn.Embedding(self.num_patches, 64)
-        self.transformer_encoder = TransformerBlock(dim=64,n_heads=4)
-        self.transformer_decoder = TransformerBlock(dim=64,n_heads=4)
+        self.transformer_encoder = TransformerBlock(dim=64,num_heads=4)
+        self.transformer_decoder = TransformerBlock(dim=64,num_heads=4)
         self.lin1 = torch.nn.Linear(self.patch_size**2,64)
         self.lin2 = torch.nn.Linear(64,self.latent_dim_per_token)
 
@@ -281,7 +282,7 @@ class ViTMAE(torch.nn.Module):
         latent_patches = self.lin2(attended_patches)
         latents = latent_patches.reshape(B,T,self.num_unmasked * self.latent_dim_per_token)
         latent_patches = F.relu(self.lin3(latent_patches))
-        latents_patches_pad_0 = torch.cat([torch.zeros((B,T,1,self.latent_dim_per_token)),latent_patches],dim=2)
+        latent_patches_pad_0 = torch.cat([torch.zeros((B,T,1,self.latent_dim_per_token)),latent_patches],dim=2)
         padded_patches = torch.gather(latent_patches_pad_0, 2, mask_indices[:,None,:].repeat(1,T,1))
         dec_pos_enc = self.positional_encoding(padded_patches.shape, x.device) 
         patches_to_decode = padded_patches + dec_pos_enc 
