@@ -1,1 +1,1 @@
-vitmae --temporal-weight 0.15 --size 1024 --name vitmae --lr 0.00001 --epochs 30 --warm-restarts
+vitmae --temporal-weight 0.1 --size 1024 --name vitmae --lr 0.0001 --epochs 30 --warm-restarts
