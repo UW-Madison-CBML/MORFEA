@@ -790,6 +790,11 @@ def train_vitmae(
                 smooth_loss = torch.tensor(0.0, device=DEVICE)
                 loss = rec_loss
             if(index % 47 == 0):
+
+                mask = mask[0].detach().cpu().numpy()
+                mask = (~ mask).reshape(14,14,1,1)
+                masked_recon = mask * recon_img
+
                 vol_img = embryo_vol[0, -1, 0].float().detach().cpu().numpy()
                 recon_img = embryo_recon[0, -1, 0].float().detach().cpu().numpy()
                 if(((vol_img < 0) | (vol_img > 1)).any()):
@@ -798,12 +803,17 @@ def train_vitmae(
                     print(f"reconstruction is out of range: [{recon_img.min()}, {recon_img.max()}]")
 
                 vol_img = (vol_img * 255).astype(np.uint8)
+                masked_img = (masked_recon * 225).astype(np.uint8)
                 recon_img = (recon_img * 255).astype(np.uint8)
+                
 
                 comparison = np.concatenate((vol_img, recon_img), axis=1)
      
                 images = wandb.Image(comparison, caption="Embryo vs Recon comparison")
-                run.log({"reconstruction": images})
+                images = wandb.Image(masked_img, caption = "masked recostruction")
+                run.log({"reconstruction": images, "masked":masked_img})
+
+                
                 traj = embryo_lat.cpu().detach().numpy()[0]
                 dist_matrix = distance_matrix(traj, traj)
                 fig, ax = plt.subplots(figsize=(8, 6))
@@ -815,6 +825,7 @@ def train_vitmae(
                 wandb.log({"temp_smoothness": wandb.Image(fig)})
 
                 plt.close(fig)
+                
 
 
             if torch.isnan(loss) or torch.isinf(loss):
