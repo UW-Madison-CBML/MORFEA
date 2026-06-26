@@ -733,7 +733,7 @@ def train_vitmae(
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=1,
+        batch_size=8,
         shuffle=False,
         num_workers=16,
         pin_memory=True,
@@ -775,25 +775,25 @@ def train_vitmae(
         count = 0
         start_time = time.perf_counter()
         end_time = time.perf_counter()
-        for index, (embryo_vol, augment) in enumerate(pbar):
+        for index, (_, embryo_vol) in enumerate(pbar):
             optimizer.zero_grad()
             t0 = time.perf_counter()
             embryo_vol = embryo_vol.to(DEVICE)
-            augment = augment.to(DEVICE)
+            #augment = augment.to(DEVICE)
             t1 = time.perf_counter()
             #with torch.autocast(device_type=DEVICE.type):
             embryo_recon, embryo_lat, mask, _ = model(embryo_vol)
-            augment_recon, augment_lat, mask_augment, _ = model(augment)
+            #augment_recon, augment_lat, mask_augment, _ = model(augment)
             B,T,_,_,_ = embryo_vol.shape
             mask_reshaped = mask.reshape(B,1,14,14,1,1).repeat(1,T,1,1,16,16).permute(0,1,2,4,3,5).contiguous().reshape(B,T,1,224,224)
-            mask_augment_reshaped = mask_augment.reshape(B,1,14,14,1,1).repeat(1,T,1,1,16,16).permute(0,1,2,4,3,5).contiguous().reshape(B,T,1,224,224)
-            masked_embryo_vol = embryo_vol * ( ~ mask_reshaped)
+            #mask_augment_reshaped = mask_augment.reshape(B,1,14,14,1,1).repeat(1,T,1,1,16,16).permute(0,1,2,4,3,5).contiguous().reshape(B,T,1,224,224)
+            masked_embryo_vol = embryo_vol * (~mask_reshaped)
             masked_embryo_recon = embryo_recon * (~mask_reshaped)
-            masked_augment = augment * (~mask_augment_reshaped)
-            masked_embryo_recon = augment_recon * (~ mask_augment_reshaped)
+            #masked_augment = augment * (~mask_augment_reshaped)
+            #masked_augment_recon = augment_recon * (~ mask_augment_reshaped)
             rec_loss,_ = reconstruction_loss(masked_embryo_vol, masked_embryo_recon, ssim_module, ms_ssim_module, ms_ssim_weight=1.0) 
-            rec_loss_augment,_ = reconstruction_loss(masked_augment, masked_augment_recon, ssim_module, ms_ssim_module, ms_ssim_weight=1.0)
-            rec_loss = rec_loss + rec_loss_augment
+            #rec_loss_augment,_ = reconstruction_loss(masked_augment, masked_augment_recon, ssim_module, ms_ssim_module, ms_ssim_weight=1.0)
+            #rec_loss = rec_loss + rec_loss_augment
  
             #rec_loss = rec_loss + augment_rec_loss # + F.mse_loss(embryo_lat, augment_lat) # need to add a single 2048 dim representation
             t2 = time.perf_counter()
@@ -889,15 +889,15 @@ def train_vitmae(
         }
         model.eval()  # Set model to evaluation mode
         with torch.no_grad():
-            for embryo_vol, _ in val_loader:
+            for embryo_vol, _ in tqdm(val_loader):
                 embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, H, W)
                 val_recon, val_lat, mask ,_ = model(embryo_vol)
                 B, T, C, H, W = embryo_vol.shape
-                mask = mask.cpu()
                 mask = mask.reshape(B,1,14,14,1,1).repeat(1,T,1,1,16,16).permute(0,1,2,4,3,5).contiguous().reshape(B,T,1,224,224)
 
-                val_recon = val_recon.cpu() * (~ mask) # mask is 0 if masked, so need to reverse so we are only looking at different pixels
-                embryo_vol = embryo_vol.cpu() * (~ mask)
+                val_recon = val_recon * (~ mask) # mask is 0 if masked, so need to reverse so we are only looking at different pixels
+                embryo_vol = embryo_vol * (~ mask)
+
                 # MSE
                 val_metrics['mse'].push(F.mse_loss(val_recon, embryo_vol).item())
 
