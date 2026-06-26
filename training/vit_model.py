@@ -239,18 +239,20 @@ class ViTMAE(torch.nn.Module):
 
 
     
-    def __init__(self, image_size=224, patch_size=16, latent_dim_per_token=64, num_unmasked=49):
+    def __init__(self, image_size=224, patch_size=16, latent_dim_per_token=64, num_unmasked=49, num_blocks=4):
         super().__init__()
         self.image_size = image_size 
         self.latent_dim_per_token = latent_dim_per_token
         assert image_size % patch_size == 0, f"expected patch_size: {patch_size}, to divide image_size: {image_size}"
         self.patch_size = patch_size
         assert 0 <= num_unmasked and num_unmasked <= (self.image_size // self.patch_size) ** 2, f"expected num_unmasked: {num_unmasked} to be less than num_patches: {(self.image_size // self.patch_size) ** 2}"
+        self.num_blocks = num_blocks
         self.num_unmasked = num_unmasked
         self.num_patches = (self.image_size // self.patch_size) ** 2
         self.embedding = torch.nn.Embedding(self.num_patches, 64)
-        self.transformer_encoder = TransformerBlock(dim=64,num_heads=4)
-        self.transformer_decoder = TransformerBlock(dim=64,num_heads=4)
+        self.transformer_encoder = torch.nn.ModuleList([TransformerBlock(dim=64,num_heads=4) for i in range(self.num_blocks)])
+        self.transformer_decoder = torch.nn.ModuleList([TransformerBlock(dim=64,num_heads=4) for i in range(self.num_blocks)])
+
         self.lin1 = torch.nn.Linear(self.patch_size**2,64)
         self.lin2 = torch.nn.Linear(64,self.latent_dim_per_token)
 
@@ -276,11 +278,13 @@ class ViTMAE(torch.nn.Module):
         B,T,C,H,W = x.shape
         patches = self.patchify(x) # B,T,num_patches, self.patch_size ** 2
         masked_patches, mask, mask_indices, pos_indices = self.mask(patches) # B,T,num_unmasked, patch_size**2; B, num_patches-torch.bool; B, num_unmasked-torch.int
+        
         pos_enc = self.positional_encoding(patches.shape, x.device, indices=pos_indices)
         masked_patches = F.relu(self.lin1(masked_patches))
         masked_patches = masked_patches + pos_enc
-        attended_patches = self.transformer_encoder(masked_patches) # B, T, num_unmasked, patch_size**2
-        latent_patches = self.lin2(attended_patches)
+        for enc in self.transformer_encoder:
+            masked_patches = enc(masked_patches) # B, T, num_unmasked, patch_size**2
+        latent_patches = self.lin2(masked_patches)
         latents = latent_patches.reshape(B,T,self.num_unmasked * self.latent_dim_per_token)
         latent_patches = F.relu(self.lin3(latent_patches))
         latent_patches = F.relu(self.lin4(latent_patches))
@@ -288,8 +292,9 @@ class ViTMAE(torch.nn.Module):
         padded_patches = torch.gather(latent_patches_pad_0, 2, (mask_indices[:,None,:,None]+1).repeat(1,T,1,self.latent_dim_per_token)) # need to add 1 to account for offset
         dec_pos_enc = self.positional_encoding(padded_patches.shape, x.device) 
         patches_to_decode = padded_patches + dec_pos_enc 
-        recon_patches = self.transformer_decoder(patches_to_decode) 
-        recon_patches = F.sigmoid(self.lin5(recon_patches))
+        for dec in self.transformer_decoder:
+            patches_to_decode = dec(patches_to_decode) 
+        recon_patches = F.sigmoid(self.lin5(patches_to_decode))
         x_recon = self.unpatchify(recon_patches)
         return x_recon, latents, mask, self.masked_loss(patches, recon_patches, mask)
         
