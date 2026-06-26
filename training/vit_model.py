@@ -199,7 +199,6 @@ class ViTMAE(torch.nn.Module):
         noise = torch.rand(B,P, device=x.device)
         rand_indices = noise.argsort(dim=1)
         pos_indices = rand_indices[:,:self.num_unmasked].sort(dim=1).values
-        print(pos_indices)
         int_mask = F.one_hot(pos_indices, num_classes=self.num_patches).sum(dim=1)
         assert ((int_mask == 0) | (int_mask == 1)).all(), "error somehow pos_indices is not unique"
         mask = int_mask.to(torch.bool) 
@@ -239,7 +238,7 @@ class ViTMAE(torch.nn.Module):
 
 
     
-    def __init__(self, image_size=224, patch_size=16, latent_dim_per_token=64, num_unmasked=49, num_blocks=4):
+    def __init__(self, image_size=224, patch_size=16, latent_dim_per_token=64, num_unmasked=49, num_blocks=8):
         super().__init__()
         self.image_size = image_size 
         self.latent_dim_per_token = latent_dim_per_token

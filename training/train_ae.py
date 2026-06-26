@@ -630,7 +630,8 @@ def train_vitmae(
     epochs=25,
     warm_restarts=True,
     image_size = 224,
-    vgg_weight=0.0
+    vgg_weight=0.0,
+    test_val = False
     ):
     #hyperparameters:
 
@@ -781,9 +782,20 @@ def train_vitmae(
             augment = augment.to(DEVICE)
             t1 = time.perf_counter()
             #with torch.autocast(device_type=DEVICE.type):
-            embryo_recon, embryo_lat, mask, rec_loss = model(embryo_vol)
-            _, augment_lat, _, augment_rec_loss = model(augment)
-            rec_loss = rec_loss + augment_rec_loss # + F.mse_loss(embryo_lat, augment_lat) # need to add a single 2048 dim representation
+            embryo_recon, embryo_lat, mask, _ = model(embryo_vol)
+            augment_recon, augment_lat, mask_augment, _ = model(augment)
+            B,T,_,_,_ = embryo_vol.shape
+            mask_reshaped = mask.reshape(B,1,14,14,1,1).repeat(1,T,1,1,16,16).permute(0,1,2,4,3,5).contiguous().reshape(B,T,1,224,224)
+            mask_augment_reshaped = mask_augment.reshape(B,1,14,14,1,1).repeat(1,T,1,1,16,16).permute(0,1,2,4,3,5).contiguous().reshape(B,T,1,224,224)
+            masked_embryo_vol = embryo_vol * ( ~ mask_reshaped)
+            masked_embryo_recon = embryo_recon * (~mask_reshaped)
+            masked_augment = augment * (~mask_augment_reshaped)
+            masked_embryo_recon = augment_recon * (~ mask_augment_reshaped)
+            rec_loss,_ = reconstruction_loss(masked_embryo_vol, masked_embryo_recon, ssim_module, ms_ssim_module, ms_ssim_weight=1.0) 
+            rec_loss_augment,_ = reconstruction_loss(masked_augment, masked_augment_recon, ssim_module, ms_ssim_module, ms_ssim_weight=1.0)
+            rec_loss = rec_loss + rec_loss_augment
+ 
+            #rec_loss = rec_loss + augment_rec_loss # + F.mse_loss(embryo_lat, augment_lat) # need to add a single 2048 dim representation
             t2 = time.perf_counter()
             # def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
             if temporal_weight > 0:
@@ -813,11 +825,11 @@ def train_vitmae(
                 recon_img = (recon_img * 255).astype(np.uint8)
                 
 
-                comparison = np.concatenate((vol_img, recon_img), axis=1)
+                comparison = np.concatenate((masked_img, vol_img, recon_img), axis=1)
      
                 images = wandb.Image(comparison, caption="Embryo vs Recon comparison")
                 masked_img = wandb.Image(masked_img, caption = "masked recostruction")
-                run.log({"reconstruction": images, "masked":masked_img})
+                run.log({"reconstruction": images})
 
                 
                 traj = embryo_lat.cpu().detach().numpy()[0]
@@ -863,6 +875,8 @@ def train_vitmae(
                     "optimizer_step_time": end_time - t3,
                     "loss": loss.detach().cpu().item()
                         })
+            if(test_val and index > 5):
+                break
         model_clone = ViTMAE()
 
         model_clone.load_state_dict(model.state_dict())
@@ -880,7 +894,7 @@ def train_vitmae(
                 val_recon, val_lat, mask ,_ = model(embryo_vol)
                 B, T, C, H, W = embryo_vol.shape
                 mask = mask.cpu()
-                mask = mask.reshape(B,1,14,14,1,1).repeat(1,T,1,1,16,16).permute(0,1,2,4,3,5).contiguous().reshape(B,T,1224,224)
+                mask = mask.reshape(B,1,14,14,1,1).repeat(1,T,1,1,16,16).permute(0,1,2,4,3,5).contiguous().reshape(B,T,1,224,224)
 
                 val_recon = val_recon.cpu() * (~ mask) # mask is 0 if masked, so need to reverse so we are only looking at different pixels
                 embryo_vol = embryo_vol.cpu() * (~ mask)
@@ -930,7 +944,7 @@ def train_vitmae(
         with torch.no_grad():
             for embryo_vol in full_seq_loader_train:
                 embryo_vol = embryo_vol.to(DEVICE)
-                _, z_seq = model(embryo_vol)
+                _, z_seq,_,_ = model(embryo_vol)
                 traj = z_seq.cpu().numpy()[0] # batch size one just use that batch
                 cebra_latents.append(traj)
                 cebra_labels.append((np.arange(len(traj)) + offset ).reshape(-1, 1).astype(np.float32))
@@ -947,7 +961,7 @@ def train_vitmae(
                 if i % 10 != 0:
                     continue
                 embryo_vol = embryo_vol.to(DEVICE) 
-                embryo_recon, z_seq = model(embryo_vol)
+                embryo_recon, z_seq,_,_ = model(embryo_vol)
                 traj = z_seq.cpu().numpy()[0] # batch size one just use that batch
                 distance_mat = distance_matrix(traj,traj)
                 fig, ax = plt.subplots(figsize=(8, 6))
@@ -1010,7 +1024,7 @@ def train_vitmae(
                 if i % 10 != 0:
                     continue
                 embryo_vol = embryo_vol.to(DEVICE) 
-                _, z_seq = model(embryo_vol)
+                _, z_seq, _, _ = model(embryo_vol)
                 traj = z_seq.cpu().detach().numpy()[0] # batch size one just use that batch
                 distance_mat = distance_matrix(traj,traj)
                 fig, ax = plt.subplots(figsize=(8, 6))
@@ -1025,7 +1039,7 @@ def train_vitmae(
                 count += 1
         # export the kanakasabapathy latents
         
-        metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model, image_size=224)
+        metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model, image_size=224, vitmae=True)
         
         model.train()
         # spoof the ICM grades
@@ -1622,6 +1636,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=2e-4, help="learning rate")
     parser.add_argument("--epochs", type=int, default=25, help="epochs")
     parser.add_argument("--warm-restarts", action="store_true", help="turn on warm restarts lr scheduling, default is cosine annealing decreasing over the the whole run")
+    parser.add_argument("--test-val", action="store_true", help="only train for a few samples then immediately move to validation for testing")
     args = parser.parse_args()
 
     if len(sys.argv) > 1 and sys.argv[1] == "convlstm":
@@ -1640,7 +1655,7 @@ if __name__ == "__main__":
             lr=args.lr,
             epochs=args.epochs,
             warm_restarts=args.warm_restarts
-
+            # test_val = args.test_val
         )
 
     elif len(sys.argv) > 1 and sys.argv[1] == "vit":
@@ -1657,7 +1672,8 @@ if __name__ == "__main__":
             latent_size = args.size,
             lr=args.lr,
             epochs=args.epochs,
-            warm_restarts=args.warm_restarts
+            warm_restarts=args.warm_restarts,
+            # test_val = args.test_val
 
         )
     elif len(sys.argv) > 1 and sys.argv[1] == "vitmae":
@@ -1674,8 +1690,8 @@ if __name__ == "__main__":
             latent_size = args.size,
             lr=args.lr,
             epochs=args.epochs,
-            warm_restarts=args.warm_restarts
-
+            warm_restarts=args.warm_restarts,
+            test_val = args.test_val
         )
     else:
         print("bad model or no args")
