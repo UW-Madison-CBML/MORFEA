@@ -271,7 +271,7 @@ class ViTMAE(torch.nn.Module):
         mask = mask[:,None,:].repeat(1, target.shape[1], 1)
         loss = (pred - target) ** 2
         loss = loss.mean(dim=-1) # B,T,P
-        loss = (loss * mask).sum() / mask.sum() 
+        loss = (loss * (~ mask)).sum() / (~ mask).sum() # 1 in mask means patch is unmasked, so we need to compare masked pixels cause those are actually reconstructed
         return loss     
           
     def forward(self, x):
@@ -288,7 +288,7 @@ class ViTMAE(torch.nn.Module):
         latents = latent_patches.reshape(B,T,self.num_unmasked * self.latent_dim_per_token)
         latent_patches = F.relu(self.lin3(latent_patches))
         latent_patches = F.relu(self.lin4(latent_patches))
-        latent_patches_pad_0 = torch.cat([torch.zeros((B,T,1,self.latent_dim_per_token)),latent_patches],dim=2)
+        latent_patches_pad_0 = torch.cat([torch.zeros((B,T,1,self.latent_dim_per_token), device=latent_patches.device),latent_patches],dim=2)
         padded_patches = torch.gather(latent_patches_pad_0, 2, (mask_indices[:,None,:,None]+1).repeat(1,T,1,self.latent_dim_per_token)) # need to add 1 to account for offset
         dec_pos_enc = self.positional_encoding(padded_patches.shape, x.device) 
         patches_to_decode = padded_patches + dec_pos_enc 

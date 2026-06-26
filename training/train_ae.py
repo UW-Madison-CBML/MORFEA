@@ -637,7 +637,7 @@ def train_vitmae(
     
     #epochs = 30
     #lr = 2e-4
-    batch_size = 8
+    batch_size = 32
     #warm_restarts = False
     # ------------------------------------------------------
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -774,13 +774,16 @@ def train_vitmae(
         count = 0
         start_time = time.perf_counter()
         end_time = time.perf_counter()
-        for index, embryo_vol in enumerate(pbar):
+        for index, (embryo_vol, augment) in enumerate(pbar):
             optimizer.zero_grad()
             t0 = time.perf_counter()
             embryo_vol = embryo_vol.to(DEVICE)
+            augment = augment.to(DEVICE)
             t1 = time.perf_counter()
             #with torch.autocast(device_type=DEVICE.type):
             embryo_recon, embryo_lat, mask, rec_loss = model(embryo_vol)
+            _, augment_lat, _, augment_rec_loss = model(augment)
+            rec_loss = rec_loss + augment_rec_loss # + F.mse_loss(embryo_lat, augment_lat) # need to add a single 2048 dim representation
             t2 = time.perf_counter()
             # def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
             if temporal_weight > 0:
@@ -791,12 +794,15 @@ def train_vitmae(
                 loss = rec_loss
             if(index % 47 == 0):
 
-                mask = mask[0].detach().cpu().numpy()
-                mask = (~ mask).reshape(14,14,1,1)
-                masked_recon = mask * recon_img
-
                 vol_img = embryo_vol[0, -1, 0].float().detach().cpu().numpy()
                 recon_img = embryo_recon[0, -1, 0].float().detach().cpu().numpy()
+
+                mask = mask[0].detach().cpu()
+                mask = mask.reshape(14,14,1,1).repeat(1,1,16,16).permute(0,2,1,3).contiguous().reshape(224,224).numpy()
+                masked_recon = mask * vol_img
+
+
+
                 if(((vol_img < 0) | (vol_img > 1)).any()):
                     print(f"gt image has negative: [{vol_img.min()}, {vol_img.max()}]")
                 if(((recon_img < 0) | (recon_img > 1)).any()):
@@ -810,7 +816,7 @@ def train_vitmae(
                 comparison = np.concatenate((vol_img, recon_img), axis=1)
      
                 images = wandb.Image(comparison, caption="Embryo vs Recon comparison")
-                images = wandb.Image(masked_img, caption = "masked recostruction")
+                masked_img = wandb.Image(masked_img, caption = "masked recostruction")
                 run.log({"reconstruction": images, "masked":masked_img})
 
                 
@@ -869,11 +875,15 @@ def train_vitmae(
         }
         model.eval()  # Set model to evaluation mode
         with torch.no_grad():
-            for embryo_vol in val_loader:
+            for embryo_vol, _ in val_loader:
                 embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, H, W)
-                val_recon, val_lat = model(embryo_vol)
+                val_recon, val_lat, mask ,_ = model(embryo_vol)
                 B, T, C, H, W = embryo_vol.shape
+                mask = mask.cpu()
+                mask = mask.reshape(B,1,14,14,1,1).repeat(1,T,1,1,16,16).permute(0,1,2,4,3,5).contiguous().reshape(B,T,1224,224)
 
+                val_recon = val_recon.cpu() * (~ mask) # mask is 0 if masked, so need to reverse so we are only looking at different pixels
+                embryo_vol = embryo_vol.cpu() * (~ mask)
                 # MSE
                 val_metrics['mse'].push(F.mse_loss(val_recon, embryo_vol).item())
 

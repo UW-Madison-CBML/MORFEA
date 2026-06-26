@@ -18,8 +18,6 @@ class IVFSequenceDataset(Dataset):
         self.augment = v2.Compose([
             v2.RandomHorizontalFlip(p=0.5),
             v2.RandomVerticalFlip(p=0.5),
-            v2.RandomRotation([0,90,180,270], center=None),
-            v2.Lambda(lambda x: x.contiguous())
         ])
 
 
@@ -47,8 +45,6 @@ class IVFSequenceDataset(Dataset):
         return vol
 
     def __getitem__(self, idx):
-        if self.inference:
-            idx = idx // 4
         row = self.df.iloc[idx]
         if pd.isna(row["embryo_paths"]) or pd.isna(row["empty_well_paths"]) or pd.isna(row["sample_paths"]):
             print(f"Row {idx} has missing path data: ", row.to_string(index = False))
@@ -60,16 +56,15 @@ class IVFSequenceDataset(Dataset):
         embryo_vol = self._normalize_video(embryo_vol)
         embryo_vol = embryo_vol[:,None, :, :] 
         torch_vol = torch.from_numpy(embryo_vol) 
-        if(self.inference):
-            return torch_vol
-        else:
-            return self.augment(Video(torch_vol))
-        # alternatively:
-        # return torch_vol, self.augment(Video(torch_vol))
-        # and remove the len*4 stuff
+        #if(self.inference):
+        #    return torch_vol
+        #else:
+        #    re
+        #return self.augment(Video(torch_vol))
+        return torch_vol, self.augment(Video(torch_vol))
 
     def __len__(self):
-        return len(self.df) if self.inference else 4*len(self.df)
+        return len(self.df)
 
 if __name__ == "__main__":
 
