@@ -208,14 +208,14 @@ class ViTMAE(torch.nn.Module):
 
 
     def positional_encoding(self,shape,device,indices=None):
-        B,T,P,L = shape # B,T,P,64
+        B,T,P,L = shape # B,T,P,128
         assert P == self.num_patches, f"expected pos_enc shape[2] to be {self.num_patches}, got {P}"
-        pos_enc = self.embedding(torch.arange(P,device=device)) # P, 64
+        pos_enc = self.embedding(torch.arange(P,device=device)) # P, 128
         pos_enc = pos_enc[None,None,:,:].repeat(B,T,1,1)
         if indices is not None:
             assert indices.shape == (B,self.num_unmasked), f"expected indices.shape = [{B},{self.num_unmasked}], got {indices.shape}" 
             assert 0 <= indices.min()  and indices.max() < self.num_patches, f"expected indices to be in range [0,{self.num_patches}), got [{indices.min()},{indices.max()})"
-            return torch.gather(pos_enc, 2, indices[:,None,:,None].repeat(1,T,1,64)) # last dim is embedding dim 64
+            return torch.gather(pos_enc, 2, indices[:,None,:,None].repeat(1,T,1,128)) # last dim is embedding dim 128
         else:
             return pos_enc
 
@@ -238,7 +238,7 @@ class ViTMAE(torch.nn.Module):
 
 
     
-    def __init__(self, image_size=224, patch_size=16, latent_dim_per_token=64, num_unmasked=49, num_blocks=8):
+    def __init__(self, image_size=224, patch_size=16, latent_dim_per_token=128, num_unmasked=49, num_blocks=8):
         super().__init__()
         self.image_size = image_size 
         self.latent_dim_per_token = latent_dim_per_token
@@ -248,17 +248,17 @@ class ViTMAE(torch.nn.Module):
         self.num_blocks = num_blocks
         self.num_unmasked = num_unmasked
         self.num_patches = (self.image_size // self.patch_size) ** 2
-        self.embedding = torch.nn.Embedding(self.num_patches, 64)
-        self.transformer_encoder = torch.nn.ModuleList([TransformerBlock(dim=64,num_heads=4) for i in range(self.num_blocks)])
-        self.transformer_decoder = torch.nn.ModuleList([TransformerBlock(dim=64,num_heads=4) for i in range(self.num_blocks)])
+        self.embedding = torch.nn.Embedding(self.num_patches, 128)
+        self.transformer_encoder = torch.nn.ModuleList([TransformerBlock(dim=128,num_heads=8) for i in range(self.num_blocks)])
+        self.transformer_decoder = torch.nn.ModuleList([TransformerBlock(dim=128,num_heads=8) for i in range(self.num_blocks)])
 
-        self.lin1 = torch.nn.Linear(self.patch_size**2,64)
-        self.lin2 = torch.nn.Linear(64,self.latent_dim_per_token)
+        self.lin1 = torch.nn.Linear(self.patch_size**2,128)
+        self.lin2 = torch.nn.Linear(128,self.latent_dim_per_token)
 
         self.lin3 = torch.nn.Linear(self.latent_dim_per_token, self.latent_dim_per_token)
 
-        self.lin4 = torch.nn.Linear(self.latent_dim_per_token, 64)
-        self.lin5 = torch.nn.Linear(64, self.patch_size**2)
+        self.lin4 = torch.nn.Linear(self.latent_dim_per_token, 128)
+        self.lin5 = torch.nn.Linear(128, self.patch_size**2)
 
     def masked_loss(self, target, pred, mask):
         """
