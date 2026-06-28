@@ -4,11 +4,15 @@ import iisignature
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from scipy.optimize import least_squares
-def get_path_sig(trajectory, depth):
+def get_path_sig(trajectory, depth, time_offsets = 1.0):
+    # add time information
+    trajectory = np.concatenate([trajectory, time_offsets * np.arange(trajectory.shape[0])[:,None]],axis=1)
     s_info = iisignature.prepare(trajectory.shape[1], depth)
     return iisignature.logsig(trajectory, s_info)
 
-def get_path_sigs(trajectory, depth, return_feature_labels=False):
+def get_path_sigs(trajectory, depth, time_offsets = 1.0, return_feature_labels=False):
+    # add time information
+    trajectory = np.concatenate([trajectory,time_offsets * np.arange(trajectory.shape[0])[:,None]],axis=1)
     s_info = iisignature.prepare(trajectory.shape[1], depth)
     signature = []
     for i in range(len(trajectory)):

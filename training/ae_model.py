@@ -86,13 +86,13 @@ class Encoder(nn.Module):
             ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
 
             # 32 -> 16 
-            ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
+            #ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
 
             # 16 -> 8
             #ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
 
         )
-        self.final_resolution = 16 #2 ** (8 - len([module for module in self.spatial_cnn.modules() if not isinstance(self.spatial_cnn, nn.Sequential)]))
+        self.final_resolution = 32 #2 ** (8 - len([module for module in self.spatial_cnn.modules() if not isinstance(self.spatial_cnn, nn.Sequential)]))
         self.use_lstm = use_lstm
         """if not self.use_convlstm:
             self.convlstm = None 
@@ -151,7 +151,7 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
 
-    def __init__(self, latent_size=4096, num_layers=2, hidden_channels=64, initial_resolution=16,final_size=128, use_lstm=True):
+    def __init__(self, latent_size=4096, num_layers=2, hidden_channels=64, initial_resolution=32,final_size=128, use_lstm=True):
         super(Decoder, self).__init__()
         self.latent_size = latent_size
         self.hidden_channels = hidden_channels
@@ -181,7 +181,7 @@ class Decoder(nn.Module):
             #ResidualUpBlock(self.hidden_channels, self.hidden_channels),
 
             # 16 -> 32 
-            ResidualUpBlock(self.hidden_channels, self.hidden_channels),
+            #ResidualUpBlock(self.hidden_channels, self.hidden_channels),
 
             # 32 -> 64 
             ResidualUpBlock(self.hidden_channels, self.hidden_channels),

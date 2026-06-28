@@ -1,1 +1,1 @@
-convlstm --ms-ssim-weight 1.0 --rec-weight 0.0 --vgg-weight 0.0 --temporal-weight 0.1 --size 1024 --name vitmae --lr 0.0004 --epochs 100 --warm-restarts 
+convlstm --name convlstm --ms-ssim-weight 1.0 --rec-weight 0.0 --vgg-weight 0.0 --temporal-weight 0.2 --size 1024  --lr 0.0004 --epochs 100 --warm-restarts 
