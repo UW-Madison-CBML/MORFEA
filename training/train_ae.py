@@ -1247,7 +1247,7 @@ def train_lstm(
         count = 0
         start_time = time.perf_counter()
         end_time = time.perf_counter()
-        for index, embryo_vol in enumerate(pbar):
+        for index, (_, embryo_vol) in enumerate(pbar):
             optimizer.zero_grad()
             t0 = time.perf_counter()
             embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, 500, 500)
@@ -1412,7 +1412,7 @@ def train_lstm(
         }
         model.eval()  # Set model to evaluation mode
         with torch.no_grad():
-            for embryo_vol in val_loader:
+            for embryo_vol,_ in val_loader:
                 embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, H, W)
                 val_recon, val_lat = model(embryo_vol)
                 B, T, C, H, W = embryo_vol.shape
