@@ -1,1 +1,1 @@
-vitmae_facebook --name vitmae_faceboo --lr 0.0004 --epochs 100 --warm-restarts 
+vitmae_facebook --name vitmae_faceboo --lr 0.00015 --epochs 100 --warm-restarts 
