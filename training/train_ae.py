@@ -613,8 +613,273 @@ def train_vit(
         kanakasabapathy_val_df = kanakasabapathy_df[kanakasabapathy_mask]
         kanakasabapathy_df = kanakasabapathy_df[~kanakasabapathy_mask]
         train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "kanakasabapathy", run, batch_size=128, epochs=30)
+from transformers import ViTImageProcessor, ViTMAEForPreTraining
+def train_vitmae_facebook(
+    loss_type="l1",
+    ms_ssim_weight=0.5,
+    rec_weight=0.5,
+    temporal_weight=0.1,
+    dropout_rate=0.1,
+    use_lstm=True,
+    use_batchnorm=True,
+    model_name="", 
+    latent_size = 4096,
+    lr=2e-4,
+    epochs=25,
+    warm_restarts=True,
+    image_size = 224,
+    vgg_weight=0.0,
+    test_val = False
+    ):
+    #hyperparameters:
+
+    
+    #epochs = 30
+    #lr = 2e-4
+    batch_size = 32
+    #warm_restarts = False
+    # ------------------------------------------------------
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    torch.cuda.init()
+    gc.collect()
+    torch.cuda.empty_cache()
+    
+    #torch.autograd.detect_anomaly(True)
+    # Build loss description for logging
+   
+    config = ViTMAEConfig(
+        image_size=224,
+        patch_size=16,
+        num_channels=1,
+        hidden_size=384,
+        num_hidden_layers=8,
+        num_attention_heads=6,
+        decoder_hidden_size=192,
+        decoder_num_hidden_layers=4,
+        decoder_num_attention_heads=6,
+        mask_ratio=0.75,
+        norm_pix_loss=True, 
+    )
+    model = ViTMAEForPreTraining(config)
+
+    date_label = datetime.now().strftime("%Y-%m-%d")
+
+    wandb.login(key=os.getenv("WANDB_KEY"))
+    run = wandb.init(
+        entity="jenslundsgaard7-uw-madison",
+        project="IVF-Training",
+        name=model_name +"-" + date_label,
+        config={
+            "lr": lr,
+            "batch_size":batch_size,
+            "architecture": type(model).__name__,
+            "dataset": "https://zenodo.org/records/7912264",
+            "epochs": epochs,
+            "train_split": "not ICM graded",
+            "val_split": "ICM graded",
+            "ms_ssim_weight": ms_ssim_weight,
+            "rec_weight": rec_weight,
+            "temporal_weight": temporal_weight,
+            "dropout_rate": dropout_rate,
+            "use_lstm": use_lstm,
+            "use_batchnorm": use_batchnorm,
+            "latent_size": latent_size,
+            "image_size": image_size,
+            "distributed": False,
+            "warm_restarts":warm_restarts,
+        },
+    )
+    hf_token = os.getenv("HF_TOKEN")
+    assert hf_token is not None, "hf_token is none"
+    try:
+        login(token=hf_token, add_to_git_credential=False)
+    except Exception as e:
+        print(f"{e}: bad login")
+
+    torch.cuda.init()
+    artifact = wandb.Artifact(name="scripts", type="model_file")
+    artifact.add_file(os.path.abspath("train_ae.py"))
+    artifact.add_file(os.path.abspath("vit_model.py"))
+    run.log_artifact(artifact)
+
+    VAL_EMBRYOS = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"}).dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
+
+    torch.cuda.init()
+    model = model.to(DEVICE)
+    trainable_params = 0
+    all_params = 0
+    for _, param in model.named_parameters():
+        all_params += param.numel()
+        if param.requires_grad:
+            trainable_params += param.numel()
+    print(
+        f"trainable params: {trainable_params} || all params: {all_params} || trainable%: {100 * trainable_params / all_params}"
+    )
+    run.log({"train_params":trainable_params, "params":all_params})
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
+
+    df = pd.read_csv(os.path.abspath("index.csv"))
+    mask = df["cell_id"].isin(VAL_EMBRYOS)
+    val_df = df[mask]
+    train_df = df[~mask]
+    train_dataset = IVFSequenceDataset(train_df, resize=224)
+    val_dataset = IVFSequenceDataset(val_df, resize=224)
+    print("val size: ", str(len(val_df) / len(df)))
+    full_seq_df = pd.read_csv(os.path.abspath("index_embryo.csv")).rename(columns={"cell_id":"embryo_id"})
+    full_seq_val_mask = full_seq_df["embryo_id"].isin(VAL_EMBRYOS)
+    full_seq_df_val = full_seq_df[full_seq_val_mask] # just look at validation ICM embryos
+    
+    full_seq_df_train = full_seq_df[~full_seq_val_mask] # just look at validation ICM embryos
+    full_seq_dataset_val = IVFEmbryoDataset(full_seq_df_val, resize=224, norm="minmax01")
+    full_seq_dataset_train = IVFEmbryoDataset(full_seq_df_train, resize=224, norm="minmax01")
+
+    loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=16,
+        pin_memory=True,
+        drop_last=True,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=8,
+        shuffle=False,
+        num_workers=16,
+        pin_memory=True,
+        drop_last=False 
+    )
+    full_seq_loader_val = DataLoader(
+        full_seq_dataset_val,
+        batch_size=1,
+        shuffle=False,
+        num_workers=16,
+        pin_memory=True,
+        drop_last=False 
+    )
+    full_seq_loader_train = DataLoader(
+        full_seq_dataset_train,
+        batch_size=1,
+        shuffle=False,
+        num_workers=16,
+        pin_memory=True,
+        drop_last=False 
+    )
+    
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, len(loader) * epochs) if warm_restarts else torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
+    scaler = torch.amp.GradScaler()
 
 
+    for epoch in range(epochs):
+        print(f"epoch {epoch}")
+        print(torch.cuda.memory_summary(device=DEVICE, abbreviated=False))
+        gc.collect()
+        torch.cuda.empty_cache()
+
+        model.train()
+        pbar = tqdm(loader, desc=f"epoch: {epoch}")
+        total = 0.0
+        count = 0
+        start_time = time.perf_counter()
+        end_time = time.perf_counter()
+        for index, (_, embryo_vol) in enumerate(pbar):
+            optimizer.zero_grad()
+            t0 = time.perf_counter()
+            B,T,C,H,W = embryo_vol
+            embryo_vol = embryo_vol.reshape(B*T,C,H,W).to(DEVICE)
+            t1 = time.perf_counter()
+
+            outputs = model(embryo_vol)
+            loss = outputs.loss
+            t2 = time.perf_counter()
+            if torch.isnan(loss) or torch.isinf(loss):
+                print(f"NaN/Inf detected, skipping batch")
+                continue
+
+            loss.backward()
+            t3 = time.perf_counter()
+            total_norm = 0
+            for p in model.parameters():
+                if p.grad is not None:
+                    param_norm = p.grad.data.norm(2)
+                    total_norm += param_norm.item() ** 2
+
+            total_norm = total_norm ** 0.5
+
+            if total_norm > 100:
+                print(f"Warning: Large gradient norm: {total_norm:.2f}")
+ 
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5) 
+
+            optimizer.step()
+            scheduler.step()
+            end_time = time.perf_counter()
+
+
+
+            if(index % 47 == 0):
+                output_patches = outputs.logits.detach()
+                target_patches = model.patchify(embryo_vol).detach()
+                if model.config.norm_pix_loss:
+                    mean = target_patches.mean(dim=-1, keepdim=True)
+                    var = target_patches.var(dim=-1, keepdim=True)
+                    output_patches = output_patches * (var + 1e-6) ** 0.5 + mean
+                mask = outputs.mask.detach()
+
+                mask_expand = mask.unsqueeze(-1).type_as(output_patches)      
+                recon_patches = target_patches * (1 - mask_expand) + output_patches * mask_expand
+                masked_input_patches = target_patches * (1 - mask_expand)
+                with torch.no_grad():
+                    embryo_vol = model.unpatchify(target_patches)
+                    masked_vol = model.unpatchify(masked_input_patches)
+                    embryo_recon = model.unpatchify(recon_patches)
+
+
+                vol_img = embryo_vol[0, -1, 0].cpu().numpy()
+                recon_img = embryo_recon[0, -1, 0].cpu().numpy()
+                masked_img = masked_vol[0, -1, 0].cpu().numpy()
+
+
+                if(((vol_img < 0) | (vol_img > 1)).any()):
+                    print(f"gt image has negative: [{vol_img.min()}, {vol_img.max()}]")
+                if(((recon_img < 0) | (recon_img > 1)).any()):
+                    print(f"reconstruction is out of range: [{recon_img.min()}, {recon_img.max()}]")
+
+                vol_img = (vol_img * 255).astype(np.uint8)
+                masked_img = (masked_img * 225).astype(np.uint8)
+                recon_img = (recon_img * 255).astype(np.uint8)
+                
+
+                comparison = np.concatenate((masked_img, vol_img, recon_img), axis=1)
+     
+                images = wandb.Image(comparison, caption="Embryo vs Recon comparison")
+                masked_img = wandb.Image(masked_img, caption = "masked recostruction")
+                run.log({"reconstruction": images})
+
+                """ 
+                traj = embryo_lat.cpu().detach().numpy()[0]
+                dist_matrix = distance_matrix(traj, traj)
+                fig, ax = plt.subplots(figsize=(8, 6))
+                im = ax.imshow(dist_matrix, cmap='viridis')
+
+                ax.set_xlabel("Time Index")
+                ax.set_ylabel("Time Index")
+                plt.colorbar(im, ax=ax)
+                wandb.log({"temp_smoothness": wandb.Image(fig)})
+
+                plt.close(fig) """
+ 
+            if (index % 5 == 0):
+                run.log({
+                    "data_to_gpu_time": t1 - t0,
+                    "model_forward_time": t2 - t1,
+                    "grad_calc_time": t3 - t2,
+                    "optimizer_step_time": end_time - t3,
+                    "loss": loss.detach().cpu().item()
+                        })
+            if(test_val and index > 5):
+                break
 
 def train_vitmae(
     loss_type="l1",
@@ -651,7 +916,6 @@ def train_vitmae(
     # Build loss description for logging
    
     model = ViTMAE()
-
     date_label = datetime.now().strftime("%Y-%m-%d")
 
     wandb.login(key=os.getenv("WANDB_KEY"))
@@ -1678,6 +1942,23 @@ if __name__ == "__main__":
         )
     elif len(sys.argv) > 1 and sys.argv[1] == "vitmae":
         train_vitmae(
+            loss_type=args.loss_type,
+            ms_ssim_weight=args.ms_ssim_weight,
+            rec_weight=args.rec_weight,
+            vgg_weight=args.vgg_weight,
+            temporal_weight=args.temporal_weight,
+            dropout_rate=args.dropout_rate,
+            use_lstm=not args.no_lstm,
+            use_batchnorm=not args.no_batchnorm,
+            model_name = args.name,
+            latent_size = args.size,
+            lr=args.lr,
+            epochs=args.epochs,
+            warm_restarts=args.warm_restarts,
+            test_val = args.test_val
+        )
+    elif len(sys.argv) > 1 and sys.argv[1] == "vitmae_facebook":
+        train_vitmae_facebook(
             loss_type=args.loss_type,
             ms_ssim_weight=args.ms_ssim_weight,
             rec_weight=args.rec_weight,

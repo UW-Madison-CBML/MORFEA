@@ -238,7 +238,7 @@ class ViTMAE(torch.nn.Module):
 
 
     
-    def __init__(self, image_size=224, patch_size=16, latent_dim_per_token=128, num_unmasked=49, num_blocks=8):
+    def __init__(self, image_size=224, patch_size=16, latent_dim_per_token=128, num_unmasked=80, num_blocks=8):
         super().__init__()
         self.image_size = image_size 
         self.latent_dim_per_token = latent_dim_per_token

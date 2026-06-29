@@ -1,1 +1,1 @@
-convlstm --name convlstm --ms-ssim-weight 1.0 --rec-weight 0.0 --vgg-weight 0.0 --temporal-weight 0.2 --size 1024  --lr 0.0004 --epochs 100 --warm-restarts 
+vitmae_facebook --name vitmae_faceboo --lr 0.0004 --epochs 100 --warm-restarts 
