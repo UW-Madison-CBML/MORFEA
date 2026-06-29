@@ -124,10 +124,10 @@ class Encoder(nn.Module):
         x = x.view(B * T, C, H, W)  # (B*T, 1, H, W)
 
         #x = self.spatial_cnn(x)      
-        residual = self.resblock2(self.resblock1(x)) 
-        x = self.resblock3(residual)
-        _, C2, H2, W2 = x.shape
-        x = x.view(B, T, C2, H2, W2)  
+        residual = self.resblock3(self.resblock2(self.resblock1(x)))
+        x = residual
+        _, C2, H2, W2 = residual.shape
+        x = residual.view(B, T, C2, H2, W2)  
 
         """# ConvLSTM processes temporal sequence
         if(self.use_convlstm):
@@ -153,7 +153,7 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
 
-    def __init__(self, latent_size=4096, num_layers=2, hidden_channels=64, initial_resolution=16,final_size=128, use_lstm=True):
+    def __init__(self, latent_size=4096, num_layers=2, hidden_channels=64, initial_resolution=16,final_size=128, use_lstm=True, use_residual=True):
         super(Decoder, self).__init__()
         self.latent_size = latent_size
         self.hidden_channels = hidden_channels
@@ -183,19 +183,19 @@ class Decoder(nn.Module):
             #ResidualUpBlock(self.hidden_channels, self.hidden_channels),
 
             # 16 -> 32 
-        resblock1 = ResidualUpBlock(self.hidden_channels, self.hidden_channels)
+        self.resblock1 = ResidualUpBlock(self.hidden_channels, self.hidden_channels)
 
             # 32 -> 64 
-        resblock2 = ResidualUpBlock(self.hidden_channels, self.hidden_channels)
+        self.resblock2 = ResidualUpBlock(self.hidden_channels, self.hidden_channels)
 
             # 64 -> 128 
-        resblock3 = ResidualUpBlock(self.hidden_channels, self.hidden_channels)
+        self.resblock3 = ResidualUpBlock(self.hidden_channels, self.hidden_channels)
 
             # 128 -> 256
             #ResidualUpBlock(self.hidden_channels, self.hidden_channels),
 
 
-        out_conv = nn.Conv2d(self.hidden_channels, 1, kernel_size=3, padding=1)
+        self.out_conv = nn.Conv2d(self.hidden_channels, 1, kernel_size=3, padding=1)
         #    nn.Sigmoid()
         #)
         
@@ -226,9 +226,8 @@ class Decoder(nn.Module):
         # Spatial decoding: process each timestep separately
         B, T, C, H, W = h_seq.shape
         h_seq = h_seq.view(B * T, C, H, W)  # (B*T, hidden_dim, 16, 16)
-        x_rec = self.resblock1(h_seq)  # (B*T, 1, 128, 128)
 
-        x_rec = self.out_conv(self.resblock3(self.resblock2(x_rec + residual)))
+        x_rec = self.out_conv(self.resblock3(self.resblock2(self.resblock1(h_seq  + residual))))
         x_rec = F.sigmoid(x_rec)
         x_rec = x_rec.view(B, T, 1, self.final_size, self.final_size)  # (B, T, 1, 128, 128)
 
