@@ -3,6 +3,56 @@ import torch.nn as nn
 from huggingface_hub import PyTorchModelHubMixin
 import torch.nn.functional as F
 
+
+class CellLSTM(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(CellLSTM, self).__init__()
+        self.hidden_size = hidden_size
+        
+        self.cell_forward = nn.LSTMCell(input_size, hidden_size)
+        self.cell_backward = nn.LSTMCell(input_size, hidden_size)
+        
+    def forward(self, x, hx=None):
+        x_seq = x.transpose(0, 1)
+        seq_len, batch_size, _ = x_seq.size()
+        
+        if hx is None:
+            h_f = torch.zeros(batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
+            c_f = torch.zeros(batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
+            h_b = torch.zeros(batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
+            c_b = torch.zeros(batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
+        else:
+            h_f, c_f, h_b, c_b = hx
+
+        forward_h, forward_c = [None] * seq_len, [None] * seq_len
+        backward_h, backward_c = [None] * seq_len, [None] * seq_len
+
+        for t in range(seq_len):
+            h_f, c_f = self.cell_forward(x_seq[t], (h_f, c_f))
+            forward_h[t] = h_f
+            forward_c[t] = c_f
+            
+        for t in reversed(range(seq_len)):
+            h_b, c_b = self.cell_backward(x_seq[t], (h_b, c_b))
+            backward_h[t] = h_b
+            backward_c[t] = c_b
+
+        f_h_seq = torch.stack(forward_h, dim=0)
+        f_c_seq = torch.stack(forward_c, dim=0)
+        b_h_seq = torch.stack(backward_h, dim=0)
+        b_c_seq = torch.stack(backward_c, dim=0)
+
+        f_h_seq = f_h_seq.transpose(0, 1)
+        f_c_seq = f_c_seq.transpose(0, 1)
+        b_h_seq = b_h_seq.transpose(0, 1)
+        b_c_seq = b_c_seq.transpose(0, 1)
+
+        out_seq = torch.cat([f_h_seq, b_h_seq,f_c_seq, b_c_seq], dim=-1)
+
+        return out_seq # B, T, 4 * hidden_size
+
+         
+
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels, downsample=False):
         super(ResidualBlock, self).__init__()
@@ -110,11 +160,11 @@ class Encoder(nn.Module):
 
         self.latent_compress = nn.Linear(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size)
         if self.use_lstm:
-            self.lstm_enc = nn.LSTM(latent_size, latent_size, batch_first=True, bidirectional=True)
+            self.lstm_enc = CellLSTM(latent_size, latent_size)
         else:
             self.lstm_enc = None
 
-        self.lin1 = nn.Linear(latent_size*2,latent_size)
+        self.lin1 = nn.Linear(latent_size*4,latent_size)
 
 
 
@@ -173,7 +223,7 @@ class Decoder(nn.Module):
                 return_all_layers=False
             )"""
         if self.use_lstm:
-            self.lstm_dec = nn.LSTM(latent_size, latent_size, batch_first=True, bidirectional=True)
+            self.lstm_enc = CellLSTM(latent_size, latent_size)
         else:
             self.lstm_dec = None
     
@@ -202,7 +252,7 @@ class Decoder(nn.Module):
         self.initial_resolution = initial_resolution
         self.lin1 = nn.Linear(latent_size,latent_size)
 
-        self.latent_expand = nn.Linear(latent_size*2, self.hidden_channels * self.initial_resolution * self.initial_resolution)
+        self.latent_expand = nn.Linear(latent_size*4, self.hidden_channels * self.initial_resolution * self.initial_resolution)
         self.final_size = final_size
     def forward(self, z_seq, residual):
         B, T, L = z_seq.shape
