@@ -1,6 +1,8 @@
 import numpy as np
 from vit_model import ViTLSTMAE, SmallViTLSTMAE, ConvViTLSTMAE, ViTMAE
+from torchvision.transforms.functional import rgb_to_grayscale
 import torchvision
+from torchvision.transforms.v2 import RGB
 import pandas as pd
 import torch
 import torch.nn.functional as F
@@ -641,13 +643,14 @@ def train_vitmae_facebook(
     # ------------------------------------------------------
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    grayscale_to_rgb = RGB()
     torch.cuda.init()
     gc.collect()
     torch.cuda.empty_cache()
     
     #torch.autograd.detect_anomaly(True)
     # Build loss description for logging
-   
+    """ 
     config = ViTMAEConfig(
         image_size=224,
         patch_size=16,
@@ -661,6 +664,9 @@ def train_vitmae_facebook(
         mask_ratio=0.75,
         norm_pix_loss=True, 
     )
+    """ 
+
+    config = ViTMAEConfig("facebook/vit-mae-base")
     model = ViTMAEForPreTraining(config)
 
     date_label = datetime.now().strftime("%Y-%m-%d")
@@ -770,6 +776,7 @@ def train_vitmae_facebook(
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, len(loader) * epochs) if warm_restarts else torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(loader) * epochs)
     scaler = torch.amp.GradScaler()
 
+    ms_ssim_module = MS_SSIM(data_range=1, size_average=True, channel=1)
 
     for epoch in range(epochs):
         print(f"epoch {epoch}")
@@ -787,7 +794,7 @@ def train_vitmae_facebook(
             optimizer.zero_grad()
             t0 = time.perf_counter()
             B,T,C,H,W = embryo_vol.shape
-            embryo_vol = embryo_vol.reshape(B*T,C,H,W).to(DEVICE)
+            embryo_vol = grayscale_to_rgb(embryo_vol.reshape(B*T,C,H,W)).to(DEVICE)
             t1 = time.perf_counter()
 
             outputs = model(embryo_vol)
@@ -831,9 +838,9 @@ def train_vitmae_facebook(
                 recon_patches = target_patches * (1 - mask_expand) + output_patches * mask_expand
                 masked_input_patches = target_patches * (1 - mask_expand)
                 with torch.no_grad():
-                    embryo_vol = model.unpatchify(target_patches)
-                    masked_vol = model.unpatchify(masked_input_patches)
-                    embryo_recon = model.unpatchify(recon_patches)
+                    embryo_vol = rgb_to_grayscale(model.unpatchify(target_patches))
+                    masked_vol = rgb_to_grayscale(model.unpatchify(masked_input_patches))
+                    embryo_recon = rgb_to_grayscale(model.unpatchify(recon_patches))
 
 
                 vol_img = embryo_vol[0, 0].cpu().numpy()
@@ -889,12 +896,13 @@ def train_vitmae_facebook(
         model.eval()  # Set model to evaluation mode
         with torch.no_grad():
             for embryo_vol, _ in tqdm(val_loader):
-                embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, H, W)
+                embryo_vol = grayscale_to_rgb(embryo_vol).to(DEVICE)  # (1, T, 1, H, W)
 
                 B, T, C, H, W = embryo_vol.shape
-                embryo_vol = embryo_vol.reshape(T,1, H,W)
+                embryo_vol = embryo_vol.reshape(B*T,C, H,W)
                 outputs = model(embryo_vol)
-                val_recon = model.unpatchify(outputs.logits)
+                val_recon = rgb_to_grayscale(model.unpatchify(outputs.logits))
+                embryo_vol = rgb_to_grayscale(embryo_vol)
 
                 # MSE
                 val_metrics['mse'].push(F.mse_loss(val_recon, embryo_vol).item())
@@ -917,8 +925,14 @@ def train_vitmae_facebook(
         val_log_std_dict = {
             f"val_{key}_std": value.std_dev for key, value in val_metrics.items()
         }
+
         run.log(val_log_dict | val_log_std_dict)
 
+        config = ViTMAEConfig("facebook/vit-mae-base")
+        model_clone = ViTMAEForPreTraining(config)
+
+        model_clone.load_state_dict(model.state_dict())
+        save_and_push_model(model_clone, model_name +"-"+ date_label, [], hf_token, model_config=config)
 
         image_dict = {} # collect all the plots for WandB logging
         count = 0
@@ -926,12 +940,14 @@ def train_vitmae_facebook(
             for i, embryo_vol in enumerate(full_seq_loader_val):
                 if i % 10 != 0:
                     continue
+                embryo_vol = grayscale_to_rgb(embryo_vol)
                 B,T,C,H,W = embryo_vol.shape
                 embryo_vol = embryo_vol.reshape(B*T,C,H,W)
                 embryo_vol = embryo_vol.to(DEVICE) 
                 outputs = model(embryo_vol)
-                embryo_recon = model.unpatchify(outputs.logits)
-                rand_idx = (20000 * i) % embryo_vol.shape[1]
+                embryo_recon = rgb_to_grayscale(model.unpatchify(outputs.logits))
+                embryo_vol = rgb_to_grayscale(embryo_vol)
+                rand_idx = (20000 * i) % embryo_vol.shape[0]
                 vol_img = embryo_vol[rand_idx, 0].cpu().detach().numpy()
                 recon_img = embryo_recon[rand_idx, 0].cpu().detach().numpy()
 
