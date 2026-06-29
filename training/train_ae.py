@@ -613,7 +613,7 @@ def train_vit(
         kanakasabapathy_val_df = kanakasabapathy_df[kanakasabapathy_mask]
         kanakasabapathy_df = kanakasabapathy_df[~kanakasabapathy_mask]
         train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "kanakasabapathy", run, batch_size=128, epochs=30)
-from transformers import ViTImageProcessor, ViTMAEForPreTraining
+from transformers import ViTImageProcessor, ViTMAEForPreTraining, ViTMAEConfig
 def train_vitmae_facebook(
     loss_type="l1",
     ms_ssim_weight=0.5,
@@ -786,7 +786,7 @@ def train_vitmae_facebook(
         for index, (_, embryo_vol) in enumerate(pbar):
             optimizer.zero_grad()
             t0 = time.perf_counter()
-            B,T,C,H,W = embryo_vol
+            B,T,C,H,W = embryo_vol.shape
             embryo_vol = embryo_vol.reshape(B*T,C,H,W).to(DEVICE)
             t1 = time.perf_counter()
 
@@ -836,9 +836,9 @@ def train_vitmae_facebook(
                     embryo_recon = model.unpatchify(recon_patches)
 
 
-                vol_img = embryo_vol[0, -1, 0].cpu().numpy()
-                recon_img = embryo_recon[0, -1, 0].cpu().numpy()
-                masked_img = masked_vol[0, -1, 0].cpu().numpy()
+                vol_img = embryo_vol[0, 0].cpu().numpy()
+                recon_img = embryo_recon[0, 0].cpu().numpy()
+                masked_img = masked_vol[0, 0].cpu().numpy()
 
 
                 if(((vol_img < 0) | (vol_img > 1)).any()):
@@ -881,6 +881,69 @@ def train_vitmae_facebook(
             if(test_val and index > 5):
                 break
 
+        val_metrics = {
+            'mse': RunningStats(),
+            'l1': RunningStats(),
+            'ssim': RunningStats(),
+        }
+        model.eval()  # Set model to evaluation mode
+        with torch.no_grad():
+            for embryo_vol, _ in tqdm(val_loader):
+                embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, H, W)
+
+                B, T, C, H, W = embryo_vol.shape
+                embryo_vol = embryo_vol.reshape(T,1, H,W)
+                outputs = model(embryo_vol)
+                val_recon = model.unpatchify(outputs.logits)
+
+                # MSE
+                val_metrics['mse'].push(F.mse_loss(val_recon, embryo_vol).item())
+
+                # L1
+                val_metrics['l1'].push(F.l1_loss(val_recon, embryo_vol).item())
+
+                # MS-SSIM
+                val_recon_flat = val_recon.view(B * T, C, H, W)
+                embryo_vol_flat = embryo_vol.view(B * T, C, H, W)
+
+                # the recon and groud truth images are already normalized
+                ms_ssim_val = ms_ssim_module(val_recon_flat, embryo_vol_flat)
+                val_metrics['ssim'].push((1 - ms_ssim_val).item())
+
+        # Log to wandb with val_ prefix
+        val_log_dict = {
+            f"val_{key}": value.mean for key, value in val_metrics.items()
+        }
+        val_log_std_dict = {
+            f"val_{key}_std": value.std_dev for key, value in val_metrics.items()
+        }
+        run.log(val_log_dict | val_log_std_dict)
+
+
+        image_dict = {} # collect all the plots for WandB logging
+        count = 0
+        with torch.no_grad():
+            for i, embryo_vol in enumerate(full_seq_loader_val):
+                if i % 10 != 0:
+                    continue
+                B,T,C,H,W = embryo_vol.shape
+                embryo_vol = embryo_vol.reshape(B*T,C,H,W)
+                embryo_vol = embryo_vol.to(DEVICE) 
+                outputs = model(embryo_vol)
+                embryo_recon = model.unpatchify(outputs.logits)
+                rand_idx = (20000 * i) % embryo_vol.shape[1]
+                vol_img = embryo_vol[rand_idx, 0].cpu().detach().numpy()
+                recon_img = embryo_recon[rand_idx, 0].cpu().detach().numpy()
+
+                vol_img = (vol_img * 255).astype(np.uint8)
+                recon_img = (recon_img * 255).astype(np.uint8)
+                comparison = np.concatenate((vol_img, recon_img), axis=1)
+     
+                images = wandb.Image(comparison, caption="embryo_recon_val")
+                image_dict[f"reconstruction_val_{count}"] = images
+                count += 1
+        run.log(image_dict)
+ 
 def train_vitmae(
     loss_type="l1",
     ms_ssim_weight=0.5,
