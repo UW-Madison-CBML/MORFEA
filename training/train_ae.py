@@ -1,8 +1,10 @@
 import numpy as np
 from vit_model import ViTLSTMAE, SmallViTLSTMAE, ConvViTLSTMAE, ViTMAE
 from torchvision.transforms.functional import rgb_to_grayscale
+#from torchvision.transforms import RGB
+from torchvision.transforms.v2 import Grayscale
+
 import torchvision
-from torchvision.transforms.v2 import RGB
 import pandas as pd
 import torch
 import torch.nn.functional as F
@@ -643,7 +645,7 @@ def train_vitmae_facebook(
     # ------------------------------------------------------
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    grayscale_to_rgb = RGB()
+    grayscale_to_rgb = Grayscale(num_output_channels=3)
     torch.cuda.init()
     gc.collect()
     torch.cuda.empty_cache()
@@ -666,7 +668,7 @@ def train_vitmae_facebook(
     )
     """ 
 
-    config = ViTMAEConfig("facebook/vit-mae-base")
+    config = ViTMAEConfig.from_pretrained("facebook/vit-mae-base")
     model = ViTMAEForPreTraining(config)
 
     date_label = datetime.now().strftime("%Y-%m-%d")
@@ -898,11 +900,12 @@ def train_vitmae_facebook(
             for embryo_vol, _ in tqdm(val_loader):
                 embryo_vol = grayscale_to_rgb(embryo_vol).to(DEVICE)  # (1, T, 1, H, W)
 
-                B, T, C, H, W = embryo_vol.shape
-                embryo_vol = embryo_vol.reshape(B*T,C, H,W)
+                B, T, C1, H, W = embryo_vol.shape
+                embryo_vol = embryo_vol.reshape(B*T,C1, H,W)
                 outputs = model(embryo_vol)
                 val_recon = rgb_to_grayscale(model.unpatchify(outputs.logits))
                 embryo_vol = rgb_to_grayscale(embryo_vol)
+                BT, C, H, W = embryo_vol.shape
 
                 # MSE
                 val_metrics['mse'].push(F.mse_loss(val_recon, embryo_vol).item())
@@ -911,11 +914,8 @@ def train_vitmae_facebook(
                 val_metrics['l1'].push(F.l1_loss(val_recon, embryo_vol).item())
 
                 # MS-SSIM
-                val_recon_flat = val_recon.view(B * T, C, H, W)
-                embryo_vol_flat = embryo_vol.view(B * T, C, H, W)
 
-                # the recon and groud truth images are already normalized
-                ms_ssim_val = ms_ssim_module(val_recon_flat, embryo_vol_flat)
+                ms_ssim_val = ms_ssim_module(val_recon, embryo_vol)
                 val_metrics['ssim'].push((1 - ms_ssim_val).item())
 
         # Log to wandb with val_ prefix
@@ -928,12 +928,15 @@ def train_vitmae_facebook(
 
         run.log(val_log_dict | val_log_std_dict)
 
-        config = ViTMAEConfig("facebook/vit-mae-base")
+        config = ViTMAEConfig.from_pretrained("facebook/vit-mae-base")
         model_clone = ViTMAEForPreTraining(config)
 
         model_clone.load_state_dict(model.state_dict())
-        save_and_push_model(model_clone, model_name +"-"+ date_label, [], hf_token, model_config=config)
 
+        model_clone.save_pretrained(model_name +"-"+ date_label) 
+        model_clone.push_to_hub(model_name +"-"+ date_label) 
+
+        
         image_dict = {} # collect all the plots for WandB logging
         count = 0
         with torch.no_grad():
