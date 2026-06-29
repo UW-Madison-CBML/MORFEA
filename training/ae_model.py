@@ -69,29 +69,29 @@ class ResidualUpBlock(nn.Module):
 
 class Encoder(nn.Module):
 
-    def __init__(self, input_channels=1, num_layers=2, latent_size=4096, hidden_channels=64, use_lstm=True):
+    def __init__(self, input_channels=1, num_layers=2, latent_size=4096, hidden_channels=64, use_lstm=True, use_residual=True):
         super(Encoder, self).__init__()
-
+        self.use_residual = use_residual
         self.latent_size = latent_size
         self.hidden_channels = hidden_channels
-        self.spatial_cnn = nn.Sequential(
+        #self.spatial_cnn = nn.Sequential(
             # 256 -> 128
             #ResidualBlock(input_channels, self.hidden_channels, downsample=True),
 
             # 128 -> 64 
             #ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
-            ResidualBlock(input_channels, self.hidden_channels, downsample=True),
+        self.resblock1 = ResidualBlock(input_channels, self.hidden_channels, downsample=True)
 
             # 64 -> 32 
-            ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
+        self.resblock2 = ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True)
 
             # 32 -> 16 
-            ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
+        self.resblock3 = ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True)
 
             # 16 -> 8
             #ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
 
-        )
+        #)
         self.final_resolution = 16 #2 ** (8 - len([module for module in self.spatial_cnn.modules() if not isinstance(self.spatial_cnn, nn.Sequential)]))
         self.use_lstm = use_lstm
         """if not self.use_convlstm:
@@ -110,11 +110,11 @@ class Encoder(nn.Module):
 
         self.latent_compress = nn.Linear(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size)
         if self.use_lstm:
-            self.lstm_enc = nn.LSTM(latent_size, latent_size, batch_first=True)
+            self.lstm_enc = nn.LSTM(latent_size, latent_size, batch_first=True, bidirectional=True)
         else:
             self.lstm_enc = None
 
-        self.lin1 = nn.Linear(latent_size,latent_size)
+        self.lin1 = nn.Linear(latent_size*2,latent_size)
 
 
 
@@ -123,7 +123,9 @@ class Encoder(nn.Module):
 
         x = x.view(B * T, C, H, W)  # (B*T, 1, H, W)
 
-        x = self.spatial_cnn(x)      
+        #x = self.spatial_cnn(x)      
+        residual = self.resblock2(self.resblock1(x)) 
+        x = self.resblock3(residual)
         _, C2, H2, W2 = x.shape
         x = x.view(B, T, C2, H2, W2)  
 
@@ -146,7 +148,7 @@ class Encoder(nn.Module):
         z_seq = z_compressed.view(B, T, self.latent_size)  
 
 
-        return z_seq
+        return z_seq, residual if self.use_residual else torch.zeros_like(residual, device=residual.device, dtype=residual.dtype)
 
 
 class Decoder(nn.Module):
@@ -171,38 +173,38 @@ class Decoder(nn.Module):
                 return_all_layers=False
             )"""
         if self.use_lstm:
-            self.lstm_dec = nn.LSTM(latent_size, latent_size, batch_first=True)
+            self.lstm_dec = nn.LSTM(latent_size, latent_size, batch_first=True, bidirectional=True)
         else:
             self.lstm_dec = None
     
         self.dropout = nn.Dropout(0.1)
-        self.spatial_decoder = nn.Sequential(
+        #self.spatial_decoder = nn.Sequential(
             # 8 -> 16
             #ResidualUpBlock(self.hidden_channels, self.hidden_channels),
 
             # 16 -> 32 
-            ResidualUpBlock(self.hidden_channels, self.hidden_channels),
+        resblock1 = ResidualUpBlock(self.hidden_channels, self.hidden_channels)
 
             # 32 -> 64 
-            ResidualUpBlock(self.hidden_channels, self.hidden_channels),
+        resblock2 = ResidualUpBlock(self.hidden_channels, self.hidden_channels)
 
             # 64 -> 128 
-            ResidualUpBlock(self.hidden_channels, self.hidden_channels),
+        resblock3 = ResidualUpBlock(self.hidden_channels, self.hidden_channels)
 
             # 128 -> 256
             #ResidualUpBlock(self.hidden_channels, self.hidden_channels),
 
 
-            nn.Conv2d(self.hidden_channels, 1, kernel_size=3, padding=1),
-            nn.Sigmoid()
-        )
+        out_conv = nn.Conv2d(self.hidden_channels, 1, kernel_size=3, padding=1)
+        #    nn.Sigmoid()
+        #)
         
         self.initial_resolution = initial_resolution
         self.lin1 = nn.Linear(latent_size,latent_size)
 
-        self.latent_expand = nn.Linear(latent_size, self.hidden_channels * self.initial_resolution * self.initial_resolution)
+        self.latent_expand = nn.Linear(latent_size*2, self.hidden_channels * self.initial_resolution * self.initial_resolution)
         self.final_size = final_size
-    def forward(self, z_seq):
+    def forward(self, z_seq, residual):
         B, T, L = z_seq.shape
 
         z_flat = z_seq # linear works on bottom most dim
@@ -224,7 +226,10 @@ class Decoder(nn.Module):
         # Spatial decoding: process each timestep separately
         B, T, C, H, W = h_seq.shape
         h_seq = h_seq.view(B * T, C, H, W)  # (B*T, hidden_dim, 16, 16)
-        x_rec = self.spatial_decoder(h_seq)  # (B*T, 1, 128, 128)
+        x_rec = self.resblock1(h_seq)  # (B*T, 1, 128, 128)
+
+        x_rec = self.out_conv(self.resblock3(self.resblock2(x_rec + residual)))
+        x_rec = F.sigmoid(x_rec)
         x_rec = x_rec.view(B, T, 1, self.final_size, self.final_size)  # (B, T, 1, 128, 128)
 
         return x_rec
@@ -282,21 +287,23 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         self.encoder = Encoder(
             latent_size=self.latent_size,
             use_lstm=self.use_lstm,
-            hidden_channels = self.hidden_channels
+            hidden_channels = self.hidden_channels,
+            use_residual = self.use_residual
         )
 
         self.decoder = Decoder(
             latent_size=self.latent_size,
             use_lstm=self.use_lstm,
-            hidden_channels = self.hidden_channels
+            hidden_channels = self.hidden_channels,
+            use_residual = self.use_residual
         )
 
 
     def forward(self, x, return_all=False, hidden=None):
 
-        z_seq = self.encoder(x)
+        z_seq,residual = self.encoder(x)
 
-        x_rec = self.decoder(z_seq)
+        x_rec = self.decoder(z_seq, residual)
 
 
         return x_rec, z_seq

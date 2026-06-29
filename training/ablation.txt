@@ -1,1 +1,2 @@
-vitmae_facebook --name vitmae_faceboo --lr 0.00015 --epochs 100 --warm-restarts 
+vitmae_facebook --name vitmae_facebook --lr 0.00015 --epochs 100 --warm-restarts 
+convlstm --name convlstm --ms-ssim-weight 1.0 --recon-weight 0.0 --vgg-weight 0.0 --lr 0.00015 --epochs 100 --warm-restarts 
