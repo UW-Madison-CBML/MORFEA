@@ -97,7 +97,7 @@ class ResidualUpBlock(nn.Module):
         self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm2d(out_channels)
 
-        self.shortcut = nn.Sequentioal(nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1), nn.BatchNorm2d(out_channels))
+        self.shortcut = nn.Sequential(nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1), nn.BatchNorm2d(out_channels))
 
     def forward(self, x):
         identity = self.shortcut(x)
