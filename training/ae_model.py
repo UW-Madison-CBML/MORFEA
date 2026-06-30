@@ -54,24 +54,20 @@ class CellLSTM(nn.Module):
          
 
 class ResidualBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, downsample=False):
+    def __init__(self, in_channels, out_channels):
         super(ResidualBlock, self).__init__()
 
-        stride = 2 if downsample else 1
 
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1)
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=2, padding=1)
         self.bn1 = nn.BatchNorm2d(out_channels)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.relu = nn.ReLU()
+        self.conv2 =nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm2d(out_channels)
 
-        if in_channels != out_channels or downsample:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride),
+        self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=2),
                 nn.BatchNorm2d(out_channels)
-            )
-        else:
-            self.shortcut = nn.Identity()
+        )
 
     def forward(self, x):
         identity = self.shortcut(x)
@@ -83,7 +79,7 @@ class ResidualBlock(nn.Module):
         out = self.conv2(out)
         out = self.bn2(out)
 
-        out += identity
+        out = out + identity
         out = self.relu(out)
 
         return out
@@ -93,25 +89,28 @@ class ResidualUpBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(ResidualUpBlock, self).__init__()
 
-        self.upsample = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1)
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
+        self.upsample = nn.ConvTranspose2d(out_channels, out_channels, kernel_size=4, stride=2, padding=1)
+        
         self.bn1 = nn.BatchNorm2d(out_channels)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.relu = nn.ReLU()
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm2d(out_channels)
 
-        self.shortcut = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1)
+        self.shortcut = nn.Sequentioal(nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1), nn.BatchNorm2d(out_channels))
 
     def forward(self, x):
         identity = self.shortcut(x)
 
-        out = self.upsample(x)
+        out = self.conv1(x)
+        out = self.upsample(out)
         out = self.bn1(out)
         out = self.relu(out)
 
-        out = self.conv(out)
+        out = self.conv2(out)
         out = self.bn2(out)
 
-        out += identity
+        out = out + identity
         out = self.relu(out)
 
         return out
@@ -130,13 +129,13 @@ class Encoder(nn.Module):
 
             # 128 -> 64 
             #ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
-        self.resblock1 = ResidualBlock(input_channels, self.hidden_channels, downsample=True)
+        self.resblock1 = ResidualBlock(input_channels, self.hidden_channels)
 
             # 64 -> 32 
-        self.resblock2 = ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True)
+        self.resblock2 = ResidualBlock(self.hidden_channels, self.hidden_channels)
 
             # 32 -> 16 
-        self.resblock3 = ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True)
+        self.resblock3 = ResidualBlock(self.hidden_channels, self.hidden_channels)
 
             # 16 -> 8
             #ResidualBlock(self.hidden_channels, self.hidden_channels, downsample=True),
@@ -160,11 +159,11 @@ class Encoder(nn.Module):
 
         self.latent_compress = nn.Linear(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size)
         if self.use_lstm:
-            self.lstm_enc = CellLSTM(latent_size, latent_size)
+            self.lstm_enc = nn.LSTM(latent_size, latent_size, batch_first=True, bidirectional=True)
         else:
             self.lstm_enc = None
 
-        self.lin1 = nn.Linear(latent_size*4,latent_size)
+        self.lin1 = nn.Linear(latent_size*2,latent_size)
 
 
 
@@ -173,11 +172,10 @@ class Encoder(nn.Module):
 
         x = x.view(B * T, C, H, W)  # (B*T, 1, H, W)
 
-        #x = self.spatial_cnn(x)      
-        residual = self.resblock3(self.resblock2(self.resblock1(x)))
-        x = residual
-        _, C2, H2, W2 = residual.shape
-        x = residual.view(B, T, C2, H2, W2)  
+        # x = self.spatial_cnn(x)      
+        x = self.resblock3(self.resblock2(self.resblock1(x)))
+        _, C2, H2, W2 = x.shape
+        x = x.view(B, T, C2, H2, W2)  
 
         """# ConvLSTM processes temporal sequence
         if(self.use_convlstm):
@@ -198,7 +196,7 @@ class Encoder(nn.Module):
         z_seq = z_compressed.view(B, T, self.latent_size)  
 
 
-        return z_seq, residual if self.use_residual else torch.zeros_like(residual, device=residual.device, dtype=residual.dtype)
+        return z_seq
 
 
 class Decoder(nn.Module):
@@ -223,7 +221,7 @@ class Decoder(nn.Module):
                 return_all_layers=False
             )"""
         if self.use_lstm:
-            self.lstm_enc = CellLSTM(latent_size, latent_size)
+            self.lstm_dec = nn.LSTM(latent_size, latent_size, batch_first=True, bidirectional=True)
         else:
             self.lstm_dec = None
     
@@ -252,9 +250,9 @@ class Decoder(nn.Module):
         self.initial_resolution = initial_resolution
         self.lin1 = nn.Linear(latent_size,latent_size)
 
-        self.latent_expand = nn.Linear(latent_size*4, self.hidden_channels * self.initial_resolution * self.initial_resolution)
+        self.latent_expand = nn.Linear(latent_size*2, self.hidden_channels * self.initial_resolution * self.initial_resolution)
         self.final_size = final_size
-    def forward(self, z_seq, residual):
+    def forward(self, z_seq):
         B, T, L = z_seq.shape
 
         z_flat = z_seq # linear works on bottom most dim
@@ -277,7 +275,7 @@ class Decoder(nn.Module):
         B, T, C, H, W = h_seq.shape
         h_seq = h_seq.view(B * T, C, H, W)  # (B*T, hidden_dim, 16, 16)
 
-        x_rec = self.out_conv(self.resblock3(self.resblock2(self.resblock1(h_seq  + residual))))
+        x_rec = self.out_conv(self.resblock3(self.resblock2(self.resblock1(h_seq))))
         x_rec = F.sigmoid(x_rec)
         x_rec = x_rec.view(B, T, 1, self.final_size, self.final_size)  # (B, T, 1, 128, 128)
 
@@ -350,9 +348,9 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
 
     def forward(self, x, return_all=False, hidden=None):
 
-        z_seq,residual = self.encoder(x)
+        z_seq = self.encoder(x)
 
-        x_rec = self.decoder(z_seq, residual)
+        x_rec = self.decoder(z_seq)
 
 
         return x_rec, z_seq

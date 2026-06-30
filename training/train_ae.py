@@ -617,6 +617,7 @@ def train_vit(
         kanakasabapathy_val_df = kanakasabapathy_df[kanakasabapathy_mask]
         kanakasabapathy_df = kanakasabapathy_df[~kanakasabapathy_mask]
         train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "kanakasabapathy", run, batch_size=128, epochs=30)
+
 from transformers import ViTImageProcessor, ViTMAEForPreTraining, ViTMAEConfig
 def train_vitmae_facebook(
     loss_type="l1",
@@ -725,7 +726,7 @@ def train_vitmae_facebook(
         f"trainable params: {trainable_params} || all params: {all_params} || trainable%: {100 * trainable_params / all_params}"
     )
     run.log({"train_params":trainable_params, "params":all_params})
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr,betas=(0.9, 0.95), weight_decay=1e-5)
 
     df = pd.read_csv(os.path.abspath("index.csv"))
     mask = df["cell_id"].isin(VAL_EMBRYOS)
@@ -1637,6 +1638,16 @@ def train_lstm(
                 continue
 
             loss.backward()
+            """
+            for name, param in model.named_parameters():
+                if param.requires_grad:
+                    if param.grad is not None:
+                        grad_elements = param.grad.numel()
+                    else:
+                        grad_elements = "None yet"
+                        
+                    print(f"{name:<50} | {grad_elements:<20}")
+            """
             t3 = time.perf_counter()
             total_norm = 0
             for p in model.parameters():

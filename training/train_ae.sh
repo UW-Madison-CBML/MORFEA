@@ -10,6 +10,7 @@ export WANDB_KEY=$WANDB_KEY
 
 export TORCH_DISTRIBUTED_DEBUG=DETAIL
 export NCCL_DEBUG=INFO
+export CUDA_LAUNCH_BLOCKING=1
 
 tar -zxf embryo_dataset.tar.gz
 
