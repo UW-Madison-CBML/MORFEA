@@ -1506,7 +1506,7 @@ def train_lstm(
         # Ablation parameters
         dropout_rate=dropout_rate,
         use_lstm=use_lstm,
-        use_residual=use_residual,
+        use_residual=True,
         use_batchnorm=use_batchnorm
     )
     artifact = wandb.Artifact(name="scripts", type="model_file")
@@ -1580,6 +1580,8 @@ def train_lstm(
     ssim_module = SSIM(win_size=7, win_sigma=1.5, data_range=1, size_average=True, channel=1)
     ms_ssim_module = MS_SSIM(data_range=1, size_average=True, channel=1)
     for epoch in range(epochs):
+        if epoch > 10:
+            model.use_residual = False
         print(f"epoch {epoch}")
         print(torch.cuda.memory_summary(device=DEVICE, abbreviated=False))
         gc.collect()
