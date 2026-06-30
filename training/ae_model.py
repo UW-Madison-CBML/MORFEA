@@ -175,6 +175,9 @@ class Encoder(nn.Module):
         # x = self.spatial_cnn(x)      
         x = self.resblock3(self.resblock2(self.resblock1(x)))
         _, C2, H2, W2 = x.shape
+        residual = x 
+        if self.training():
+            residual = residual + (0.3 * (torch.std(x) + 1e-6) * torch.randn_like(x, device=x.device, dtype=x.dtype))
         x = x.view(B, T, C2, H2, W2)  
 
         """# ConvLSTM processes temporal sequence
@@ -196,7 +199,7 @@ class Encoder(nn.Module):
         z_seq = z_compressed.view(B, T, self.latent_size)  
 
 
-        return z_seq
+        return z_seq, residual if self.use_residual else torch.zeros_like(residual, device=residual.device, dtype=residual.dtype)
 
 
 class Decoder(nn.Module):
@@ -252,7 +255,8 @@ class Decoder(nn.Module):
 
         self.latent_expand = nn.Linear(latent_size*2, self.hidden_channels * self.initial_resolution * self.initial_resolution)
         self.final_size = final_size
-    def forward(self, z_seq):
+        self.use_residual = use_residual
+    def forward(self, z_seq, residual):
         B, T, L = z_seq.shape
 
         z_flat = z_seq # linear works on bottom most dim
@@ -275,7 +279,7 @@ class Decoder(nn.Module):
         B, T, C, H, W = h_seq.shape
         h_seq = h_seq.view(B * T, C, H, W)  # (B*T, hidden_dim, 16, 16)
 
-        x_rec = self.out_conv(self.resblock3(self.resblock2(self.resblock1(h_seq))))
+        x_rec = self.out_conv(self.resblock3(self.resblock2(self.resblock1(h_seq + residual))))
         x_rec = F.sigmoid(x_rec)
         x_rec = x_rec.view(B, T, 1, self.final_size, self.final_size)  # (B, T, 1, 128, 128)
 
@@ -348,9 +352,9 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
 
     def forward(self, x, return_all=False, hidden=None):
 
-        z_seq = self.encoder(x)
+        z_seq,residual = self.encoder(x)
 
-        x_rec = self.decoder(z_seq)
+        x_rec = self.decoder(z_seq, residual)
 
 
         return x_rec, z_seq
