@@ -17,6 +17,7 @@ import os
 from ae_model import ConvLSTMAutoencoder
 import sys
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 from scipy.spatial import distance_matrix
 from torch.utils.data import DataLoader
 from dataset_ivf import IVFSequenceDataset
@@ -53,6 +54,7 @@ from export_kanakasabapathy_latents import export_kanakasabapathy
 from dataset_ivf_embryo import read_gray, normalize_video
 from pytorch_msssim import MS_SSIM, SSIM
 from dataset_vit import VITDataset
+from stage_dataset import get_annotations_col, StageDataset
 class RunningStats:
     def __init__(self):
         self.n = 0
@@ -420,6 +422,7 @@ def train_vit(
             optimizer.step()
             scheduler.step()
             end_time = time.perf_counter()
+            
             if (index % 5 == 0):
                 run.log({
                     "data_to_gpu_time": t1 - t0,
@@ -427,7 +430,6 @@ def train_vit(
                     "grad_calc_time": t3 - t2,
                     "optimizer_step_time": end_time - t3,
                     "loss": loss.detach().cpu().item(),
-                    "residual_decay": F.sigmoid(torch.tensor(model.decay_rate * (model.decay -  model.decay_offset))).item()
                         })
         model_clone = SmallViTLSTMAE()
 
@@ -1531,8 +1533,8 @@ def train_lstm(
     run.log({"train_params": trainable_params, "params": all_params})
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
 
-    df = pd.read_csv(os.path.abspath("index.csv"))
-    mask = df["cell_id"].isin(VAL_EMBRYOS)
+    df = pd.read_csv(os.path.abspath("index.csv")).rename(columns={"cell_id":"embryo_id"})
+    mask = df["embryo_id"].isin(VAL_EMBRYOS)
     val_df = df[mask]
     train_df = df[~mask]
     train_dataset = IVFSequenceDataset(train_df, resize=image_size, norm="minmax01")
@@ -1543,7 +1545,7 @@ def train_lstm(
     full_seq_df_val = full_seq_df[full_seq_val_mask] # just look at validation ICM embryos
     
     full_seq_df_train = full_seq_df[~full_seq_val_mask] # just look at validation ICM embryos
-    full_seq_dataset_val = IVFEmbryoDataset(full_seq_df_val, resize=128, norm="minmax01")
+    full_seq_dataset_val = IVFEmbryoDataset(full_seq_df_val, resize=128, norm="minmax01", return_embryo_id=True)
     full_seq_dataset_train = IVFEmbryoDataset(full_seq_df_train, resize=128, norm="minmax01")
 
     loader = DataLoader(
@@ -1686,7 +1688,9 @@ def train_lstm(
                     "loss": loss.item(),
                     "rec_loss": rec_loss.item(),
                     "smooth_loss": smooth_loss.item(),
-                    "lr": scheduler.get_last_lr()[0]
+                    "lr": scheduler.get_last_lr()[0],
+                    "residual_decay": F.sigmoid(torch.tensor(model.decay_rate * (model.decay -  model.decay_offset))),
+                    "decay_count":model.decay
                 }
 
                 # Add loss-specific metrics
@@ -1835,12 +1839,15 @@ def train_lstm(
         #cebra_time_model.save("cebra_time_model.pt")
 
         trajs = []
+        traj_labels = []
+        traj_stages = []
         image_dict = {} # collect all the plots for WandB logging
         count = 0
         with torch.no_grad():
-            for i, embryo_vol in enumerate(full_seq_loader_val):
+            for i, (embryo_vol, embryo_id) in enumerate(full_seq_loader_val):
                 if i % 10 != 0:
                     continue
+                embryo_id = embryo_id[0] # get rid of the batch
                 embryo_vol = embryo_vol.to(DEVICE) 
                 embryo_recon, z_seq = model(embryo_vol)
                 traj = z_seq.cpu().numpy()[0] # batch size one just use that batch
@@ -1856,7 +1863,8 @@ def train_lstm(
                 plt.close(fig)                
                 
                 trajs.append(traj) # add traj to list of all trajs for PCA calculation
-                          
+                traj_labels.append(np.linspace(0,1,traj.shape[0]))
+                traj_stages.append(np.array([StageDataset.PHASES.index(p) for p in get_annotations_col(embryo_id, traj.shape[0], os.path.abspath("embryo_dataset_annotations"))]))
                 
                 cebra_embedding = cebra_time_model.transform(traj, session_id=0) # i guess dont batch it?
                 fig, ax = plt.subplots(figsize=(8, 6))
@@ -1884,11 +1892,14 @@ def train_lstm(
                 count += 1
         # make sure to normalize mean and std dev before PCA 
         pca = PCA(n_components=2).fit(StandardScaler().fit_transform(np.concatenate(trajs, axis=0)))
+        embeddings = []
         count = 0 
-        for traj in trajs: 
+        # do individual pca stuff
+        for traj, labels in zip(trajs, traj_labels): 
             embedding = pca.transform(traj) 
+            embeddings.append(embedding)
             fig, ax = plt.subplots(figsize=(8, 6))
-            im = ax.scatter(embedding[:,0], embedding[:,1],c=np.linspace(0,1,embedding.shape[0]), cmap='viridis')
+            im = ax.scatter(embedding[:,0], embedding[:,1],c=labels, cmap='viridis', vmin=0, vmax=1)
 
             ax.set_xlabel("PCA 1")
             ax.set_ylabel("PCA 2")
@@ -1897,7 +1908,33 @@ def train_lstm(
 
             plt.close(fig)  
             count += 1
-        
+        # do all pca, colored by time
+        all_trajs = np.concatenate(embeddings, axis=0) 
+        all_traj_labels = np.concatenate(traj_labels)
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection='3d')
+        im = ax.scatter(all_trajs[:,0], all_trajs[:,1], all_trajs[:,2] ,c=all_traj_labels, cmap='viridis', vmin=0, vmax=1)
+        plt.colorbar(im, ax=ax)
+        image_dict[f"pca_val_all_time"] = wandb.Image(fig)
+
+        plt.close(fig) 
+        # now by phase
+        all_traj_stages = np.concatenate(traj_stages)
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection='3d')
+
+        im = ax.scatter(all_trajs[:,0], all_trajs[:,1], all_trajs[:,2] ,c=all_traj_stages, cmap='tab20c', vmin=0, vmax=19)
+        legend_elements = [Patch(facecolor=plt.cm.tab20c(p_idx), label=phase) for p_idx, phase in enumerate(StageDataset.PHASES)]
+        fig.legend(handles=legend_elements, title="Phases") 
+        plt.tight_layout(rect=[0, 0, 0.85, 1])
+
+        image_dict[f"pca_val_all_phase"] = wandb.Image(fig)
+
+        plt.close(fig) 
+
+
+
         del cebra_time_model
         count = 0 # build a count for 0 indexing
         with torch.no_grad():

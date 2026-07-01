@@ -12,9 +12,10 @@ export TORCH_DISTRIBUTED_DEBUG=DETAIL
 export NCCL_DEBUG=INFO
 export CUDA_LAUNCH_BLOCKING=1
 
-tar -zxf embryo_dataset.tar.gz
-
+tar -xvf embryo_dataset.tar.gz
+tar -xvf embryo_dataset_annotations.tar.gz
 tar -xvf kanakasabapathy.tar.gz
+
 mv alldata/ kanakasabapathy/
 
 python train_ae.py "$@"

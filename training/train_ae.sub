@@ -16,7 +16,7 @@ Requirements = (Target.HasCHTCStaging == true)
 
 #require_gpus = (DriverVersion >= 10.1)
 
-transfer_input_files = train_ae.sh, train_ae.py, ../api_keys.txt, dataset_ivf.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, ../utils/build_index.py, ae_model.py, ablation.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, dataset_ivf_embryo.py ,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, ../analysis/export_kanakasabapathy_latents.py, train_lstm_classifier.py, grade_lstm_model.py, grade_lstm_dataset.py, ../utils/geometric_features.py, file:///staging/groups/bhaskar_group/ivf/kanakasabapathy.tar.gz, vit_model.py, dataset_vit.py
+transfer_input_files = train_ae.sh, train_ae.py, ../api_keys.txt, dataset_ivf.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, file:///staging/groups/bhaskar_group/ivf/index.csv, ../utils/build_index.py, ae_model.py, ablation.txt, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, dataset_ivf_embryo.py ,file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, ../analysis/export_kanakasabapathy_latents.py, train_lstm_classifier.py, grade_lstm_model.py, grade_lstm_dataset.py, ../utils/geometric_features.py, file:///staging/groups/bhaskar_group/ivf/kanakasabapathy.tar.gz, vit_model.py, dataset_vit.py, stage_dataset.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_annotations.tar.gz,
 
 gpus_minimum_capability = 7.0
 requirements= Machine=="bhaskargpu4000.chtc.wisc.edu"

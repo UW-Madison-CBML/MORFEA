@@ -31,16 +31,16 @@ def normalize_video(vol, norm):
     return vol
 
 class IVFEmbryoDataset(Dataset):
-    def __init__(self, df, crop=45, resize=128, norm="minmax01", max_frames=None):
+    def __init__(self, df, crop=45, resize=128, norm="minmax01", return_embryo_id=False):
         self.crop = crop
         self.df = df
         self.resize = resize
         self.norm = norm
-        self.max_frames = None
         self.augment = v2.Compose([
             v2.RandomHorizontalFlip(p=0.5),
             v2.RandomHorizontalFlip(p=0.5),
         ])
+        self.return_embryo_id = return_embryo_id
 
     
     def __getitem__(self, idx):
@@ -52,8 +52,6 @@ class IVFEmbryoDataset(Dataset):
 
         embryo_paths = row["embryo_paths"].split("|")
 
-        if self.max_frames is not None and len(embryo_paths) > self.max_frames:
-            embryo_paths = embryo_paths[:self.max_frames]
 
         embryo_frames = [read_gray(p, self.resize, self.crop) for p in embryo_paths]
         embryo_vol = np.stack(embryo_frames, axis=0)  # (T, H, W)
@@ -61,8 +59,11 @@ class IVFEmbryoDataset(Dataset):
         embryo_vol = normalize_video(embryo_vol, self.norm)
 
         embryo_vol = embryo_vol[:, None, :, :]
-
-        return torch.from_numpy(embryo_vol)
+        if self.return_embryo_id:
+            return torch.from_numpy(embryo_vol), row["embryo_id"]
+            
+        else:
+            return torch.from_numpy(embryo_vol)
 
     def __len__(self):
         return len(self.df)
