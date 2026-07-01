@@ -80,7 +80,8 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
     if z_seq.size(1) < 2:
         return torch.tensor(0.0, device=z_seq.device)
     diff = z_seq[:,1:,:] - z_seq[:,:-1,:]
-    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:]) - F.sigmoid(F.mse_loss(z_seq[:, 1:, :], z_seq[:,:-1,:]))
+    # use l1 for the contrastive loss below as it has it's highest gradient magnitude near 0
+    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:]) - F.sigmoid(F.l1_loss(z_seq[:, 1:, :], z_seq[:,:-1,:]))
     
     return weight * output
 
@@ -425,7 +426,8 @@ def train_vit(
                     "model_forward_time": t2 - t1,
                     "grad_calc_time": t3 - t2,
                     "optimizer_step_time": end_time - t3,
-                    "loss": loss.detach().cpu().item()
+                    "loss": loss.detach().cpu().item(),
+                    "residual_decay": F.sigmoid(torch.tensor(model.decay_rate * (model.decay -  model.decay_offset))).item()
                         })
         model_clone = SmallViTLSTMAE()
 

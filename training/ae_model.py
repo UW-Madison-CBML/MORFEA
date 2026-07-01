@@ -176,8 +176,6 @@ class Encoder(nn.Module):
         x = self.resblock3(self.resblock2(self.resblock1(x)))
         _, C2, H2, W2 = x.shape
         residual = x 
-        if self.training:
-            residual = residual + (0.3 * (torch.std(x) + 1e-6) * torch.randn_like(x, device=x.device, dtype=x.dtype))
         x = x.view(B, T, C2, H2, W2)  
 
         """# ConvLSTM processes temporal sequence
@@ -351,13 +349,17 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         
         # reset this every instantiation, if we retrain later we don't want to affect this
         self.decay = 0 
-        self.decay_rate = -1e-2
+        self.decay_rate = -1e-3
+        self.decay_offset = 1000
 
 
     def forward(self, x, return_all=False, hidden=None):
         z_seq,residual = self.encoder(x)
+        if self.training:
+            residual = residual + (0.8 * (torch.std(residual) + 1e-6) * torch.randn_like(residual, device=residual.device, dtype=residual.dtype))
+
+        residual = F.sigmoid(torch.tensor(self.decay_rate * (self.decay -  self.decay_offset), device= x.device, dtype= x.dtype)) * residual
         if(self.training):
-            residual = F.sigmoid(torch.tensor(self.decay_rate * (self.decay -  1000), device= x.device, dtype= x.dtype)) * residual
             self.decay += 1
 
         x_rec = self.decoder(z_seq, residual)
