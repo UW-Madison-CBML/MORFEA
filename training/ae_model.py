@@ -159,11 +159,12 @@ class Encoder(nn.Module):
 
         self.latent_compress = nn.Linear(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size)
         if self.use_lstm:
-            self.lstm_enc = nn.LSTM(latent_size, latent_size, batch_first=True, bidirectional=True)
+            self.lstm_enc = nn.GRU(latent_size, latent_size, batch_first=True, bidirectional=True)
         else:
             self.lstm_enc = None
 
-        self.lin1 = nn.Linear(latent_size*2,latent_size)
+        self.lin1 = nn.Linear(latent_size*2,latent_size*2)
+        self.lin2 = nn.Linear(latent_size*2,latent_size)
 
 
 
@@ -193,12 +194,12 @@ class Encoder(nn.Module):
         if self.use_lstm:
             z_compressed, _ = self.lstm_enc(z_compressed)
         z_compressed = self.dropout(z_compressed)
-        z_compressed = self.lin1(z_compressed)
+        z_compressed = F.relu(self.lin1(z_compressed)) # B, T, L*2
+        z_compressed = self.lin2(z_compressed) # B, T, L, no relu so that latent space can be negative
         z_seq = z_compressed.view(B, T, self.latent_size)  
 
 
-        return z_seq, residual if self.use_residual else torch.zeros_like(residual, device=residual.device, dtype=residual.dtype)
-
+        return z_seq, residual
 
 class Decoder(nn.Module):
 
@@ -222,7 +223,7 @@ class Decoder(nn.Module):
                 return_all_layers=False
             )"""
         if self.use_lstm:
-            self.lstm_dec = nn.LSTM(latent_size, latent_size, batch_first=True, bidirectional=True)
+            self.lstm_dec = nn.GRU(latent_size, latent_size, batch_first=True, bidirectional=True)
         else:
             self.lstm_dec = None
     
@@ -249,6 +250,8 @@ class Decoder(nn.Module):
         #)
         
         self.initial_resolution = initial_resolution
+        
+        self.lin_relu = nn.Linear(latent_size, latent_size)
         self.lin1 = nn.Linear(latent_size,latent_size)
 
         self.latent_expand = nn.Linear(latent_size*2, self.hidden_channels * self.initial_resolution * self.initial_resolution)
@@ -256,9 +259,8 @@ class Decoder(nn.Module):
         self.use_residual = use_residual
     def forward(self, z_seq, residual):
         B, T, L = z_seq.shape
-
-        z_flat = z_seq # linear works on bottom most dim
-        z_flat = F.relu(self.lin1(z_flat))
+        relu_residual = F.relu(self.lin_relu(F.relu(z_seq)))  # we don't use ReLU before latent space, but we want to also have the decision boundary
+        z_flat = F.relu(self.lin1(z_seq)) + relu_residual
         if self.use_lstm:
             z_flat, _ = self.lstm_dec(z_flat)
         z_flat = self.dropout(z_flat) 
@@ -351,18 +353,28 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         self.decay = 0 
         self.decay_rate = -1e-3
         self.decay_offset = 1000
+        self.decayed = False
 
 
     def forward(self, x, return_all=False, hidden=None):
+        # encode
         z_seq,residual = self.encoder(x)
-        if self.training:
-            residual = residual + (0.8 * (torch.std(residual) + 1e-6) * torch.randn_like(residual, device=residual.device, dtype=residual.dtype))
 
-        residual = F.sigmoid(torch.tensor(self.decay_rate * (self.decay -  self.decay_offset), device= x.device, dtype= x.dtype)) * residual
-        if(self.training):
-            self.decay += 1
+        # residual logic, add noise to residual during training, and always scale the residual by the decay
+        if self.use_residual and not self.decayed:
+            if self.training:
+                residual = residual + (0.8 * (torch.std(residual) + 1e-6) * torch.randn_like(residual, device=residual.device, dtype=residual.dtype))
+            weight = F.sigmoid(torch.tensor(self.decay_rate * (self.decay -  self.decay_offset), device= x.device, dtype= x.dtype)) 
+            decayed = F.relu(weight - 1e-3)
+            self.decayed = decayed.cpu().item() == 0
+            weight = weight * decayed * (1 / (torch.std(residual) + 1e-6)) # also normalize so that residual can't just try to get super large
 
-        x_rec = self.decoder(z_seq, residual)
+            residual = residual * weight
+            if(self.training):
+                self.decay += 1
+        # decode
+        x_rec = self.decoder(z_seq, residual if (self.use_residual and not self.decayed) else torch.zeros_like(residual, device=residual.device, dtype=residual.dtype))
+
 
         return x_rec, z_seq
 
