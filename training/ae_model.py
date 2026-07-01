@@ -159,7 +159,7 @@ class Encoder(nn.Module):
 
         self.latent_compress = nn.Linear(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size)
         if self.use_lstm:
-            self.lstm_enc = nn.GRU(latent_size, latent_size, batch_first=True, bidirectional=True)
+            self.lstm_enc = nn.LSTM(latent_size, latent_size, batch_first=True, bidirectional=True)
         else:
             self.lstm_enc = None
 
@@ -223,7 +223,7 @@ class Decoder(nn.Module):
                 return_all_layers=False
             )"""
         if self.use_lstm:
-            self.lstm_dec = nn.GRU(latent_size, latent_size, batch_first=True, bidirectional=True)
+            self.lstm_dec = nn.LSTM(latent_size, latent_size, batch_first=True, bidirectional=True)
         else:
             self.lstm_dec = None
     
@@ -251,16 +251,17 @@ class Decoder(nn.Module):
         
         self.initial_resolution = initial_resolution
         
-        self.lin_relu = nn.Linear(latent_size, latent_size)
-        self.lin1 = nn.Linear(latent_size,latent_size)
+        self.lin1 = nn.Linear(latent_size,2*latent_size)
+        self.lin2 = nn.Linear(2*latent_size, latent_size)
 
         self.latent_expand = nn.Linear(latent_size*2, self.hidden_channels * self.initial_resolution * self.initial_resolution)
         self.final_size = final_size
         self.use_residual = use_residual
+        self.bn = nn.BatchNorm(self.hidden_channels)
     def forward(self, z_seq, residual):
         B, T, L = z_seq.shape
-        relu_residual = F.relu(self.lin_relu(F.relu(z_seq)))  # we don't use ReLU before latent space, but we want to also have the decision boundary
-        z_flat = F.relu(self.lin1(z_seq)) + relu_residual
+        z_flat = F.relu(self.lin1(z_seq))
+        z_flat = F.relu(self.lin2(z_flat))
         if self.use_lstm:
             z_flat, _ = self.lstm_dec(z_flat)
         z_flat = self.dropout(z_flat) 
@@ -278,7 +279,7 @@ class Decoder(nn.Module):
         # Spatial decoding: process each timestep separately
         B, T, C, H, W = h_seq.shape
         h_seq = h_seq.view(B * T, C, H, W)  # (B*T, hidden_dim, 16, 16)
-
+        h_seq = self.bn(h_seq) # normalize h_seq so that the model can't try to make it as small as residual, so that residual signal slowly fades
         x_rec = self.out_conv(self.resblock3(self.resblock2(self.resblock1(h_seq + residual))))
         x_rec = F.sigmoid(x_rec)
         x_rec = x_rec.view(B, T, 1, self.final_size, self.final_size)  # (B, T, 1, 128, 128)
