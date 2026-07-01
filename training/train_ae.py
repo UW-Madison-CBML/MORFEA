@@ -1867,8 +1867,7 @@ def train_lstm(
                 traj_stages.append(np.array([StageDataset.PHASES.index(p) for p in get_annotations_col(embryo_id, traj.shape[0], os.path.abspath("embryo_dataset_annotations"))]))
                 
                 cebra_embedding = cebra_time_model.transform(traj, session_id=0) # i guess dont batch it?
-                fig, ax = plt.subplots(figsize=(8, 6))
-                ax = fig.add_subplot(111, projection='3d')
+                fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
                 im = ax.scatter(cebra_embedding[:,0], cebra_embedding[:,1], cebra_embedding[:,2], c=np.linspace(0,1,cebra_embedding.shape[0]), cmap='viridis')
 
                 ax.set_xlabel("Cebra 1")
@@ -1891,18 +1890,16 @@ def train_lstm(
                 image_dict[f"reconstruction_val_{count}"] = images
                 count += 1
         # make sure to normalize mean and std dev before PCA 
-        pca = PCA(n_components=2).fit(StandardScaler().fit_transform(np.concatenate(trajs, axis=0)))
+        pca = PCA(n_components=3).fit(StandardScaler().fit_transform(np.concatenate(trajs, axis=0)))
         embeddings = []
         count = 0 
         # do individual pca stuff
         for traj, labels in zip(trajs, traj_labels): 
             embedding = pca.transform(traj) 
             embeddings.append(embedding)
-            fig, ax = plt.subplots(figsize=(8, 6))
-            im = ax.scatter(embedding[:,0], embedding[:,1],c=labels, cmap='viridis', vmin=0, vmax=1)
+            fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
+            im = ax.scatter(embedding[:,0], embedding[:,1],embedding[:,2], c=labels, cmap='viridis', vmin=0, vmax=1)
 
-            ax.set_xlabel("PCA 1")
-            ax.set_ylabel("PCA 2")
             plt.colorbar(im, ax=ax)
             image_dict[f"pca_val_{count}"] = wandb.Image(fig)
 
@@ -1912,8 +1909,7 @@ def train_lstm(
         all_trajs = np.concatenate(embeddings, axis=0) 
         all_traj_labels = np.concatenate(traj_labels)
 
-        fig, ax = plt.subplots(figsize=(8, 6))
-        ax = fig.add_subplot(111, projection='3d')
+        fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
         im = ax.scatter(all_trajs[:,0], all_trajs[:,1], all_trajs[:,2] ,c=all_traj_labels, cmap='viridis', vmin=0, vmax=1)
         plt.colorbar(im, ax=ax)
         image_dict[f"pca_val_all_time"] = wandb.Image(fig)
@@ -1921,8 +1917,7 @@ def train_lstm(
         plt.close(fig) 
         # now by phase
         all_traj_stages = np.concatenate(traj_stages)
-        fig, ax = plt.subplots(figsize=(8, 6))
-        ax = fig.add_subplot(111, projection='3d')
+        fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
 
         im = ax.scatter(all_trajs[:,0], all_trajs[:,1], all_trajs[:,2] ,c=all_traj_stages, cmap='tab20c', vmin=0, vmax=19)
         legend_elements = [Patch(facecolor=plt.cm.tab20c(p_idx), label=phase) for p_idx, phase in enumerate(StageDataset.PHASES)]
