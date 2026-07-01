@@ -80,7 +80,8 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
     if z_seq.size(1) < 2:
         return torch.tensor(0.0, device=z_seq.device)
     diff = z_seq[:,1:,:] - z_seq[:,:-1,:]
-    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:])
+    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:]) - F.sigmoid(F.mse_loss(z_seq[:, 1:, :], z_seq[:,:-1,:]))
+    
     return weight * output
 
 

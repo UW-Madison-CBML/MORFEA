@@ -348,14 +348,20 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
             hidden_channels = self.hidden_channels,
             use_residual = self.use_residual
         )
+        # reset this every instantiation, if we retrain later we don't want to affect this
+        self.decay = 0 
+        self.decay_rate = -1e-4
 
 
     def forward(self, x, return_all=False, hidden=None):
 
         z_seq,residual = self.encoder(x)
+        if(self.training()):
+            residual = F.sigmoid(torch.tensor(self.decay * self.decay_rate, device= x.device, dtype= x.dtype)) * residual
+            self.decay += 1
 
         x_rec = self.decoder(z_seq, residual)
-
+        
 
         return x_rec, z_seq
 
