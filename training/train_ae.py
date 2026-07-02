@@ -2053,7 +2053,7 @@ def train_lstm(
         # spoof the ICM grades
         metadata_df['ICM'] = metadata_df['TE']
 
-        for i in range(10):
+        for i in (pbar := tqdm(range(10), desc="working on kananakasabpathy recon visuals")):
             idx = (i * 20000) % len(imgs)
             vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 128, 0)], "minmax01")[0]
             recon_img = imgs[idx]
@@ -2064,6 +2064,8 @@ def train_lstm(
 
             images = wandb.Image(comparison, caption="kanakasabapathy_recon_val")
             image_dict[f"kanakasabapathy_recon_val_{idx}"] = images
+            if(test_val):
+                break
 
         run.log(image_dict | {"kanakasabapathy_grade_sizes": wandb.Table(dataframe=metadata_df.groupby("TE",as_index=False).size()), "kanakasabapathy_knn_top_stages": wandb.Table(dataframe=pd.DataFrame({"size":metadata_df.groupby("pred_stages").size().reindex(StageDataset.PHASES), "stage":StageDataset.PHASES}, index=StageDataset.PHASES))})
         # train the lstm model on the kanakasabapathy latents and log the loss to wandb
