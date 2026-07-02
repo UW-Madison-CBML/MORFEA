@@ -1,1 +1,1 @@
-convlstm --name convlstm --ms-ssim-weight 0.7 --rec-weight 0.3 --vgg-weight 0.0 --temporal-weight 0.3 --lr 0.0004 --epochs 100 --size 2048 --warm-restarts
+convlstm --name convlstm --ms-ssim-weight 0.7 --rec-weight 0.3 --vgg-weight 0.0 --temporal-weight 0.3 --lr 0.0004 --epochs 100 --size 2048 --warm-restarts --test-val
