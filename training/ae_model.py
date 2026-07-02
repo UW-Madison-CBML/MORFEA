@@ -351,7 +351,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         # reset this every instantiation, if we retrain later we don't want to affect this
         self.decay = 0 
         self.decay_rate = -1e-3
-        self.decay_offset = 500
+        self.decay_offset = 0
         self.decayed = False
 
 
@@ -364,9 +364,9 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
             if self.training:
                 residual = residual + (0.8 * (torch.std(residual) + 1e-6) * torch.randn_like(residual, device=residual.device, dtype=residual.dtype))
             weight = F.sigmoid(torch.tensor(self.decay_rate * (self.decay -  self.decay_offset), device= x.device, dtype= x.dtype)) 
-            decayed = F.relu(weight - 1e-3)
+            decayed = F.relu(weight - 1e-5)
             self.decayed = decayed.cpu().item() == 0
-            weight = weight * decayed * (1 / (torch.std(residual) + 1e-6)) # also normalize so that residual can't just try to get super large
+            weight = 0.2 * weight * decayed * (1 / (torch.std(residual) + 1e-6)) # also normalize so that residual can't just try to get super large
 
             residual = residual * weight
             if(self.training):

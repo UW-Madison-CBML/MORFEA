@@ -12,6 +12,6 @@ def prfcm(gt_indices, pred_indices, num_classes):
     recall = torch.nan_to_num(diag/confusion_mat.sum(dim=0), 0.0)
     precision = torch.nan_to_num(diag/confusion_mat.sum(dim=1), 0.0)
     f1 = torch.nan_to_num(2 * (precision * recall) / (precision + recall), 0.0)
-    return recall, precision, f1, confusion_mat
+    return (recall, precision, f1), confusion_mat
 
 
