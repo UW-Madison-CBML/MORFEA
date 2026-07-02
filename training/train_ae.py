@@ -3,7 +3,7 @@ from vit_model import ViTLSTMAE, SmallViTLSTMAE, ConvViTLSTMAE, ViTMAE
 from torchvision.transforms.functional import rgb_to_grayscale
 #from torchvision.transforms import RGB
 from torchvision.transforms.v2 import Grayscale
-
+from sklearn.neighbors import KNeighborsClassifier
 import torchvision
 import pandas as pd
 import torch
@@ -81,9 +81,9 @@ VAL_EMBRYOS = []#"RS363-7", "CZ594-5","CJ261-10","RL747-8","TM272-9","LFA766-1",
 def temporal_smoothness_loss(z_seq, weight=0.1):
     if z_seq.size(1) < 2:
         return torch.tensor(0.0, device=z_seq.device)
-    diff = z_seq[:,1:,:] - z_seq[:,:-1,:]
+    diff = z_seq[:,1:,:] - z_seq[:,:-1,:].detach()
     # use l1 for the contrastive loss below as it has it's highest gradient magnitude near 0
-    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:]) - F.sigmoid(F.l1_loss(z_seq[:, 1:, :], z_seq[:,:-1,:]))
+    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:]) - F.sigmoid(F.l1_loss(z_seq[:, 1:, :], z_seq[:,:-1,:].detach()))
     
     return weight * output
 
@@ -1511,7 +1511,7 @@ def train_lstm(
         # Ablation parameters
         dropout_rate=dropout_rate,
         use_lstm=use_lstm,
-        use_residual=True,
+        use_residual=use_residual,
         use_batchnorm=use_batchnorm
     )
     artifact = wandb.Artifact(name="scripts", type="model_file")
@@ -1890,12 +1890,15 @@ def train_lstm(
                 image_dict[f"reconstruction_val_{count}"] = images
                 count += 1
         # make sure to normalize mean and std dev before PCA 
-        pca = PCA(n_components=3).fit(StandardScaler().fit_transform(np.concatenate(trajs, axis=0)))
+        scaler = StandardScaler()
+        pca = PCA(n_components=3).fit(scaler.fit_transform(np.concatenate(trajs, axis=0)))
+        all_trajs_full = []
         embeddings = []
         count = 0 
         # do individual pca stuff
         for traj, labels in zip(trajs, traj_labels): 
             embedding = pca.transform(traj) 
+            all_trajs_full.append(traj)
             embeddings.append(embedding)
             fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
             im = ax.scatter(embedding[:,0], embedding[:,1],embedding[:,2], c=labels, cmap='viridis', vmin=0, vmax=1)
@@ -1905,6 +1908,7 @@ def train_lstm(
 
             plt.close(fig)  
             count += 1
+        all_trajs_full = np.concatenate(all_trajs, axis=0)
         # do all pca, colored by time
         all_trajs = np.concatenate(embeddings, axis=0) 
         all_traj_labels = np.concatenate(traj_labels)
@@ -1951,14 +1955,30 @@ def train_lstm(
                 plt.close(fig)   
                 count += 1
         # export the kanakasabapathy latents
-        
+        GRADES = ["A","B","C"]; GRADE_COLORS = ["#00FF00", "#FFFF00", "#FF0000"]
         metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model)
+        kanakasabapathy_embedding = pca.transform(scaler.transform(kanakasabapathy_lats))
+        # get the grades, and plot these in the same space as the validation latents
+        kanakasabapathy_colors = np.array([GRADE_COLORS[GRADES.index(g)] for g in metadata_df["TE"].to_list()])
+        fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
+        im = ax.scatter(kanakasabapathy_embedding[:,0], kanakasabapathy_embedding[:,1], kanakasabapathy_embedding[:,2], c=kanakasabapathy_colors)
+        plt.colorbar(im, ax=ax)
+        image_dict[f"kanakasabapathy_gt_grades"] = wandb.Image(fig)
+        plt.close(fig) 
+        # load classifier
+        knn = KNeighborsClassifier(n_neighbors=5)
+        # fit on all_trajs_full, concatenated list of latent trajectory points in full latent space, with labels being the G.T. stage for each frame
+        knn.fit(all_trajs_full, all_traj_stages) 
+        # now these are predicted stages for each kanakasabapathy
+        kanakasabapathy_k_nearest = knn.transform(kanakasabapathy_lats)
+        metadata_df["pred_stages"] = [StageDataset.PHASES[s] for s in kanakasabapathy_k_nearest]
         
+
         model.train()
         # spoof the ICM grades
         metadata_df['ICM'] = metadata_df['TE']
 
-        for i in range(5):
+        for i in range(10):
             idx = (i * 20000) % len(imgs)
             vol_img = normalize_video([read_gray(metadata_df.iloc[idx]["path"], 128, 0)], "minmax01")[0]
             recon_img = imgs[idx]
@@ -1970,7 +1990,7 @@ def train_lstm(
             images = wandb.Image(comparison, caption="kanakasabapathy_recon_val")
             image_dict[f"kanakasabapathy_recon_val_{idx}"] = images
 
-        run.log(image_dict | {"kanakasabapathy_grade_sizes": wandb.Table(dataframe=metadata_df.groupby("TE",as_index=False).size())})
+        run.log(image_dict | {"kanakasabapathy_grade_sizes": wandb.Table(dataframe=metadata_df.groupby("TE",as_index=False).size()), "kanakasabapathy_knn_top_stages": wandb.Table(dataframe=pd.DataFrame({"size":metadata_df.groupby("pred_stages").size().reindex(StageDataset.PHASES)}))})
         # train the lstm model on the kanakasabapathy latents and log the loss to wandb
         kanakasabapathy_lats_df = pd.DataFrame(kanakasabapathy_lats, index=metadata_df.index, columns=[f"z_{i}" for i in range(kanakasabapathy_lats.shape[1])])
         
