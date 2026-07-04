@@ -1969,18 +1969,18 @@ def train_lstm(
         image_dict[f"pca_val_all_phase"] = wandb.Image(fig)
 
         plt.close(fig) 
-        all_traj_ids = np.concatenate(traj_ids, axis=0) 
+        # now by individual trajectory id 
         fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
+        traj_ids_unique = list(set(all_traj_ids))
+        traj_ids_to_index = {t_id:i for i,t_id in enumerate(traj_ids_unique)}
+        id_colors = np.array([traj_ids_to_index[t_id] for t_id in all_traj_ids])
+        im = ax.scatter(all_embeddings[:,0], all_embeddings[:,1], all_embeddings[:,2] ,c=id_colors, cmap="viridis")
 
-        im = ax.scatter(all_embeddings[:,0], all_embeddings[:,1], all_embeddings[:,2] ,c=all_traj_stages, cmap='tab20c', vmin=0, vmax=19)
-        legend_elements = [Patch(facecolor=plt.cm.tab20c(p_idx), label=phase) for p_idx, phase in enumerate(StageDataset.PHASES)]
-        fig.legend(handles=legend_elements, title="Phases") 
-        plt.tight_layout(rect=[0, 0, 0.85, 1])
-
-        image_dict[f"pca_val_all_phase"] = wandb.Image(fig)
+        image_dict[f"pca_val_all_embryo_id"] = wandb.Image(fig)
 
         plt.close(fig) 
-        pca_df = pd.DataFrame({"embryo_id":trajs_ids, "pca_0":all_trajs[:,0], "pca_1":all_trajs[:,1],"pca_2":all_trajs[:,2],"stage":all_traj_stages})
+        pca_df = pd.DataFrame({"embryo_id":all_traj_ids, "pca_0":all_embeddings[:,0], "pca_1":all_embeddings[:,1],"pca_2":all_embeddings[:,2],"stage":all_traj_stages})
+        image_dict["pca_val_df"] = wandb.Table(dataframe = pca_df)
 
         # --------------------------------------------
         # export the training smoothness plots
