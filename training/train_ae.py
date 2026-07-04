@@ -1852,6 +1852,8 @@ def train_lstm(
         trajs = []
         traj_labels = []
         traj_stages = []
+        all_traj_ids = []
+
         image_dict = {} # collect all the plots for WandB logging
         count = 0
         with torch.no_grad():
@@ -1878,7 +1880,7 @@ def train_lstm(
                 trajs.append(traj) # add traj to list of all trajs for PCA calculation
                 traj_labels.append(np.linspace(0,1,traj.shape[0]))
                 traj_stages.append(np.array([StageDataset.PHASES.index(p) for p in get_annotations_col(embryo_id, traj.shape[0], os.path.abspath("embryo_dataset_annotations"))]))
-                
+                all_traj_ids += ([embryo_id]*len(traj))
                 cebra_embedding = cebra_time_model.transform(traj, session_id=0) # i guess dont batch it?
                 fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
                 im = ax.scatter(cebra_embedding[:,0], cebra_embedding[:,1], cebra_embedding[:,2], c=np.linspace(0,1,cebra_embedding.shape[0]), cmap='viridis')
@@ -1967,8 +1969,18 @@ def train_lstm(
         image_dict[f"pca_val_all_phase"] = wandb.Image(fig)
 
         plt.close(fig) 
+        all_traj_ids = np.concatenate(traj_ids, axis=0) 
+        fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
 
+        im = ax.scatter(all_embeddings[:,0], all_embeddings[:,1], all_embeddings[:,2] ,c=all_traj_stages, cmap='tab20c', vmin=0, vmax=19)
+        legend_elements = [Patch(facecolor=plt.cm.tab20c(p_idx), label=phase) for p_idx, phase in enumerate(StageDataset.PHASES)]
+        fig.legend(handles=legend_elements, title="Phases") 
+        plt.tight_layout(rect=[0, 0, 0.85, 1])
 
+        image_dict[f"pca_val_all_phase"] = wandb.Image(fig)
+
+        plt.close(fig) 
+        pca_df = pd.DataFrame({"embryo_id":trajs_ids, "pca_0":all_trajs[:,0], "pca_1":all_trajs[:,1],"pca_2":all_trajs[:,2],"stage":all_traj_stages})
 
         # --------------------------------------------
         # export the training smoothness plots
@@ -2067,7 +2079,7 @@ def train_lstm(
             if(test_val):
                 break
 
-        run.log(image_dict | {"kanakasabapathy_grade_sizes": wandb.Table(dataframe=metadata_df.groupby("TE",as_index=False).size()), "kanakasabapathy_knn_top_stages": wandb.Table(dataframe=pd.DataFrame({"size":metadata_df.groupby("pred_stages").size().reindex(StageDataset.PHASES), "stage":StageDataset.PHASES}, index=StageDataset.PHASES))})
+        run.log(image_dict | {"kanakasabapathy_grade_sizes": wandb.Table(dataframe=metadata_df.groupby("TE",as_index=False).size()), "kanakasabapathy_knn_top_stages": wandb.Table(dataframe=pd.DataFrame({"size":metadata_df.groupby("pred_stages").size().reindex(StageDataset.PHASES), "stage":StageDataset.PHASES}, index=StageDataset.PHASES)), "kanakasabapathy_df":wandb.Table(dataframe=metadata_df)})
         # train the lstm model on the kanakasabapathy latents and log the loss to wandb
         kanakasabapathy_lats_df = pd.DataFrame(kanakasabapathy_lats, index=metadata_df.index, columns=[f"z_{i}" for i in range(kanakasabapathy_lats.shape[1])])
         
