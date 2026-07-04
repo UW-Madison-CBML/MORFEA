@@ -159,11 +159,11 @@ class Encoder(nn.Module):
 
         self.latent_compress = nn.Linear(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size)
         if self.use_lstm:
-            self.lstm_enc = nn.GRU(latent_size, latent_size, batch_first=True, bidirectional=True)
+            self.lstm_enc = nn.GRU(latent_size, latent_size, batch_first=True)
         else:
             self.lstm_enc = None
 
-        self.lin1 = nn.Linear(latent_size*2,latent_size)
+        #self.lin1 = nn.Linear(latent_size*2,latent_size)
         #self.lin2 = nn.Linear(latent_size*2,latent_size)
 
 
@@ -193,8 +193,8 @@ class Encoder(nn.Module):
         z_compressed = F.relu(self.latent_compress(h_flat))
         if self.use_lstm:
             z_seq, _ = self.lstm_enc(z_compressed)
-        z_seq = self.dropout(z_seq)
-        z_seq = self.lin1(z_seq) + z_compressed # B, T, L*2
+        #z_seq = self.dropout(z_seq)
+        #z_seq = self.lin1(z_seq) + z_compressed # B, T, L*2
         #z_compressed = self.lin2(z_compressed) # B, T, L, no relu so that latent space can be negative
         z_seq = z_compressed.view(B, T, self.latent_size)  
 
@@ -223,7 +223,7 @@ class Decoder(nn.Module):
                 return_all_layers=False
             )"""
         if self.use_lstm:
-            self.lstm_dec = nn.GRU(2*latent_size, latent_size, batch_first=True, bidirectional=True)
+            self.lstm_dec = nn.GRU(latent_size, latent_size, batch_first=True) # bidirectional=True)
         else:
             self.lstm_dec = None
     
@@ -251,19 +251,19 @@ class Decoder(nn.Module):
         
         self.initial_resolution = initial_resolution
         
-        self.lin1 = nn.Linear(latent_size, latent_size*2)
+        #self.lin1 = nn.Linear(latent_size, latent_size*2)
 
-        self.latent_expand = nn.Linear(latent_size*2, self.hidden_channels * self.initial_resolution * self.initial_resolution)
+        self.latent_expand = nn.Linear(latent_size, self.hidden_channels * self.initial_resolution * self.initial_resolution)
         self.final_size = final_size
         self.use_residual = use_residual
         self.bn = nn.BatchNorm2d(self.hidden_channels)
     def forward(self, z_seq, residual):
         B, T, L = z_seq.shape
-        z = F.relu(self.lin1(z_seq)) # B, T, 2L
+        #z = F.relu(self.lin1(z_seq)) # B, T, 2L
         if self.use_lstm:
-            z_seq, _ = self.lstm_dec(z)
-        z_seq = self.dropout(z_seq) 
-        z_expanded = F.relu(self.latent_expand(z_seq + z))
+            z_seq, _ = self.lstm_dec(z_seq)
+        #z_seq = self.dropout(z_seq) 
+        z_expanded = F.relu(self.latent_expand(z_seq)) # + z))
         assert z_expanded.shape == (B, T, self.hidden_channels * (self.initial_resolution ** 2)), f"BAD z_expanded shape: {z_expanded.shape}"
         z_spatial = z_expanded.view(B, T, self.hidden_channels, self.initial_resolution, self.initial_resolution)  
 

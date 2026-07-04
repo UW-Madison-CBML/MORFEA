@@ -1633,7 +1633,7 @@ def train_lstm(
                 plt.close(fig)
             # def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
             rec_loss, rec_metrics = reconstruction_loss(
-                embryo_recon, embryo_vol, ssim_module, ms_ssim_module, l1_weight=0.0, ms_ssim_weight=1.0, vgg_weight=0.0
+                embryo_recon, embryo_vol, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
             )
             if temporal_weight > 0:
                 smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
