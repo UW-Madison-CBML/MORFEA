@@ -1985,7 +1985,7 @@ def train_lstm(
         # --------------------------------------------
         # export the training smoothness plots
         count = 0 # build a count for 0 indexing
-        with torch.no_grad():
+        """with torch.no_grad():
             for i, embryo_vol in (pbar := tqdm(enumerate(full_seq_loader_train), desc="Working on train dist maps")):
                 if i % 10 != 0:
                     continue
@@ -2004,7 +2004,7 @@ def train_lstm(
                 plt.close(fig)   
                 count += 1
                 if(test_val):
-                    break
+                    break"""
         # export the kanakasabapathy latents and set colors
         GRADES = ["A","B","C"]; GRADE_COLORS = ["#00FF00", "#FFFF00", "#FF0000"]
 
