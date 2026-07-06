@@ -23,7 +23,7 @@ class IVFSequenceDataset(Dataset):
 
 
     def _read_gray(self, path):
-        img = Image.open(path)
+        img = Image.open(path).convert("L")
         if img is None:
             raise FileNotFoundError(path)
         # Resize if needed

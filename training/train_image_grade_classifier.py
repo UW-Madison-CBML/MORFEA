@@ -102,9 +102,10 @@ def train_single_frame_classifier():
     
     IMAGE_SIZE = 224
     val_ratio = 0.2
+    epochs = 500
     wandb.login(key=os.getenv("WANDB_KEY"))
-    learning_rate = 0.0001
-    weight_decay = 1e-5
+    learning_rate = 0.0005
+    weight_decay = 1e-3
     run = wandb.init(
         name = "image_grade",
         entity="jenslundsgaard7-uw-madison",
@@ -112,6 +113,7 @@ def train_single_frame_classifier():
         config={
             "lr":learning_rate,
             "image_size": IMAGE_SIZE,
+            "epochs":epochs
                 }
     )
     grade_options = ["A","B","C"]
@@ -129,36 +131,36 @@ def train_single_frame_classifier():
     val_df = df.iloc[:val_index]
     df = df.iloc[val_index:]
 
-    dataset = SingleFrameDataset(df) 
-    dataset_val = SingleFrameDataset(val_df)
+    dataset = SingleFrameDataset(df, image_size=IMAGE_SIZE) 
+    dataset_val = SingleFrameDataset(val_df, image_size=IMAGE_SIZE)
     crit = torch.nn.CrossEntropyLoss(weight= torch.tensor(weights, device=DEVICE))
-    model = SingleFrameModel()
-    epochs = 8 
+    model = SingleFrameModel(image_size=IMAGE_SIZE)
+    model = model.to(DEVICE)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    scheduler = CosineAnnealingLR(optimizer, len(loader) * epochs)
 
     loader = DataLoader(
         dataset,
-        batch_size=256,
+        batch_size=128,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
         drop_last=True)
     loader_val = DataLoader(
         dataset_val,
-        batch_size=256,
+        batch_size=128,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
         drop_last=False)
 
+    scheduler = CosineAnnealingLR(optimizer, len(loader) * epochs)
     print(len(loader))
     for epoch in range(epochs):
         model.train()
         for features, targets in loader:
             features = features.to(DEVICE)
             targets = targets.to(DEVICE).long()
-            label = model(features, lengths)
+            label = model(features)
             loss = crit(label, targets)
 
             optimizer.zero_grad() 
