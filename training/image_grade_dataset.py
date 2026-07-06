@@ -96,7 +96,7 @@ class SingleFrameDataset(Dataset):
         self.resize = image_size
         self.crop = 0
     def _read_gray(self, path):
-        img = Image.open(path)
+        img = Image.open(path).convert("L")
         if img is None:
             raise FileNotFoundError(path)
         # Resize if needed

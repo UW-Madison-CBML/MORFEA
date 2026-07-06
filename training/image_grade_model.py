@@ -37,27 +37,30 @@ class ImageGradeModel(Module):
         return x
 class SingleFrameModel(Module):
 
-    def __init__(self, num_classes=3):
+    def __init__(self, num_classes=3, image_size=224):
         super().__init__()
         self.num_classes = num_classes
         self.cnn = torch.nn.Sequential(
             ResidualBlock(1, 32),
             ResidualBlock(32, 32),
-            ResidualBlock(32, 32),
-            ResidualBlock(32, 32)
+            ResidualBlock(32, 16),
+            ResidualBlock(16, 8)
         )
 
-
-        self.lin1 = torch.nn.Linear(2048, 256)
-        self.lin2 = torch.nn.Linear(256, 128)
-        self.lin3 = torch.nn.Linear(128, num_classes)
+        first_lin_size = 8 * ((image_size // 16) ** 2)
+        self.lin1 = torch.nn.Linear(first_lin_size, 128)
+        self.lin2 = torch.nn.Linear(128, 64)
+        self.lin3 = torch.nn.Linear(64, num_classes)
+        self.dropout = torch.nn.Dropout(0.3)
         
 
         
-    def forward(self, x, lengths):
+    def forward(self, x):
+        B, C, H, W = x.shape
         x = self.cnn(x)
-        x = x.view(B,T,-1) # last dim should be 2048
+        x = x.view(B,-1) # last dim should be 2048
         x = F.relu(self.lin1(x))
+        x = self.dropout(x)
         x = F.relu(self.lin2(x))
         x = self.lin3(x)
         return x
