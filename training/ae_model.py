@@ -118,7 +118,7 @@ class ResidualUpBlock(nn.Module):
 
 class Encoder(nn.Module):
 
-    def __init__(self, input_channels=1, num_layers=2, latent_size=4096, hidden_channels=64, use_lstm=True, use_residual=True):
+    def __init__(self, input_channels=1, num_layers=2, latent_size=4096, hidden_channels=16, use_lstm=True, use_residual=True):
         super(Encoder, self).__init__()
         self.use_residual = use_residual
         self.latent_size = latent_size
@@ -158,6 +158,9 @@ class Encoder(nn.Module):
         self.dropout = nn.Dropout(0.1)
 
         self.latent_compress = nn.Linear(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size)
+        self.latent_compress.weight.data = torch.eye(max(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size))[:self.hidden_channels * self.final_resolution * self.final_resolution,:latent_size]
+        self.latent_compress.bias.data.fill_(0.0)
+
         if self.use_lstm:
             self.lstm_enc = nn.GRU(latent_size, latent_size, batch_first=True)
         else:
@@ -190,20 +193,22 @@ class Encoder(nn.Module):
         # Flatten and compress spatial dimensions with linear layer
         B, T, C, H, W = h_seq.shape
         h_flat = h_seq.view(B, T, C * H * W)  # Linear just works on bottom most dim
-        z_compressed = F.relu(self.latent_compress(h_flat))
-        if self.use_lstm:
-            z_seq, _ = self.lstm_enc(z_compressed)
+        z_seq = self.latent_compress(h_flat)
+        #if self.use_lstm:
+        #    z_seq, _ = self.lstm_enc(z_compressed)
+        #else:
+        #    z_seq = z_compressied
         #z_seq = self.dropout(z_seq)
         #z_seq = self.lin1(z_seq) + z_compressed # B, T, L*2
         #z_compressed = self.lin2(z_compressed) # B, T, L, no relu so that latent space can be negative
-        z_seq = z_compressed.view(B, T, self.latent_size)  
+        z_seq = z_seq.view(B, T, self.latent_size)  
 
 
         return z_seq, residual
 
 class Decoder(nn.Module):
 
-    def __init__(self, latent_size=4096, num_layers=2, hidden_channels=64, initial_resolution=16,final_size=128, use_lstm=True, use_residual=True):
+    def __init__(self, latent_size=4096, num_layers=2, hidden_channels=16, initial_resolution=16,final_size=128, use_lstm=True, use_residual=True):
         super(Decoder, self).__init__()
         self.latent_size = latent_size
         self.hidden_channels = hidden_channels
@@ -254,14 +259,16 @@ class Decoder(nn.Module):
         #self.lin1 = nn.Linear(latent_size, latent_size*2)
 
         self.latent_expand = nn.Linear(latent_size, self.hidden_channels * self.initial_resolution * self.initial_resolution)
+        self.latent_expand.weight.data = torch.eye(max(latent_size, self.hidden_channels * self.initial_resolution * self.initial_resolution))[:latent_size,:self.hidden_channels * self.initial_resolution * self.initial_resolution]
+        self.latent_expand.bias.data.fill_(0.0)
         self.final_size = final_size
         self.use_residual = use_residual
         self.bn = nn.BatchNorm2d(self.hidden_channels)
     def forward(self, z_seq, residual):
         B, T, L = z_seq.shape
         #z = F.relu(self.lin1(z_seq)) # B, T, 2L
-        if self.use_lstm:
-            z_seq, _ = self.lstm_dec(z_seq)
+        #if self.use_lstm:
+        #    z_seq, _ = self.lstm_dec(z_seq)
         #z_seq = self.dropout(z_seq) 
         z_expanded = F.relu(self.latent_expand(z_seq)) # + z))
         assert z_expanded.shape == (B, T, self.hidden_channels * (self.initial_resolution ** 2)), f"BAD z_expanded shape: {z_expanded.shape}"
@@ -302,7 +309,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         use_lstm=True,
         use_residual=True,
         use_batchnorm=True,
-        hidden_channels=64
+        hidden_channels=16
         ):
         super(ConvLSTMAutoencoder, self).__init__()
         self.use_classifier = use_classifier

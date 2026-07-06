@@ -5,28 +5,37 @@ from torch.utils.data import Dataset
 from PIL import Image, ImageFile
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-
-
+from torchvision.transforms import v2
+from torchvision.tv_tensors import Video
 class ImageGradeDataset(Dataset):
-    def __init__(self, df, grade, resize=128, norm="minmax01", max_frames=None, return_whole_seqs=False):
+    def __init__(self, df, grade, crop=50, resize=128, norm="minmax01", max_frames=None, return_whole_seqs=False):
+        
         df = df.dropna(subset=[grade])
         self.df = pd.concat([pd.DataFrame({"embryo_id":row["embryo_id"], "image_path":row["embryo_paths"].split("|"), grade:row[grade]}) for _, row in df.iterrows()], axis=0, ignore_index=True)
         self.groups = self.df.groupby("embryo_id")
+        self.crop = crop
         self.resize = resize
         self.norm = norm
         self.GRADES = ["A", "B", "C"]
         self.return_whole_seqs = return_whole_seqs
-        
-        self.grade = grade
+        self.augment = v2.Compose([
+            v2.RandomHorizontalFlip(p=0.5),
+            v2.RandomVerticalFlip(p=0.5),
+        ])
 
+       
+        self.grade = grade
     def _read_gray(self, path):
         img = Image.open(path)
         if img is None:
             raise FileNotFoundError(path)
-
+        # Resize if needed
         if self.resize is not None:
+            # crop
+            img = img.crop((self.crop,self.crop,500-self.crop,500-self.crop))
+            #resize
             img = img.resize((self.resize, self.resize), Image.BILINEAR)
-
+            
         return np.array(img, dtype="float32")
 
     def _normalize_video(self, vol):
@@ -38,6 +47,7 @@ class ImageGradeDataset(Dataset):
             vol = (vol - lo) / (hi - lo + 1e-6)
             vol = np.clip(vol, 0, 1)
         return vol
+
 
     def __getitem__(self, idx):
         rows=None
@@ -78,3 +88,31 @@ class ImageGradeDataset(Dataset):
         targets = torch.tensor(targets)
     
         return signals_padded, targets, lengths 
+
+class SingleFrameDataset(Dataset):
+    GRADES = ["A", "B", "C"]
+    def __init__(self, df, image_size=224):
+        self.df = df 
+        self.resize = image_size
+        self.crop = 0
+    def _read_gray(self, path):
+        img = Image.open(path)
+        if img is None:
+            raise FileNotFoundError(path)
+        # Resize if needed
+        if self.resize is not None:
+            # crop
+            img = img.crop((self.crop,self.crop,500-self.crop,500-self.crop))
+            #resize
+            img = img.resize((self.resize, self.resize), Image.BILINEAR)
+            
+        return np.array(img, dtype="float32")
+
+
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+        return torch.tensor(self._read_gray(row["path"]))[None,:,:], torch.tensor(self.__class__.GRADES.index(row["TE"]), dtype=torch.long)
+
+    def __len__(self):
+        return len(self.df)
+
