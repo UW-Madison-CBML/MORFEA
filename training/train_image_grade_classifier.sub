@@ -21,7 +21,7 @@ when_to_transfer_output = ON_EXIT_OR_EVICT
 Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
-transfer_input_files = train_image_grade_classifier.sh, train_image_grade_classifier.py, image_grade_model.py, ../api_keys.txt, image_grade_dataset.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, ../utils/geometric_features.py,file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, ae_model.py, file:///staging/groups/bhaskar_group/ivf/index_embryo.csv
+transfer_input_files = train_image_grade_classifier.sh, train_image_grade_classifier.py, image_grade_model.py, ../api_keys.txt, image_grade_dataset.py, file:///staging/groups/bhaskar_group/ivf/embryo_dataset_grades.csv, ../utils/geometric_features.py,file:///staging/groups/bhaskar_group/ivf/embryo_dataset.tar.gz, ae_model.py, file:///staging/groups/bhaskar_group/ivf/index_embryo.csv, file:///staging/groups/bhaskar_group/ivf/kanakasabapathy.tar.gz
 +WantGPULab = true
 +GPUJobLength = "long"
 gpus_minimum_capability = 7.0
