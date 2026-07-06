@@ -1,6 +1,8 @@
 #!/bin/bash
 
 tar -zxf embryo_dataset.tar.gz
+tar -xvf kanakasabapathy.tar.gz
+mv alldata/ kanakasabapathy/
 
 if [ -f "api_keys.txt" ]; then
     WB_KEY=$(tail -n 1 api_keys.txt)

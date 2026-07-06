@@ -99,7 +99,6 @@ def train_single_frame_classifier():
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     
     IMAGE_SIZE = 224
     val_ratio = 0.2
@@ -139,14 +138,14 @@ def train_single_frame_classifier():
     scheduler = CosineAnnealingLR(optimizer, len(loader) * epochs)
 
     loader = DataLoader(
-        dataset_te,
+        dataset,
         batch_size=256,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
         drop_last=True)
     loader_val = DataLoader(
-        dataset_te_val,
+        dataset_val,
         batch_size=256,
         shuffle=True,
         num_workers=4,
@@ -167,7 +166,7 @@ def train_single_frame_classifier():
             optimizer.step()
 
             scheduler.step()
-            run.log({"te": loss.item()})
+            run.log({"loss": loss.item()})
         acc_stats = RunningStats()
 
         model.eval()
@@ -200,7 +199,7 @@ def train_single_frame_classifier():
             val_dict[f"{g}_recall"] = recall; val_dict[f"{g}_precision"] = precision; val_dict[f"{g}_f1"] = f1
             #---------------------------------------------------------------------------------- 
             
-        run.log({"acc_mean": acc_stats.mean, "acc_std":acc_stats.std_dev })
+        run.log(val_dict | {"acc_mean": acc_stats.mean, "acc_std":acc_stats.std_dev })
 
 
 def train_image_sequence_classifier():
@@ -370,6 +369,7 @@ def train_image_sequence_classifier():
         run.log({"te_acc_mean": te_acc_stats.mean, "te_acc_std":te_acc_stats.std_dev, "icm_acc_mean":icm_acc_stats.mean, "icm_acc_std":icm_acc_stats.std_dev})
 
 if __name__ == "__main__":
+    import sys
     if(len(sys.argv) >= 2 and sys.argv[1] == "sequence"):
         train_image_sequence_classifier()
     else:
