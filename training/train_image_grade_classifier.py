@@ -1,6 +1,6 @@
 import torch
-from image_grade_dataset import ImageGradeDataset
-from image_grade_model import ImageGradeModel
+from image_grade_dataset import ImageGradeDataset, SingleFrameDataset
+from image_grade_model import ImageGradeModel, SingleFrameModel
 from torch.utils.data import DataLoader
 import wandb
 import os
@@ -20,7 +20,7 @@ def recall_precision_f1(confusion_mat, i):
         f1 = 2 * (precision * recall) / (precision + recall)
     return recall, precision, f1
 
-VAL_EMBRYOS =[
+VAL_EMBRYOS = [
     "RG434-11",
     "RC1103-1",
     "LV488-7",
@@ -94,8 +94,116 @@ class RunningStats:
     def std_dev(self):
         return math.sqrt(self.variance)
 
+def train_single_frame_classifier():
+    weights = [0.3,0.3,0.3]
+    torch.cuda.empty_cache()
+    torch.autograd.detect_anomaly(True)
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def main():
+    
+    IMAGE_SIZE = 224
+    val_ratio = 0.2
+    wandb.login(key=os.getenv("WANDB_KEY"))
+    learning_rate = 0.0001
+    weight_decay = 1e-5
+    run = wandb.init(
+        name = "image_grade",
+        entity="jenslundsgaard7-uw-madison",
+        project="IVF-Training",
+        config={
+            "lr":learning_rate,
+            "image_size": IMAGE_SIZE,
+                }
+    )
+    grade_options = ["A","B","C"]
+    grade_df = pd.read_csv(os.path.abspath("embryo_dataset_grades.csv")).rename(columns={"video_name":"embryo_id"}) 
+    
+    images_3 = [os.path.join("kanakasabapathy","3",path) for path in os.listdir(os.path.join("kanakasabapathy","3"))]
+    images_4 = [os.path.join("kanakasabapathy","4",path) for path in os.listdir(os.path.join("kanakasabapathy","4"))]
+    images_5 = [os.path.join("kanakasabapathy","5",path) for path in os.listdir(os.path.join("kanakasabapathy","5"))]
+    paths = images_3 + images_4 + images_5
+    grades = (["C"] * len(images_3))+ (["B"] * len(images_4))+(["A"] * len(images_5))
+    df = pd.DataFrame({"path":paths, "TE":grades, "embryo_id":np.arange(len(paths))}) #spoof the embryo id as just a number
+    df = df.sample(frac=1, replace=False)
+    VAL_RATIO = 0.2 
+    val_index = int(VAL_RATIO * len(df))
+    val_df = df.iloc[:val_index]
+    df = df.iloc[val_index:]
+
+    dataset = SingleFrameDataset(df) 
+    dataset_val = SingleFrameDataset(val_df)
+    crit = torch.nn.CrossEntropyLoss(weight= torch.tensor(weights, device=DEVICE))
+    model = SingleFrameModel()
+    epochs = 8 
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    scheduler = CosineAnnealingLR(optimizer, len(loader) * epochs)
+
+    loader = DataLoader(
+        dataset_te,
+        batch_size=256,
+        shuffle=True,
+        num_workers=16,
+        pin_memory=True,
+        drop_last=True)
+    loader_val = DataLoader(
+        dataset_te_val,
+        batch_size=256,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+        drop_last=False)
+
+    print(len(loader))
+    for epoch in range(epochs):
+        model.train()
+        for features, targets in loader:
+            features = features.to(DEVICE)
+            targets = targets.to(DEVICE).long()
+            label = model(features, lengths)
+            loss = crit(label, targets)
+
+            optimizer.zero_grad() 
+            loss.backward() 
+            optimizer.step()
+
+            scheduler.step()
+            run.log({"te": loss.item()})
+        acc_stats = RunningStats()
+
+        model.eval()
+        confusion_mat = torch.zeros((3,3))
+        with torch.no_grad():
+            for features, targets in loader_val:
+                
+                print(f"targets shape: {targets.shape}")
+
+                print(f"features shape: {features.shape}")
+
+                features = features.to(DEVICE)
+                logits = model(features)
+                
+                preds = logits.cpu().argmax(dim=-1)
+                
+                acc_stats.push((preds == targets).sum().item()/targets.shape[0]) 
+                
+                targets = F.one_hot(targets, num_classes=3)
+                preds = F.one_hot(preds, num_classes=3)
+
+
+                confusion_mat += torch.einsum('ti,tj->ij', preds, targets) # this einsum calculates confusion mats
+
+
+               
+        val_dict = {} 
+        for i, g in enumerate(grade_options):
+            recall, precision, f1 = recall_precision_f1(confusion_mat, i)
+            val_dict[f"{g}_recall"] = recall; val_dict[f"{g}_precision"] = precision; val_dict[f"{g}_f1"] = f1
+            #---------------------------------------------------------------------------------- 
+            
+        run.log({"acc_mean": acc_stats.mean, "acc_std":acc_stats.std_dev })
+
+
+def train_image_sequence_classifier():
     weights = [0.2,0.4,0.4]
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
@@ -262,5 +370,8 @@ def main():
         run.log({"te_acc_mean": te_acc_stats.mean, "te_acc_std":te_acc_stats.std_dev, "icm_acc_mean":icm_acc_stats.mean, "icm_acc_std":icm_acc_stats.std_dev})
 
 if __name__ == "__main__":
-    main()
+    if(len(sys.argv) >= 2 and sys.argv[1] == "sequence"):
+        train_image_sequence_classifier()
+    else:
+        train_single_frame_classifier()
 

@@ -121,7 +121,7 @@ def save_and_push_model(model, repo_name, required_files, hf_token,model_config=
         print(f"Warning: push_to_hub failed ({e}), will upload manually")
 
     model.to(device)
-    if hasattr(model, 'decoder') and hasattr(model,'encoder') and model.decoder.lstm_dec is not None and model.encoder.lstm_enc is not None:
+    if hasattr(model, 'decoder') and hasattr(model,'encoder') and hasattr(model.encoder, 'lstm_enc') and hasattr(model.decoder,'lstm_dec') and model.decoder.lstm_dec is not None and model.encoder.lstm_enc is not None:
         model.encoder.lstm_enc.flatten_parameters()
         model.decoder.lstm_dec.flatten_parameters()
     api = HfApi(token=hf_token)
@@ -1522,7 +1522,8 @@ def train_lstm(
     artifact.add_file(os.path.abspath("train_ae.py"))
     artifact.add_file(os.path.abspath("ae_model.py"))
     run.log_artifact(artifact)
-    VAL_EMBRYOS = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"}).dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
+    grades_df = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"})
+    VAL_EMBRYOS = grades_df.dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
     torch.cuda.init()
     model = model.to(DEVICE)
     trainable_params = 0
@@ -1595,9 +1596,10 @@ def train_lstm(
         torch.cuda.empty_cache()
 
         model.train()
-        if model.decoder.lstm_dec is not None and model.encoder.lstm_enc is not None:
+        if hasattr(model, 'decoder') and hasattr(model,'encoder') and hasattr(model.encoder, 'lstm_enc') and hasattr(model.decoder,'lstm_dec') and model.decoder.lstm_dec is not None and model.encoder.lstm_enc is not None:
             model.encoder.lstm_enc.flatten_parameters()
             model.decoder.lstm_dec.flatten_parameters()
+
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
         count = 0
@@ -1774,6 +1776,8 @@ def train_lstm(
 
         model_clone.load_state_dict(model.state_dict())
         save_and_push_model(model_clone, model_name +"-"+ date_label, required_files, hf_token, model_config=hf_config)
+        if(epoch % 3 != 0):
+            continue
         val_metrics = {
             'mse': RunningStats(),
             'l1': RunningStats(),
@@ -1782,7 +1786,7 @@ def train_lstm(
         }
         model.eval()  # Set model to evaluation mode
         with torch.no_grad():
-            for embryo_vol,_ in (pbar := tqdm(val_loader, desc="Working on 32-seq validation loss tests")):
+            for embryo_vol,_ in (pbar := tqdm(val_loader, desc="32-seq validation loss tests")):
                 embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, H, W)
                 val_recon, val_lat = model(embryo_vol)
                 B, T, C, H, W = embryo_vol.shape
@@ -1857,7 +1861,7 @@ def train_lstm(
         image_dict = {} # collect all the plots for WandB logging
         count = 0
         with torch.no_grad():
-            for i, (embryo_vol, embryo_id) in (pbar := tqdm(enumerate(full_seq_loader_val))):
+            for i, (embryo_vol, embryo_id) in (pbar := tqdm(list(enumerate(full_seq_loader_val)))):
                 pbar.set_description(f"Doing validation for full seq of {embryo_id[0]}") 
                 if i % 5 != 0:
                     continue
@@ -1981,6 +1985,32 @@ def train_lstm(
         plt.close(fig) 
         pca_df = pd.DataFrame({"embryo_id":all_traj_ids, "pca_0":all_embeddings[:,0], "pca_1":all_embeddings[:,1],"pca_2":all_embeddings[:,2],"stage":all_traj_stages})
         image_dict["pca_val_df"] = wandb.Table(dataframe = pca_df)
+        # -------------------------------------------------------- 
+        # now let's look at path signatures of the pca_latents:
+        def agg_path_sigs(group):
+            pca_traj = group[["pca_0", "pca_1", "pca_2"]].to_numpy()
+            path_sig = get_path_sig(pca_traj, 3) # 40 features 
+            out_df = pd.DataFrame(path_sig[None,:], columns=[f"path_sig_{i}" for i in range(path_sig.shape[0])])
+            return out_df
+            
+        path_sigs_df = pca_df.groupby("embryo_id").apply(agg_path_sigs, include_groups=False).reset_index()
+        path_sigs_df = path_sigs_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")
+        path_sig_cols = [col for col in path_sigs_df.columns if col.startswith("path_sig_")]
+        path_sigs = path_sigs_df[path_sig_cols].to_numpy()
+        path_sig_labels = [GRADE_COLORS[GRADES.index(g)] for g in path_sigs_df["TE"].to_list()]
+        norm_pca_path_sigs = PCA(n_components=3).fit_transform(StandardScaler().fit_transform(path_sigs))
+        
+        fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
+        im = ax.scatter(norm_pca_path_sigs[:,0], norm_pca_path_sigs[:,1], norm_pca_path_sigs[:,2], c=path_sig_labels)
+        legend_elements = [Patch(facecolor=GRADE_COLORS[g_idx], label=grade) for g_idx, grade in enumerate(GRADES)]
+        fig.legend(handles=legend_elements, title="Grades") 
+        plt.tight_layout(rect=[0, 0, 0.85, 1])
+
+
+        plt.colorbar(im, ax=ax)
+        image_dict[f"pca_val_stage_{count}"] = wandb.Image(fig)
+
+        plt.close(fig)  
 
         # --------------------------------------------
         # export the training smoothness plots
@@ -2094,7 +2124,10 @@ def train_lstm(
         kanakasabapathy_val_df = kanakasabapathy_df[kanakasabapathy_mask]
         kanakasabapathy_df = kanakasabapathy_df[~kanakasabapathy_mask]
         train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "kanakasabapathy", run, batch_size=128, epochs=30)
-
+        
+        
+        
+        
 
             
 
