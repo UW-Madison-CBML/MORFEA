@@ -89,7 +89,7 @@ def main(model_name, grade):
         return ps_group
     blastocyst_cebra_df = df[(df['phase'].str.contains('tEB', regex=True))][cebra_latent_cols + [grade, "embryo_id"]]
     
-    cebra_path_sigs_df = blastocyst_cebra_df.groupby("embryo_id").apply(group_to_path_sig, include_groups=False).reset_index()#
+    cebra_path_sigs_df = blastocyst_cebra_df.groupby("embryo_id").apply(group_to_path_sig).reset_index()#
     
 
     colors = ["#FF0000", "#FFFF00", '#00FF00']

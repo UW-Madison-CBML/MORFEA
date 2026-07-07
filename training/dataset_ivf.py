@@ -6,6 +6,7 @@ from PIL import Image, ImageFile
 import os
 from torchvision.transforms import v2
 from torchvision.tv_tensors import Video
+from torchvision.transforms import InterpolationMode 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 class IVFSequenceDataset(Dataset):
     def __init__(self, df, crop=45, resize=500, norm="minmax01", inference=False, sequences = True):
@@ -16,7 +17,7 @@ class IVFSequenceDataset(Dataset):
         self.norm = norm
         self.inference = inference
         self.augment = v2.Compose([
-            v2.RandomHorizontalFlip(p=0.5),
+            v2.RandomRotation([-180,180], interpolation=InterpolationMode.BILINEAR),
             v2.RandomVerticalFlip(p=0.5),
         ])
         self.sequences = sequences
@@ -46,9 +47,6 @@ class IVFSequenceDataset(Dataset):
         return vol
 
     def __getitem__(self, idx):
-        if not self.sequences:
-            seq_idx = idx % 32
-            idx = idx // 32
         row = self.df.iloc[idx]
         if pd.isna(row["embryo_paths"]) or pd.isna(row["empty_well_paths"]) or pd.isna(row["sample_paths"]):
             print(f"Row {idx} has missing path data: ", row.to_string(index = False))
@@ -65,10 +63,7 @@ class IVFSequenceDataset(Dataset):
         #else:
         #    re
         #return self.augment(Video(torch_vol))
-        if self.sequences:
-            return torch_vol, self.augment(Video(torch_vol))
-        else:
-            return torch_vol[seq_idx], self.augment(torch_vol[seq_idx])
+        return torch_vol, self.augment(Video(torch_vol))
 
     def __len__(self):
         return len(self.df) if self.sequences else len(self.df) * 32

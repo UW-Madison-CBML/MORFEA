@@ -58,6 +58,7 @@ from dataset_ivf_embryo import read_gray, normalize_video
 from pytorch_msssim import MS_SSIM, SSIM
 from dataset_vit import VITDataset
 from stage_dataset import get_annotations_col, StageDataset
+from geometric_features import get_path_sig
 class RunningStats:
     def __init__(self):
         self.n = 0
@@ -1448,11 +1449,13 @@ def train_lstm(
     warm_restarts=False,
     image_size = 128,
     vgg_weight=0.0,
-    test_val=False
+    test_val=False,
+    position_regularization=True,
+    position_regularization_weight=1.0
     ):
     #hyperparameters:
 
-    
+    POSITION_DIM = int(0.80 * latent_size)
     #epochs = 30
     #lr = 2e-4
     batch_size = 64
@@ -1493,6 +1496,7 @@ def train_lstm(
             "image_size": image_size,
             "distributed": False,
             "warm_restarts":warm_restarts,
+            "position_regularization":position_regularization
         },
     )
     hf_token = os.getenv("HF_TOKEN")
@@ -1522,6 +1526,7 @@ def train_lstm(
     artifact.add_file(os.path.abspath("train_ae.py"))
     artifact.add_file(os.path.abspath("ae_model.py"))
     run.log_artifact(artifact)
+
     grades_df = pd.read_csv("embryo_dataset_grades.csv").rename(columns={"video_name":"embryo_id"})
     VAL_EMBRYOS = grades_df.dropna(subset=["ICM"])["embryo_id"].astype(str).tolist()
     torch.cuda.init()
@@ -1605,12 +1610,14 @@ def train_lstm(
         count = 0
         start_time = time.perf_counter()
         end_time = time.perf_counter()
-        for index, (_, embryo_vol) in enumerate(pbar):
+        for index, (embryo_vol, augment_vol) in enumerate(pbar):
             optimizer.zero_grad()
             t0 = time.perf_counter()
             embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, 500, 500)
+            augment_vol = augment_vol.to(DEVICE)
             t1 = time.perf_counter()
             embryo_recon, embryo_lat = model(embryo_vol)
+            augment_recon, augment_lat = model(augment_vol) 
             t2 = time.perf_counter()
             if(index % 47 == 0):
                 vol_img = embryo_vol[0, -1, 0].cpu().detach().numpy()
@@ -1634,9 +1641,15 @@ def train_lstm(
 
                 plt.close(fig)
             # def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
-            rec_loss, rec_metrics = reconstruction_loss(
+            rec_loss, _ = reconstruction_loss(
                 embryo_recon, embryo_vol, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
             )
+            augment_rec_loss, _ = reconstruction_loss(
+                augment_recon, augment_vol, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
+            )
+            rec_loss = rec_loss + augment_rec_loss
+            if(position_regularization):
+                rec_loss = rec_loss + position_regularization_weight * F.mse_loss(embryo_lat[:,:,:POSITION_DIM], augment_lat[:,:,:POSITION_DIM])
             if temporal_weight > 0:
                 smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
                 loss = rec_loss + smooth_loss
@@ -1842,6 +1855,9 @@ def train_lstm(
             for embryo_vol in (pbar := tqdm(full_seq_loader_train, desc="Exporting train latents for training cebra")):
                 embryo_vol = embryo_vol.to(DEVICE)
                 _, z_seq = model(embryo_vol)
+
+                if(position_regularization):
+                    z_seq = z_seq[:,:,:POSITION_DIM]
                 traj = z_seq.cpu().numpy()[0] # batch size one just use that batch
                 cebra_latents.append(traj)
                 cebra_labels.append((np.arange(len(traj)) + offset ).reshape(-1, 1).astype(np.float32))
@@ -1869,6 +1885,9 @@ def train_lstm(
                 embryo_id = embryo_id[0] # get rid of the batch
                 embryo_vol = embryo_vol.to(DEVICE) 
                 embryo_recon, z_seq = model(embryo_vol)
+                if(position_regularization):
+                    z_seq = z_seq[:,:,:POSITION_DIM]
+
                 traj = z_seq.cpu().numpy()[0] # batch size one just use that batch
                 distance_mat = distance_matrix(traj,traj)
                 fig, ax = plt.subplots(figsize=(8, 6))
@@ -1985,6 +2004,8 @@ def train_lstm(
         plt.close(fig) 
         pca_df = pd.DataFrame({"embryo_id":all_traj_ids, "pca_0":all_embeddings[:,0], "pca_1":all_embeddings[:,1],"pca_2":all_embeddings[:,2],"stage":all_traj_stages})
         image_dict["pca_val_df"] = wandb.Table(dataframe = pca_df)
+
+        GRADES = ["A","B","C"]; GRADE_COLORS = ["#00FF00", "#FFFF00", "#FF0000"]
         # -------------------------------------------------------- 
         # now let's look at path signatures of the pca_latents:
         def agg_path_sigs(group):
@@ -1993,7 +2014,7 @@ def train_lstm(
             out_df = pd.DataFrame(path_sig[None,:], columns=[f"path_sig_{i}" for i in range(path_sig.shape[0])])
             return out_df
             
-        path_sigs_df = pca_df.groupby("embryo_id").apply(agg_path_sigs, include_groups=False).reset_index()
+        path_sigs_df = pca_df.groupby("embryo_id").apply(agg_path_sigs).reset_index()
         path_sigs_df = path_sigs_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")
         path_sig_cols = [col for col in path_sigs_df.columns if col.startswith("path_sig_")]
         path_sigs = path_sigs_df[path_sig_cols].to_numpy()
@@ -2008,7 +2029,7 @@ def train_lstm(
 
 
         plt.colorbar(im, ax=ax)
-        image_dict[f"pca_val_stage_{count}"] = wandb.Image(fig)
+        image_dict[f"path_sigs"] = wandb.Image(fig)
 
         plt.close(fig)  
 
@@ -2036,9 +2057,8 @@ def train_lstm(
                 if(test_val):
                     break"""
         # export the kanakasabapathy latents and set colors
-        GRADES = ["A","B","C"]; GRADE_COLORS = ["#00FF00", "#FFFF00", "#FF0000"]
 
-        metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model)
+        metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model, position_dim = POSITION_DIM if position_regularization else latent_size)
 
         kanakasabapathy_embeddings = pca.transform(scaler.transform(kanakasabapathy_lats))
         
@@ -2081,7 +2101,7 @@ def train_lstm(
         # alternatively
         kanakasabapathy_pred_grades_knn = knn.predict(val_features)
         _, cm = prfcm(torch.from_numpy(kanakasabapathy_pred_grades_knn), torch.from_numpy(val_labels), 3) # compare predicted to ground truth
-        cm = cm.numpy().T # need to transpose
+        cm = cm.numpy() # don't transpose right way
         fig, ax = plt.subplots(figsize=(10, 10))
         disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= GRADES)
         disp.plot(cmap='Blues', ax=ax, values_format='d')
@@ -2124,9 +2144,8 @@ def train_lstm(
         kanakasabapathy_val_df = kanakasabapathy_df[kanakasabapathy_mask]
         kanakasabapathy_df = kanakasabapathy_df[~kanakasabapathy_mask]
         train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "kanakasabapathy", run, batch_size=128, epochs=30)
-        
-        
-        
+
+        # export the actual model latents 
         
 
             
@@ -2173,6 +2192,9 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=25, help="epochs")
     parser.add_argument("--warm-restarts", action="store_true", help="turn on warm restarts lr scheduling, default is cosine annealing decreasing over the the whole run")
     parser.add_argument("--test-val", action="store_true", help="only train for a few samples then immediately move to validation for testing")
+    parser.add_argument("--position-regularization", action="store_true", help="use data augmentation to make model equivariant to well position")
+
+    parser.add_argument("--position-regularization-weight", type=float, default=1.0, help="use data augmentation to make model equivariant to well position")
     args = parser.parse_args()
 
     if len(sys.argv) > 1 and sys.argv[1] == "convlstm":
