@@ -36,29 +36,8 @@ def addAnnotations(group_name, group, annotations_dir):
     return group
 
 
-def export_latents_to_csv(model_name="", index_csv="index_embryo.csv",limit=None):
-    hf_token = os.getenv("HF_TOKEN") or os.getenv("HF_KEY")
-    if hf_token:
-        login(hf_token)
-
-    if not os.path.exists(index_csv):
-        raise FileNotFoundError(f"{index_csv} not found. Run build_index_embryo.py first.")
-
-    ds = IVFEmbryoDataset(pd.read_csv(index_csv), resize=128, norm="minmax01")
-
-    if limit is not None and limit > 0:
-        original_len = len(ds.df)
-        ds.df = ds.df.iloc[:limit]
-        print(f"Limited dataset from {original_len} to {len(ds.df)} embryos")
-    loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=16, pin_memory=True) # TODO fix batch size here
-
-    # Load model
-    print(f"\n{'='*60}")
-    print("LOADING MODEL")
-    print(f"{'='*60}")
-    
-    model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/"+model_name)
-    
+def export_latents_to_csv(model, loader):
+        
     model = model.to(DEVICE)
     model.eval()
     print(f"Model loaded successfully on {DEVICE}!")
@@ -131,7 +110,6 @@ def export_latents_to_csv(model_name="", index_csv="index_embryo.csv",limit=None
     print(f"Unique embryos: {df['embryo_id'].nunique()}")
     normed_df = df
 
-    np.save(model_name + '.npy', latents_data)
 
     metadata = normed_df[['embryo_id', 'time_step']]
 
@@ -155,6 +133,35 @@ def export_latents_to_csv(model_name="", index_csv="index_embryo.csv",limit=None
         print(f"Grades file {grades_file} not found, skipping grade join")
     annotations_dir = "embryo_dataset_annotations"
     metadata = metadata.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,annotations_dir)).reset_index()
+
+    return metadata, latents_data
+def main(model_name,index_csv):
+    hf_token = os.getenv("HF_TOKEN") or os.getenv("HF_KEY")
+    if hf_token:
+        login(hf_token)
+
+    if not os.path.exists(index_csv):
+        raise FileNotFoundError(f"{index_csv} not found. Run build_index_embryo.py first.")
+
+    ds = IVFEmbryoDataset(pd.read_csv(index_csv), resize=128, norm="minmax01")
+
+    if limit is not None and limit > 0:
+        original_len = len(ds.df)
+        ds.df = ds.df.iloc[:limit]
+        print(f"Limited dataset from {original_len} to {len(ds.df)} embryos")
+    loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=16, pin_memory=True) # TODO fix batch size here
+
+    # Load model
+    print(f"\n{'='*60}")
+    print("LOADING MODEL")
+    print(f"{'='*60}")
+    
+    model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/"+model_name)
+
+    metadata_df, latents_data = export_latents_to_csv(model, loader)
+     
+    np.save(model_name + '.npy', latents_data)
+    
     metadata.to_csv(model_name + '.csv', index=False)
     torch.cuda.empty_cache()
     print(f"\n{'='*60}")
@@ -163,7 +170,7 @@ def export_latents_to_csv(model_name="", index_csv="index_embryo.csv",limit=None
     print(f"  Latent embeddings saved to: {model_name}.npy")
     print(f"  Metadata saved to: {model_name}.csv")
     print(f"{'='*60}\n")
-
+   
 if __name__ == "__main__":
     import argparse
 
@@ -171,16 +178,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--name", type=str, help="Name of the model", default="JensLundsgaard/IVF-ConvLSTM-Model-2025-12-15")
     parser.add_argument("--index", type=str, help="Input index CSV file", default="index_embryo.csv")
-    parser.add_argument("--limit", type=int, default=0,
-                       help="Maximum number of embryos to process (default: 25, use 0 for all)")
 
     args = parser.parse_args()
 
-    # Convert 0 to None for processing all embryos
-    limit = None if args.limit == 0 else args.limit
+    
+    main(model_name,index_csv)
 
-    export_latents_to_csv(
-        model_name=args.name,
-        index_csv=args.index,
-        limit=limit
-    )

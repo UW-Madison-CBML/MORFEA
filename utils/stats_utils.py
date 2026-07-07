@@ -7,7 +7,7 @@ def prfcm(gt_indices, pred_indices, num_classes):
     # returns: precision, recall, f1. shape = num_classes
     #          confusion_mat. shape = num_classes, num_classes
 
-    confusion_mat = torch.einsum("bi, bj->ij", F.one_hot(pred_indices, num_classes=num_classes), F.one_hot(gt_indices, num_classes=num_classes))
+    confusion_mat = torch.einsum("bi, bj->ij", F.one_hot(gt_indices, num_classes=num_classes), F.one_hot(pred_indices, num_classes=num_classes))
     diag = confusion_mat[torch.arange(num_classes),torch.arange(num_classes)]
     recall = torch.nan_to_num(diag/confusion_mat.sum(dim=0), 0.0)
     precision = torch.nan_to_num(diag/confusion_mat.sum(dim=1), 0.0)

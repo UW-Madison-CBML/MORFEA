@@ -158,16 +158,16 @@ class Encoder(nn.Module):
         self.dropout = nn.Dropout(0.1)
 
         self.latent_compress = nn.Linear(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size)
-        self.latent_compress.weight.data = torch.eye(max(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size))[:self.hidden_channels * self.final_resolution * self.final_resolution,:latent_size]
-        self.latent_compress.bias.data.fill_(0.0)
+        #self.latent_compress.weight.data = torch.eye(max(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size))[:self.hidden_channels * self.final_resolution * self.final_resolution,:latent_size]
+        #self.latent_compress.bias.data.fill_(0.0)
 
         if self.use_lstm:
             self.lstm_enc = nn.GRU(latent_size, latent_size, batch_first=True)
 
-            self.lstm_enc.weight_ih_l[0].data = torch.eye(latent_size*3)[:latent_size, :latent_size*3]
-            self.lstm_enc.weight_hh_l[0].data = torch.eye(latent_size*3)[:latent_size, :latent_size*3]
+            """self.lstm_enc.weight_ih_l[0].data = torch.eye(latent_size*3)[:3*latent_size, :latent_size]
+            self.lstm_enc.weight_hh_l[0].data = torch.eye(latent_size*3)[:3*latent_size, :latent_size]
             self.lstm_enc.bias_ih_l[0].data.fill_(0.0)
-            self.lstm_enc.bias_hh_l[0].data.fill_(0.0)
+            self.lstm_enc.bias_hh_l[0].data.fill_(0.0)"""
         else:
             self.lstm_enc = None
 
@@ -205,7 +205,7 @@ class Encoder(nn.Module):
         if self.use_lstm:
             z_seq, _ = self.lstm_enc(z_compressed)
         else:
-            z_seq = z_compressied
+            z_seq = z_compressed
         #z_seq = self.dropout(z_seq)
         #z_seq = self.lin1(z_seq) # B, T, L*2
         #z_compressed = self.lin2(z_compressed) # B, T, L, no relu so that latent space can be negative
@@ -237,10 +237,10 @@ class Decoder(nn.Module):
             )"""
         if self.use_lstm:
             self.lstm_dec = nn.GRU(latent_size, latent_size, batch_first=True) # bidirectional=True)
-            self.lstm_dec.weight_ih_l[0].data = torch.eye(latent_size*3)[:latent_size, :latent_size*3]
-            self.lstm_dec.weight_hh_l[0].data = torch.eye(latent_size*3)[:latent_size, :latent_size*3]
-            self.lstm_dec.bias_ih_l[0].data.fill_(0.0)
-            self.lstm_dec.bias_hh_l[0].data.fill_(0.0)
+            #self.lstm_dec.weight_ih_l[0].data = torch.eye(latent_size*3)[:latent_size, :latent_size*3]
+            #self.lstm_dec.weight_hh_l[0].data = torch.eye(latent_size*3)[:latent_size, :latent_size*3]
+            #self.lstm_dec.bias_ih_l[0].data.fill_(0.0)
+            #self.lstm_dec.bias_hh_l[0].data.fill_(0.0)
 
         else:
             self.lstm_dec = None
@@ -276,8 +276,8 @@ class Decoder(nn.Module):
 
 
         self.latent_expand = nn.Linear(latent_size, self.hidden_channels * self.initial_resolution * self.initial_resolution)
-        self.latent_expand.weight.data = torch.eye(max(latent_size, self.hidden_channels * self.initial_resolution * self.initial_resolution))[:latent_size,:self.hidden_channels * self.initial_resolution * self.initial_resolution]
-        self.latent_expand.bias.data.fill_(0.0)
+        #self.latent_expand.weight.data = torch.eye(max(latent_size, self.hidden_channels * self.initial_resolution * self.initial_resolution))[:latent_size,:self.hidden_channels * self.initial_resolution * self.initial_resolution]
+        #self.latent_expand.bias.data.fill_(0.0)
         self.final_size = final_size
         self.use_residual = use_residual
         self.bn = nn.BatchNorm2d(self.hidden_channels)

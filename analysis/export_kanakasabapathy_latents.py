@@ -12,7 +12,9 @@ import os
 import gc
 GRADES = ["A", "B", "C"] # I believe it is this order since 0 seems most prominent
 
-def export_kanakasabapathy(model, image_size = 128, vitmae=False):
+def export_kanakasabapathy(model, image_size = 128, vitmae=False, position_dim = None):
+    if position_dim is None:
+        position_dim = model.latent_size
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     images_3 = [os.path.join("kanakasabapathy","3",path) for path in os.listdir(os.path.join("kanakasabapathy","3"))]
     images_4 = [os.path.join("kanakasabapathy","4",path) for path in os.listdir(os.path.join("kanakasabapathy","4"))]
@@ -49,6 +51,7 @@ def export_kanakasabapathy(model, image_size = 128, vitmae=False):
         else:
             imgs, latents = model(images_tensor)
     latents = latents.cpu().squeeze(1).numpy() # squeeze out time dim of 1: (B, 512)
+    latents = latents[:,:position_dim] # grab out the position regularized components
     imgs = imgs.cpu().squeeze(1).squeeze(1).numpy() # (B, 128, 128)
     gc.collect()
     torch.cuda.memory.empty_cache()

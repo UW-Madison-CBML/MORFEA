@@ -104,7 +104,7 @@ def train_single_frame_classifier():
     val_ratio = 0.2
     epochs = 500
     wandb.login(key=os.getenv("WANDB_KEY"))
-    learning_rate = 0.0005
+    learning_rate = 0.005
     weight_decay = 1e-3
     run = wandb.init(
         name = "image_grade",

@@ -41,16 +41,16 @@ class SingleFrameModel(Module):
         super().__init__()
         self.num_classes = num_classes
         self.cnn = torch.nn.Sequential(
-            ResidualBlock(1, 32),
-            ResidualBlock(32, 32),
-            ResidualBlock(32, 16),
+            ResidualBlock(1, 16),
+            ResidualBlock(16, 16),
+            ResidualBlock(16, 16),
             ResidualBlock(16, 8)
         )
 
         first_lin_size = 8 * ((image_size // 16) ** 2)
-        self.lin1 = torch.nn.Linear(first_lin_size, 128)
-        self.lin2 = torch.nn.Linear(128, 64)
-        self.lin3 = torch.nn.Linear(64, num_classes)
+        self.lin1 = torch.nn.Linear(first_lin_size, 64)
+        self.lin2 = torch.nn.Linear(64, 32)
+        self.lin3 = torch.nn.Linear(32, num_classes)
         self.dropout = torch.nn.Dropout(0.3)
         
 
