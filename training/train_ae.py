@@ -1560,7 +1560,7 @@ def train_lstm(
 
     loader = DataLoader(
         train_dataset,
-        batch_size=batch_size,
+        batch_size=batch_size//2,
         shuffle=True,
         num_workers=16,
         pin_memory=True,
@@ -1620,16 +1620,32 @@ def train_lstm(
             augment_recon, augment_lat = model(augment_vol) 
             t2 = time.perf_counter()
             if(index % 47 == 0):
-                vol_img = embryo_vol[0, -1, 0].cpu().detach().numpy()
-                recon_img = embryo_recon[0, -1, 0].cpu().detach().numpy()
+                img_dict = {}
+                vol_img = embryo_vol[0, -1, 0].detach().cpu().numpy()
+                recon_img = embryo_recon[0, -1, 0].detach().cpu().numpy()
 
                 vol_img = (vol_img * 255).astype(np.uint8)
                 recon_img = (recon_img * 255).astype(np.uint8)
                 comparison = np.concatenate((vol_img, recon_img), axis=1)
      
                 images = wandb.Image(comparison, caption="Embryo vs Recon comparison")
-                run.log({"reconstruction": images})
-                traj = embryo_lat.cpu().detach().numpy()[0]
+                
+                img_dict["reconstruction"] = images
+
+
+                vol_img = augment_vol[0, -1, 0].detach().cpu().numpy()
+                recon_img = augment_recon[0, -1, 0].detach().cpu().numpy()
+
+                vol_img = (vol_img * 255).astype(np.uint8)
+                recon_img = (recon_img * 255).astype(np.uint8)
+                comparison = np.concatenate((vol_img, recon_img), axis=1)
+     
+                images = wandb.Image(comparison, caption="Augment Embryo vs Recon comparison")
+                
+                img_dict["reconstruction_augment"] = images
+
+
+                traj = embryo_lat.detach().cpu().numpy()[0]
                 dist_matrix = distance_matrix(traj, traj)
                 fig, ax = plt.subplots(figsize=(8, 6))
                 im = ax.imshow(dist_matrix, cmap='viridis')
@@ -1637,9 +1653,10 @@ def train_lstm(
                 ax.set_xlabel("Time Index")
                 ax.set_ylabel("Time Index")
                 plt.colorbar(im, ax=ax)
-                wandb.log({"temp_smoothness": wandb.Image(fig)})
+                img_dict["temp_smoothness"] = wandb.Image(fig)
 
                 plt.close(fig)
+                run.log(img_dict) 
             # def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
             rec_loss, _ = reconstruction_loss(
                 embryo_recon, embryo_vol, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
@@ -1648,8 +1665,10 @@ def train_lstm(
                 augment_recon, augment_vol, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
             )
             rec_loss = rec_loss + augment_rec_loss
+            position_regularization_loss = torch.tensor(0.0)
             if(position_regularization):
-                rec_loss = rec_loss + position_regularization_weight * F.mse_loss(embryo_lat[:,:,:POSITION_DIM], augment_lat[:,:,:POSITION_DIM])
+                position_regularization_loss = position_regularization_weight * F.mse_loss(embryo_lat[:,:,:POSITION_DIM].detach(), augment_lat[:,:,:POSITION_DIM])
+                rec_loss = rec_loss + position_regularization_loss
             if temporal_weight > 0:
                 smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
                 loss = rec_loss + smooth_loss
@@ -1707,7 +1726,8 @@ def train_lstm(
                     "smooth_loss": smooth_loss.item(),
                     "lr": scheduler.get_last_lr()[0],
                     "residual_decay": F.sigmoid(torch.tensor(model.decay_rate * (model.decay -  model.decay_offset))),
-                    "decay_count":model.decay
+                    "decay_count":model.decay,
+                    "position_regularization_loss":position_regularization_loss.item()
                 }
 
                 # Add loss-specific metrics
@@ -2213,7 +2233,9 @@ if __name__ == "__main__":
             lr=args.lr,
             epochs=args.epochs,
             warm_restarts=args.warm_restarts,
-            test_val = args.test_val
+            test_val = args.test_val,
+            position_regularization = args.position_regularization,
+            position_regularization_weight = args.position_regularization_weight
         )
 
     elif len(sys.argv) > 1 and sys.argv[1] == "vit":
