@@ -118,7 +118,7 @@ class ResidualUpBlock(nn.Module):
 
 class Encoder(nn.Module):
 
-    def __init__(self, input_channels=1, num_layers=2, latent_size=4096, hidden_channels=16, use_lstm=True, use_residual=True):
+    def __init__(self, input_channels=1, num_layers=2, latent_size=4096, hidden_channels=32, use_lstm=True, use_residual=True):
         super(Encoder, self).__init__()
         self.use_residual = use_residual
         self.latent_size = latent_size
@@ -216,7 +216,7 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
 
-    def __init__(self, latent_size=4096, num_layers=2, hidden_channels=16, initial_resolution=16,final_size=128, use_lstm=True, use_residual=True):
+    def __init__(self, latent_size=4096, num_layers=2, hidden_channels=32, initial_resolution=16,final_size=128, use_lstm=True, use_residual=True):
         super(Decoder, self).__init__()
         self.latent_size = latent_size
         self.hidden_channels = hidden_channels
@@ -326,7 +326,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         use_lstm=True,
         use_residual=True,
         use_batchnorm=True,
-        hidden_channels=16
+        hidden_channels=32
         ):
         super(ConvLSTMAutoencoder, self).__init__()
         self.use_classifier = use_classifier

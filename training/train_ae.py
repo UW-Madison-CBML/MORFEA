@@ -2078,7 +2078,7 @@ def train_lstm(
                     break"""
         # export the kanakasabapathy latents and set colors
 
-        metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model, position_dim = POSITION_DIM if position_regularization else latent_size)
+        metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model, position_dim = POSITION_DIM if position_regularization else latent_size, binary_classification=True)
 
         kanakasabapathy_embeddings = pca.transform(scaler.transform(kanakasabapathy_lats))
         
