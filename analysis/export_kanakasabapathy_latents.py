@@ -11,17 +11,26 @@ from dataset_ivf_embryo import read_gray, normalize_video
 import os
 import gc
 GRADES = ["A", "B", "C"] # I believe it is this order since 0 seems most prominent
-
-def export_kanakasabapathy(model, image_size = 128, vitmae=False, position_dim = None):
+# binary_classification: classify by blastocyst non blastocyst (1,2 vs 3,4,5) if True classify quality (3 vs 4 vs 5) if False
+def export_kanakasabapathy(model, image_size = 128, vitmae=False, position_dim = None, binary_classification=True):
     if position_dim is None:
         position_dim = model.latent_size
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-    images_3 = [os.path.join("kanakasabapathy","3",path) for path in os.listdir(os.path.join("kanakasabapathy","3"))]
-    images_4 = [os.path.join("kanakasabapathy","4",path) for path in os.listdir(os.path.join("kanakasabapathy","4"))]
-    images_5 = [os.path.join("kanakasabapathy","5",path) for path in os.listdir(os.path.join("kanakasabapathy","5"))]
-    paths = images_3 + images_4 + images_5
-    grades = (["C"] * len(images_3))+ (["B"] * len(images_4))+(["A"] * len(images_5))
-    metadata_df = pd.DataFrame({"path":paths, "TE":grades, "embryo_id":np.arange(len(paths))}) #spoof the embryo id as just a number
+    if binary_classification:
+        images_1 = [os.path.join("kanakasabapathy","1",path) for path in os.listdir(os.path.join("kanakasabapathy","3"))]
+        images_2 = [os.path.join("kanakasabapathy","2",path) for path in os.listdir(os.path.join("kanakasabapathy","4"))]
+        paths = images_1 + images_2
+        grades = (["C"] * len(images_1)) + (["A"] * len(images_2))
+        metadata_df = pd.DataFrame({"path":paths, "TE":grades, "embryo_id":np.arange(len(paths))}) #spoof the embryo id as just a number
+
+
+    else:
+        images_3 = [os.path.join("kanakasabapathy","3",path) for path in os.listdir(os.path.join("kanakasabapathy","3"))]
+        images_4 = [os.path.join("kanakasabapathy","4",path) for path in os.listdir(os.path.join("kanakasabapathy","4"))]
+        images_5 = [os.path.join("kanakasabapathy","5",path) for path in os.listdir(os.path.join("kanakasabapathy","5"))]
+        paths = images_3 + images_4 + images_5
+        grades = (["C"] * len(images_3))+ (["B"] * len(images_4))+(["A"] * len(images_5))
+        metadata_df = pd.DataFrame({"path":paths, "TE":grades, "embryo_id":np.arange(len(paths))}) #spoof the embryo id as just a number
 
     
     #--------------------------------------------------------------
