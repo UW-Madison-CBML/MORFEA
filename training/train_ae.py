@@ -16,6 +16,7 @@ from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 import os
 from ae_model import ConvLSTMAutoencoder
+from export_video_latent import export_video_latents
 import sys
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
@@ -2163,10 +2164,21 @@ def train_lstm(
         kanakasabapathy_mask = kanakasabapathy_df["embryo_id"].isin(VAL_EMBRYOS)
         kanakasabapathy_val_df = kanakasabapathy_df[kanakasabapathy_mask]
         kanakasabapathy_df = kanakasabapathy_df[~kanakasabapathy_mask]
-        train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "kanakasabapathy", run, batch_size=128, epochs=30)
+        train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "kanakasabapathy", run, batch_size=256, epochs=30)
 
         # export the actual model latents 
-        
+        ds = IVFEmbryoDataset(full_seq_df[full_seq_df["embryo_id"].isin(grades_df.dropna(subset="TE")["embryo_id"].unique())])
+        metadata_df, latents = export_video_latents(model, ds)
+        embryo_ids = metadata_df["embryo_id"].unique()
+        latents_df = pd.DataFrame(latents, columns = [f"z_{i}" for i in range(latents.shape[1])], index=metadata_df.index)
+        metadata_df = pd.concat([metadata_df, latents_df], axis = 1)
+        np.random.shuffle(embryo_ids)
+        VAL_EMBRYOS = embryo_ids[:int(0.3 * len(embryo_ids))]
+        grade_val_mask = metadata_df["embryo_id"].isin(VAL_EMBRYOS)
+        grade_val_df = metadata_df[grade_val_mask]
+        grade_train_df = metadata_df[~grade_val_mask]
+        train_lstm_classifier_on(grade_train_df, grade_val_df, {"latents":True, "pca_ps":True, "distance_mat":True, "curvature":True, "acceleration":True, "velocity":True, "te_lr":0.005, "icm_lr":0.005}, False, "latents_grade", run, batch_size=32, epochs=30)
+
 
             
 
