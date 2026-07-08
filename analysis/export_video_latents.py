@@ -36,7 +36,9 @@ def addAnnotations(group_name, group, annotations_dir):
     return group
 
 
-def export_video_latents(model, ds):
+def export_video_latents(model, ds, latent_size = None):
+    if(latent_size is None):
+        latent_size = model.latent_size
         
 
     loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=16, pin_memory=True) 
@@ -85,6 +87,7 @@ def export_video_latents(model, ds):
         with torch.no_grad():
             #with torch.amp.autocast(device_type='cuda', dtype=torch.float16):    
             _, z_seq = model(embryo_vol)  
+            z_seq = z_seq[:,:,:latent_size]
         if(num_latents != z_seq.shape[2]):
             num_latents = z_seq.shape[2] 
         if torch.isinf(z_seq).any():
@@ -137,6 +140,7 @@ def export_video_latents(model, ds):
     model.train()
 
     return metadata, latents_data
+
 def main(model_name,index_csv):
     hf_token = os.getenv("HF_TOKEN") or os.getenv("HF_KEY")
     if hf_token:

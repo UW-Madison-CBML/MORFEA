@@ -11,6 +11,7 @@ from scipy.spatial import distance_matrix
 def add_annotations(group_name, group, features):
    
     lat_cols = [column for column in group.columns if column.startswith("z_")]
+    print("lat_cols: ", len(lat_cols))
     trajectory = group[lat_cols].to_numpy()
     
     cebra_cols = ["cebra_0", "cebra_1", "cebra_2"]
@@ -87,6 +88,7 @@ class GradeLSTMDataset(Dataset):
         self.lat_cols = [col for col in latents_df.columns if col.startswith("z_")] 
         self.df = latents_df
         if(not self.keep_na):
+            self.df = self.df.replace("NA", np.nan)
             self.df = self.df.dropna(subset=[self.grade])
         #self.df = self.df.sort_values(["embryo_id", "time_step"])
         

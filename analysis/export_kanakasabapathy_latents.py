@@ -17,10 +17,10 @@ def export_kanakasabapathy(model, image_size = 128, vitmae=False, position_dim =
         position_dim = model.latent_size
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     if binary_classification:
-        images_1 = [os.path.join("kanakasabapathy","1",path) for path in os.listdir(os.path.join("kanakasabapathy","3"))]
-        images_2 = [os.path.join("kanakasabapathy","2",path) for path in os.listdir(os.path.join("kanakasabapathy","4"))]
-        paths = images_1 + images_2
-        grades = (["C"] * len(images_1)) + (["A"] * len(images_2))
+        images_12 = [os.path.join("kanakasabapathy","1",path) for path in os.listdir(os.path.join("kanakasabapathy","1"))] + [os.path.join("kanakasabapathy","2",path) for path in os.listdir(os.path.join("kanakasabapathy","2"))]
+        images_345 = [os.path.join("kanakasabapathy","3",path) for path in os.listdir(os.path.join("kanakasabapathy","3"))] + [os.path.join("kanakasabapathy","4",path) for path in os.listdir(os.path.join("kanakasabapathy","4"))] + [os.path.join("kanakasabapathy","5",path) for path in os.listdir(os.path.join("kanakasabapathy","5"))]
+        paths = images_12 + images_345
+        grades = (["C"] * len(images_12)) + (["A"] * len(images_345))
         metadata_df = pd.DataFrame({"path":paths, "TE":grades, "embryo_id":np.arange(len(paths))}) #spoof the embryo id as just a number
 
 

@@ -1,5 +1,5 @@
 import numpy as np
-from stats_utils import prfcm
+from stats_utils import prfcm, disp_cm
 from vit_model import ViTLSTMAE, SmallViTLSTMAE, ConvViTLSTMAE, ViTMAE
 from torchvision.transforms.functional import rgb_to_grayscale
 #from torchvision.transforms import RGB
@@ -1452,7 +1452,8 @@ def train_lstm(
     vgg_weight=0.0,
     test_val=False,
     position_regularization=True,
-    position_regularization_weight=1.0
+    position_regularization_weight=1.0,
+    resume_model=""
     ):
     #hyperparameters:
 
@@ -1523,6 +1524,8 @@ def train_lstm(
         use_residual=use_residual,
         use_batchnorm=use_batchnorm
     )
+    if(resume_model != ""):
+        ConvLSTMAutoencoder.from_pretrained(resume_model)
     artifact = wandb.Artifact(name="scripts", type="model_file")
     artifact.add_file(os.path.abspath("train_ae.py"))
     artifact.add_file(os.path.abspath("ae_model.py"))
@@ -1616,9 +1619,14 @@ def train_lstm(
             t0 = time.perf_counter()
             embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, 500, 500)
             augment_vol = augment_vol.to(DEVICE)
+            in_vol = torch.cat([embryo_vol, augment_vol], axis=0)
+            
             t1 = time.perf_counter()
-            embryo_recon, embryo_lat = model(embryo_vol)
-            augment_recon, augment_lat = model(augment_vol) 
+            out_recon, out_lat = model(in_vol)
+            embryo_recon = out_recon[:batch_size//2]
+            embryo_lat = out_lat[:batch_size//2]
+            augment_recon = out_recon[batch_size//2:]
+            augment_lat = out_lat[batch_size//2:]
             t2 = time.perf_counter()
             if(index % 47 == 0):
                 img_dict = {}
@@ -1660,12 +1668,9 @@ def train_lstm(
                 run.log(img_dict) 
             # def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
             rec_loss, _ = reconstruction_loss(
-                embryo_recon, embryo_vol, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
+                out_recon, in_vol, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
             )
-            augment_rec_loss, _ = reconstruction_loss(
-                augment_recon, augment_vol, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
-            )
-            rec_loss = rec_loss + augment_rec_loss
+            
             position_regularization_loss = torch.tensor(0.0)
             if(position_regularization):
                 position_regularization_loss = position_regularization_weight * F.mse_loss(embryo_lat[:,:,:POSITION_DIM].detach(), augment_lat[:,:,:POSITION_DIM])
@@ -1924,7 +1929,7 @@ def train_lstm(
                 trajs.append(traj) # add traj to list of all trajs for PCA calculation
                 traj_labels.append(np.linspace(0,1,traj.shape[0]))
                 traj_stages.append(np.array([StageDataset.PHASES.index(p) for p in get_annotations_col(embryo_id, traj.shape[0], os.path.abspath("embryo_dataset_annotations"))]))
-                all_traj_ids += ([embryo_id]*len(traj))
+                all_traj_ids += [embryo_id]*len(traj)
                 cebra_embedding = cebra_time_model.transform(traj, session_id=0) # i guess dont batch it?
                 fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
                 im = ax.scatter(cebra_embedding[:,0], cebra_embedding[:,1], cebra_embedding[:,2], c=np.linspace(0,1,cebra_embedding.shape[0]), cmap='viridis')
@@ -1948,7 +1953,7 @@ def train_lstm(
                 images = wandb.Image(comparison, caption="embryo_recon_val")
                 image_dict[f"reconstruction_val_{count}"] = images
                 count += 1
-                if(test_val):
+                if(test_val and count > 3):
                     break
 
 
@@ -1970,8 +1975,7 @@ def train_lstm(
 
             plt.close(fig)  
             count += 1
-            if(test_val):
-                break
+
 
         count = 0
         # do individual pca stuff for stage
@@ -1992,17 +1996,38 @@ def train_lstm(
                 break
 
         # do all pca, colored by time
-        all_embeddings = np.concatenate(embeddings)
-        all_traj_labels = np.concatenate(traj_labels)
+        all_embeddings = np.concatenate(embeddings, axis=0)
+
+        all_traj_labels = np.concatenate(traj_labels, axis=0)
+
+
+
+        count = 0
+        # do some next to eachother
+        for idx in range(len(embeddings)-1): 
+            two_embeddings = np.concatenate(embeddings[idx:idx+2], axis=0) 
+            two_labels = np.concatenate(traj_labels[idx:idx+2], axis=0) 
+            fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
+            im = ax.scatter(two_embeddings[:,0], two_embeddings[:,1], two_embeddings[:,2], c=two_labels, cmap='viridis', vmin=0, vmax=1)
+
+            plt.colorbar(im, ax=ax)
+            image_dict[f"pca_val_pair_{count}"] = wandb.Image(fig)
+
+            plt.close(fig)  
+            count += 1
+            if(test_val):
+                break
+
 
         fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
-        im = ax.scatter(all_embeddings[:,0], all_embeddings[:,1], all_embeddings[:,2] ,c=all_traj_labels, cmap='viridis', vmin=0, vmax=1)
+        im = ax.scatter(all_embeddings[:,0], all_embeddings[:,1], all_embeddings[:,2], c=all_traj_labels, cmap='viridis', vmin=0, vmax=1)
         plt.colorbar(im, ax=ax)
         image_dict[f"pca_val_all_time"] = wandb.Image(fig)
 
         plt.close(fig) 
+
         # now by phase
-        all_traj_stages = np.concatenate(traj_stages)
+        all_traj_stages = np.concatenate(traj_stages, axis=0)
         fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
 
         im = ax.scatter(all_embeddings[:,0], all_embeddings[:,1], all_embeddings[:,2] ,c=all_traj_stages, cmap='tab20c', vmin=0, vmax=19)
@@ -2013,31 +2038,33 @@ def train_lstm(
         image_dict[f"pca_val_all_phase"] = wandb.Image(fig)
 
         plt.close(fig) 
+
         # now by individual trajectory id 
         fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
         traj_ids_unique = list(set(all_traj_ids))
         traj_ids_to_index = {t_id:i for i,t_id in enumerate(traj_ids_unique)}
         id_colors = np.array([traj_ids_to_index[t_id] for t_id in all_traj_ids])
         im = ax.scatter(all_embeddings[:,0], all_embeddings[:,1], all_embeddings[:,2] ,c=id_colors, cmap="viridis")
-
         image_dict[f"pca_val_all_embryo_id"] = wandb.Image(fig)
-
         plt.close(fig) 
-        pca_df = pd.DataFrame({"embryo_id":all_traj_ids, "pca_0":all_embeddings[:,0], "pca_1":all_embeddings[:,1],"pca_2":all_embeddings[:,2],"stage":all_traj_stages})
+    
+        pca_df = pd.DataFrame({"embryo_id":all_traj_ids, "pca_0":all_embeddings[:,0], "pca_1":all_embeddings[:,1], "pca_2":all_embeddings[:,2], "stage":all_traj_stages})
         image_dict["pca_val_df"] = wandb.Table(dataframe = pca_df)
+
 
         GRADES = ["A","B","C"]; GRADE_COLORS = ["#00FF00", "#FFFF00", "#FF0000"]
         # -------------------------------------------------------- 
         # now let's look at path signatures of the pca_latents:
         def agg_path_sigs(group):
             pca_traj = group[["pca_0", "pca_1", "pca_2"]].to_numpy()
-            path_sig = get_path_sig(pca_traj, 3) # 40 features 
-            out_df = pd.DataFrame(path_sig[None,:], columns=[f"path_sig_{i}" for i in range(path_sig.shape[0])])
+            path_sig = get_path_sig(pca_traj, 2) # 40 features 
+            out_df = pd.DataFrame(path_sig[None,:], columns=[f"path_sig_{idx}" for idx in range(path_sig.shape[0])])
             return out_df
             
         path_sigs_df = pca_df.groupby("embryo_id").apply(agg_path_sigs).reset_index()
         path_sigs_df = path_sigs_df.merge(grades_df, how="left", left_on="embryo_id", right_on="embryo_id")
         path_sig_cols = [col for col in path_sigs_df.columns if col.startswith("path_sig_")]
+
         path_sigs = path_sigs_df[path_sig_cols].to_numpy()
         path_sig_labels = [GRADE_COLORS[GRADES.index(g)] for g in path_sigs_df["TE"].to_list()]
         norm_pca_path_sigs = PCA(n_components=3).fit_transform(StandardScaler().fit_transform(path_sigs))
@@ -2077,10 +2104,10 @@ def train_lstm(
                 count += 1
                 if(test_val):
                     break"""
-        continue
+
         # export the kanakasabapathy latents and set colors
 
-        metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model, position_dim = POSITION_DIM if position_regularization else latent_size, binary_classification=True)
+        metadata_df, kanakasabapathy_lats, imgs = export_kanakasabapathy(model, position_dim = POSITION_DIM if position_regularization else latent_size, binary_classification=False) # do binary classification later, likely an easy result
 
         kanakasabapathy_embeddings = pca.transform(scaler.transform(kanakasabapathy_lats))
         
@@ -2104,6 +2131,7 @@ def train_lstm(
         # alternatively
         kanakasabapathy_k_nearest_stages = knn.predict(kanakasabapathy_embeddings)
         metadata_df["pred_stages"] = [StageDataset.PHASES[s] for s in kanakasabapathy_k_nearest_stages]
+        kanakasabapathy_metadata_df = metadata_df
         
         # now we look at a train and val set of kanakasabapathy embeddings, we train the k nearest on the GT grade classes, and then we print a confusion matrix
         
@@ -2123,13 +2151,9 @@ def train_lstm(
         # alternatively
         kanakasabapathy_pred_grades_knn = knn.predict(val_features)
         _, cm = prfcm(torch.from_numpy(kanakasabapathy_pred_grades_knn), torch.from_numpy(val_labels), 3) # compare predicted to ground truth
-        cm = cm.numpy() # don't transpose right way
-        fig, ax = plt.subplots(figsize=(10, 10))
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= GRADES)
-        disp.plot(cmap='Blues', ax=ax, values_format='d')
-        plt.setp(ax.get_xticklabels(), rotation=45, ha='right') 
-        image_dict["kanakasabapathy_grade_knn_cm"] = wandb.Image(fig)
-        plt.close(fig)
+        cm = cm.numpy()
+
+        image_dict["kanakasabapathy_grade_knn_cm"] = disp_cm(cm, GRADES)
 
        
 
@@ -2151,7 +2175,6 @@ def train_lstm(
             if(test_val):
                 break
 
-        run.log(image_dict | {"kanakasabapathy_grade_sizes": wandb.Table(dataframe=metadata_df.groupby("TE",as_index=False).size()), "kanakasabapathy_knn_top_stages": wandb.Table(dataframe=pd.DataFrame({"size":metadata_df.groupby("pred_stages").size().reindex(StageDataset.PHASES), "stage":StageDataset.PHASES}, index=StageDataset.PHASES)), "kanakasabapathy_df":wandb.Table(dataframe=metadata_df)})
         # train the lstm model on the kanakasabapathy latents and log the loss to wandb
         kanakasabapathy_lats_df = pd.DataFrame(kanakasabapathy_lats, index=metadata_df.index, columns=[f"z_{i}" for i in range(kanakasabapathy_lats.shape[1])])
         
@@ -2165,20 +2188,64 @@ def train_lstm(
         kanakasabapathy_mask = kanakasabapathy_df["embryo_id"].isin(VAL_EMBRYOS)
         kanakasabapathy_val_df = kanakasabapathy_df[kanakasabapathy_mask]
         kanakasabapathy_df = kanakasabapathy_df[~kanakasabapathy_mask]
-        train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "kanakasabapathy", run, batch_size=256, epochs=30)
 
         # export the actual model latents 
-        ds = IVFEmbryoDataset(full_seq_df[full_seq_df["embryo_id"].isin(grades_df.dropna(subset="TE")["embryo_id"].unique())])
-        metadata_df, latents = export_video_latents(model, ds)
+        grades_df = grades_df.replace("NA",np.NaN)
+        ds = IVFEmbryoDataset(full_seq_df[full_seq_df["embryo_id"].isin(grades_df.dropna(subset=["TE"])["embryo_id"].unique())]) # just export TE graded ones, keep_default_na=True
+
+
+        metadata_df, latents = export_video_latents(model, ds, latent_size = POSITION_DIM)
+        
+
         embryo_ids = metadata_df["embryo_id"].unique()
         latents_df = pd.DataFrame(latents, columns = [f"z_{i}" for i in range(latents.shape[1])], index=metadata_df.index)
+        metadata_df = pd.concat([metadata_df, latents_df], axis=1)
+        # get tB frame for each graded embryo
+        def get_tb(group):
+            """ 
+            group: group of latents by embryo_id with phase annotations
+                returns:
+                The single frame df from preferrably tB, if if not will try the first frame of tEB and then the last frame of tSB
+            
+            """
+            tb_rows = group[group['phase'] == "tB"]
+            if(len(tb_rows) > 0):
+                return tb_rows.iloc[int(0.5 * len(tb_rows)): int(0.5 * len(tb_rows)) + 1] # grab the single frame
+            teb_rows = group[group['phase'] == "tEB"]
+            if(len(teb_rows) > 0):
+                return teb_rows.iloc[0:1]
+            tsb_rows = group[group['phase'] == "tSB"]
+            if(len(tsb_rows) > 0):
+                return tsb_rows.iloc[-1:0]
+            return pd.DataFrame(columns = group.columns)
+
+        single_frame_val_df = metadata_df.groupby("embryo_id").apply(get_tb).reset_index(drop=True)
+        # since we have the kanaka knn built, let's just try it on the single frame dataset    
+        _, zero_shot_grade_cm = prfcm(torch.from_numpy(knn.predict(pca.transform(scaler.transform(single_frame_val_df[[col for col in single_frame_val_df.columns if col.startswith("z_")]])))),torch.tensor([GRADES.index(g) for g in single_frame_val_df["TE"].to_list()]), 3)
+        image_dict["zero_shot_grade_single_frame"] = disp_cm(zero_shot_grade_cm.numpy(), GRADES)
+        
+    
+        # do some more data preparation 
         metadata_df = pd.concat([metadata_df, latents_df], axis = 1)
+        metadata_df = metadata_df[metadata_df['phase'].isin(["tPB2", "tPNf","tPNa", "t2", "t3", "t4","t5","t6","t7","t8","t9+","tM", "tSB","tB","tEB"])] # clear out noisy phases, TODO try varying this
+        
+        # now that we have single frames, add the single frames to the val_df for the single frame dataset to try
+        train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "kanakasabapathy", run, batch_size=256, epochs=30)
+        train_lstm_classifier_on(pd.concat([kanakasabapathy_df, kanakasabapathy_val_df], axis=0, ignore_index=True), single_frame_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "single_frame_validation", run, batch_size=256, epochs=30)
+
+        run.log(image_dict | {"kanakasabapathy_grade_sizes": wandb.Table(dataframe=kanakasabapathy_metadata_df.groupby("TE",as_index=False).size()), "kanakasabapathy_knn_top_stages": wandb.Table(dataframe=pd.DataFrame({"size":kanakasabapathy_metadata_df.groupby("pred_stages").size().reindex(StageDataset.PHASES), "stage":StageDataset.PHASES}, index=StageDataset.PHASES)), "kanakasabapathy_df":wandb.Table(dataframe=kanakasabapathy_metadata_df)})
+        
         np.random.shuffle(embryo_ids)
         VAL_EMBRYOS = embryo_ids[:int(0.3 * len(embryo_ids))]
         grade_val_mask = metadata_df["embryo_id"].isin(VAL_EMBRYOS)
         grade_val_df = metadata_df[grade_val_mask]
         grade_train_df = metadata_df[~grade_val_mask]
-        train_lstm_classifier_on(grade_train_df, grade_val_df, {"latents":True, "pca_ps":True, "distance_mat":True, "curvature":True, "acceleration":True, "velocity":True, "te_lr":0.005, "icm_lr":0.005}, False, "latents_grade", run, batch_size=32, epochs=30)
+
+        try:
+            train_lstm_classifier_on(grade_train_df, grade_val_df, {"latents":True, "pca_ps":True, "distance_mat":True, "curvature":True, "acceleration":True, "velocity":True, "te_lr":0.005, "icm_lr":0.005, "ps_depth":3}, False, "latents_grade", run, batch_size=32, epochs=30)
+        except Exception as e:
+            print(f"error running grade classifier")
+
 
 
             
@@ -2226,6 +2293,7 @@ if __name__ == "__main__":
     parser.add_argument("--warm-restarts", action="store_true", help="turn on warm restarts lr scheduling, default is cosine annealing decreasing over the the whole run")
     parser.add_argument("--test-val", action="store_true", help="only train for a few samples then immediately move to validation for testing")
     parser.add_argument("--position-regularization", action="store_true", help="use data augmentation to make model equivariant to well position")
+    parser.add_argument("--resume-model", type=str, default="", help="download model from HF to resume training")
 
     parser.add_argument("--position-regularization-weight", type=float, default=1.0, help="use data augmentation to make model equivariant to well position")
     args = parser.parse_args()
@@ -2248,7 +2316,8 @@ if __name__ == "__main__":
             warm_restarts=args.warm_restarts,
             test_val = args.test_val,
             position_regularization = args.position_regularization,
-            position_regularization_weight = args.position_regularization_weight
+            position_regularization_weight = args.position_regularization_weight,
+            resume_model = args.resume_model
         )
 
     elif len(sys.argv) > 1 and sys.argv[1] == "vit":
