@@ -21,6 +21,7 @@ def get_path_sigs(trajectory, depth, time_offsets = 0.1, return_feature_labels=F
         return np.array(signature),  iisignature.basis(s_info)
     else:
         return np.array(signature)
+
 def fit_circle_curvature(points, how=""):
     if(how == "triangle"):
     
