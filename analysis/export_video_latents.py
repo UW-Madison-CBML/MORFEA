@@ -36,7 +36,7 @@ def addAnnotations(group_name, group, annotations_dir):
     return group
 
 
-def export_latents_to_csv(model, ds):
+def export_video_latents(model, ds):
         
 
     loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=16, pin_memory=True) 
@@ -156,7 +156,7 @@ def main(model_name,index_csv):
     model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/"+model_name)
 
     model = model.to(DEVICE)
-    metadata_df, latents_data = export_latents_to_csv(model, ds)
+    metadata_df, latents_data = export_video_latents(model, ds)
      
     np.save(model_name + '.npy', latents_data)
     
