@@ -16,7 +16,7 @@ from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 import os
 from ae_model import ConvLSTMAutoencoder
-from export_video_latent import export_video_latents
+from export_video_latents import export_video_latents
 import sys
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
@@ -2077,6 +2077,7 @@ def train_lstm(
                 count += 1
                 if(test_val):
                     break"""
+        continue
         # export the kanakasabapathy latents and set colors
 
         metadata_df, kanakasabapathy_lats,imgs = export_kanakasabapathy(model, position_dim = POSITION_DIM if position_regularization else latent_size, binary_classification=True)
