@@ -36,13 +36,14 @@ def addAnnotations(group_name, group, annotations_dir):
     return group
 
 
-def export_latents_to_csv(model, loader):
+def export_latents_to_csv(model, ds):
         
-    model = model.to(DEVICE)
+
+    loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=16, pin_memory=True) 
+
     model.eval()
     print(f"Model loaded successfully on {DEVICE}!")
     print(f"{'='*60}\n")
-    model = model.to(DEVICE)
 
     # Get outputs from both models
     """print("testing cosine similariy on half precision model") 
@@ -133,6 +134,7 @@ def export_latents_to_csv(model, loader):
         print(f"Grades file {grades_file} not found, skipping grade join")
     annotations_dir = "embryo_dataset_annotations"
     metadata = metadata.groupby("embryo_id", group_keys = False).apply(lambda group:addAnnotations(group.name,group,annotations_dir)).reset_index()
+    model.train()
 
     return metadata, latents_data
 def main(model_name,index_csv):
@@ -145,11 +147,6 @@ def main(model_name,index_csv):
 
     ds = IVFEmbryoDataset(pd.read_csv(index_csv), resize=128, norm="minmax01")
 
-    if limit is not None and limit > 0:
-        original_len = len(ds.df)
-        ds.df = ds.df.iloc[:limit]
-        print(f"Limited dataset from {original_len} to {len(ds.df)} embryos")
-    loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=16, pin_memory=True) # TODO fix batch size here
 
     # Load model
     print(f"\n{'='*60}")
@@ -158,11 +155,12 @@ def main(model_name,index_csv):
     
     model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/"+model_name)
 
-    metadata_df, latents_data = export_latents_to_csv(model, loader)
+    model = model.to(DEVICE)
+    metadata_df, latents_data = export_latents_to_csv(model, ds)
      
     np.save(model_name + '.npy', latents_data)
     
-    metadata.to_csv(model_name + '.csv', index=False)
+    metadata_df.to_csv(model_name + '.csv', index=False)
     torch.cuda.empty_cache()
     print(f"\n{'='*60}")
     print("EXPORT COMPLETE")
@@ -182,5 +180,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     
-    main(model_name,index_csv)
+    main(args.name,args.index)
 
