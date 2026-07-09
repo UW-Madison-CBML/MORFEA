@@ -1564,7 +1564,7 @@ def train_lstm(
 
     loader = DataLoader(
         train_dataset,
-        batch_size=batch_size//2,
+        batch_size=batch_size//2 if position_regularization else batch_size, # reserve half the batch for the augmentation
         shuffle=True,
         num_workers=16,
         pin_memory=True,
@@ -1617,16 +1617,23 @@ def train_lstm(
         for index, (embryo_vol, augment_vol) in enumerate(pbar):
             optimizer.zero_grad()
             t0 = time.perf_counter()
-            embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, 500, 500)
-            augment_vol = augment_vol.to(DEVICE)
-            in_vol = torch.cat([embryo_vol, augment_vol], axis=0)
+            if position_regularization:
+                embryo_vol = embryo_vol.to(DEVICE)  # (1, T, 1, 500, 500)
+                augment_vol = augment_vol.to(DEVICE)
+
+                in_vol = torch.cat([embryo_vol, augment_vol], axis=0)
+            else:
+                embryo_vol = embryo_vol.to(DEVICE)
             
             t1 = time.perf_counter()
-            out_recon, out_lat = model(in_vol)
-            embryo_recon = out_recon[:batch_size//2]
-            embryo_lat = out_lat[:batch_size//2]
-            augment_recon = out_recon[batch_size//2:]
-            augment_lat = out_lat[batch_size//2:]
+            if position_regularization:
+                out_recon, out_lat = model(in_vol)
+                embryo_recon = out_recon[:batch_size//2]
+                embryo_lat = out_lat[:batch_size//2]
+                augment_recon = out_recon[batch_size//2:]
+                augment_lat = out_lat[batch_size//2:]
+            else:
+                embryo_recon, embryo_lat = model(embryo_vol)
             t2 = time.perf_counter()
             if(index % 47 == 0):
                 img_dict = {}
@@ -1641,17 +1648,17 @@ def train_lstm(
                 
                 img_dict["reconstruction"] = images
 
+                if position_regularization:
+                    vol_img = augment_vol[0, -1, 0].detach().cpu().numpy()
+                    recon_img = augment_recon[0, -1, 0].detach().cpu().numpy()
 
-                vol_img = augment_vol[0, -1, 0].detach().cpu().numpy()
-                recon_img = augment_recon[0, -1, 0].detach().cpu().numpy()
-
-                vol_img = (vol_img * 255).astype(np.uint8)
-                recon_img = (recon_img * 255).astype(np.uint8)
-                comparison = np.concatenate((vol_img, recon_img), axis=1)
-     
-                images = wandb.Image(comparison, caption="Augment Embryo vs Recon comparison")
-                
-                img_dict["reconstruction_augment"] = images
+                    vol_img = (vol_img * 255).astype(np.uint8)
+                    recon_img = (recon_img * 255).astype(np.uint8)
+                    comparison = np.concatenate((vol_img, recon_img), axis=1)
+         
+                    images = wandb.Image(comparison, caption="Augment Embryo vs Recon comparison")
+                    
+                    img_dict["reconstruction_augment"] = images
 
 
                 traj = embryo_lat.detach().cpu().numpy()[0]
@@ -1682,7 +1689,7 @@ def train_lstm(
                 smooth_loss = torch.tensor(0.0, device=DEVICE)
                 loss = rec_loss
 
-            if torch.isnan(loss) or torch.isinf(loss):
+            if torch.isnan(loss.detach()) or torch.isinf(loss.detach()):
                 print(f"NaN/Inf detected, skipping batch")
                 continue
 
