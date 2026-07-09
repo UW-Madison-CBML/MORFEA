@@ -326,7 +326,7 @@ def main(model_name, features):
     metadata_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv"), keep_default_na=(not KEEP_NA))
     latents = np.load(os.path.join("latents",f"{model_name}.npy"))
     lat_cols = [f"z_{i}" for i in range(latents.shape[1])]
-    cebra_latents = np.load(os.path.join("cebra_latents", f"{model_name}.npy"))
+    #cebra_latents = np.load(os.path.join("cebra_latents", f"{model_name}.npy"))
     #normalize latents here
     #lat_mean = latents.mean(axis=0)
     #lat_std_dev = np.std(latents, axis=0) + 1e-8
@@ -335,11 +335,12 @@ def main(model_name, features):
     umap = UMAP(n_components=8)
     pca = PCA(n_components=8)
     std_scaler = StandardScaler()
-    umap_df = pd.DataFrame(umap.fit_transform(latents), columns=[f"umap_{i}" for i in range(8)], index=metadata_df.index)
+    #umap_df = pd.DataFrame(umap.fit_transform(latents), columns=[f"umap_{i}" for i in range(8)], index=metadata_df.index)
     pca_df = pd.DataFrame(pca.fit_transform(std_scaler.fit_transform(latents)), columns=[f"pca_{i}" for i in range(8)], index=metadata_df.index)
-
-    latents_df = pd.concat([metadata_df, pd.DataFrame(latents, columns=lat_cols, index=metadata_df.index), pd.DataFrame(cebra_latents, columns=["cebra_0", "cebra_1", "cebra_2"], index=metadata_df.index), umap_df, pca_df], axis=1)
+    #, pd.DataFrame(cebra_latents, columns=["cebra_0", "cebra_1", "cebra_2"], index=metadata_df.index), umap_df, p
+    latents_df = pd.concat([metadata_df, pd.DataFrame(latents, columns=lat_cols, index=metadata_df.index), pca_df], axis=1)
     #latents_df = latents_df[latents_df['phase'].str.contains("tM|tSB|tB|tEB")] # just classify around the blastocyst stage
+    
     
     te_graded = latents_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
     np.random.shuffle(te_graded)

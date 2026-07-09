@@ -1,1 +1,1 @@
---name control-2026-03-12 --run-name kromp --kromp  --icm-lr 0.0003 --te-lr 0.0003
+--name convlstm2-2026-07-09 --run-name convlstm2 --latents --icm-lr 0.005 --te-lr 0.005
