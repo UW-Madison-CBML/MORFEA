@@ -1457,7 +1457,7 @@ def train_lstm(
     ):
     #hyperparameters:
 
-    POSITION_DIM = int(0.80 * latent_size)
+    POSITION_DIM = int(0.80 * latent_size) if position_regularization else latent_size
     #epochs = 30
     #lr = 2e-4
     batch_size = 64
@@ -1473,12 +1473,12 @@ def train_lstm(
     # Build loss description for logging
    
     date_label = datetime.now().strftime("%Y-%m-%d")
-
+    training_name =model_name +"-"+ date_label
     wandb.login(key=os.getenv("WANDB_KEY"))
     run = wandb.init(
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
-        name=model_name +"-" + date_label,
+        name=training_name,
         config={
             "lr": lr,
             "batch_size":batch_size,
@@ -1814,7 +1814,7 @@ def train_lstm(
             use_lstm=use_lstm,use_residual=use_residual,use_batchnorm=use_batchnorm)
 
         model_clone.load_state_dict(model.state_dict())
-        save_and_push_model(model_clone, model_name +"-"+ date_label, required_files, hf_token, model_config=hf_config)
+        save_and_push_model(model_clone, training_name, required_files, hf_token, model_config=hf_config)
         if(epoch % 3 != 0):
             continue
         val_metrics = {
@@ -2194,7 +2194,7 @@ def train_lstm(
         ds = IVFEmbryoDataset(full_seq_df[full_seq_df["embryo_id"].isin(grades_df.dropna(subset=["TE"])["embryo_id"].unique())]) # just export TE graded ones, keep_default_na=True
 
 
-        metadata_df, latents = export_video_latents(model, ds, latent_size = POSITION_DIM)
+        metadata_df, latents = export_video_latents(model, ds, latent_size = POSITION_DIM if position_regularization else model.latent_size)
         
 
         embryo_ids = metadata_df["embryo_id"].unique()
@@ -2244,7 +2244,7 @@ def train_lstm(
         try:
             train_lstm_classifier_on(grade_train_df, grade_val_df, {"latents":True, "pca_ps":True, "distance_mat":True, "curvature":True, "acceleration":True, "velocity":True, "te_lr":0.005, "icm_lr":0.005, "ps_depth":3}, False, "latents_grade", run, batch_size=32, epochs=30)
         except Exception as e:
-            print(f"error running grade classifier")
+            print(f"error running grade classifier {e}")
 
 
 

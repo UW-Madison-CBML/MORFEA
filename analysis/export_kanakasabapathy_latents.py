@@ -52,13 +52,22 @@ def export_kanakasabapathy(model, image_size = 128, vitmae=False, position_dim =
         
     model = model.to(DEVICE)
     model.eval()
-
-    images_tensor = images_tensor.to(DEVICE)
+    images_tensor1 = images_tensor[:images_tensor.shape[0]//2]
+    images_tensor2 = images_tensor[images_tensor.shape[0]//2:]
+    images_tensor1 = images_tensor1.to(DEVICE)
+    images_tensor2 = images_tensor2.to(DEVICE)
     with torch.no_grad():
         if(vitmae):
-            imgs, latents,_,_ = model(images_tensor)
+            imgs1, latents1,_,_ = model(images_tensor1)
+            imgs2, latents2,_,_ = model(images_tensor2)
+            imgs = torch.cat([imgs1, imgs2],dim=0)
+            latents = torch.cat([latents1, latents2],dim=0)
         else:
-            imgs, latents = model(images_tensor)
+            imgs1, latents1 = model(images_tensor1)
+            imgs2, latents2 = model(images_tensor2)
+            imgs = torch.cat([imgs1, imgs2],dim=0)
+            latents = torch.cat([latents1, latents2],dim=0)
+            
     latents = latents.cpu().squeeze(1).numpy() # squeeze out time dim of 1: (B, 512)
     latents = latents[:,:position_dim] # grab out the position regularized components
     imgs = imgs.cpu().squeeze(1).squeeze(1).numpy() # (B, 128, 128)
@@ -71,7 +80,7 @@ def export_kanakasabapathy(model, image_size = 128, vitmae=False, position_dim =
 def main(model_name):
     model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/"+model_name)
     
-    metadata_df, latents, _ = export_kanakasabapathy(model)
+    metadata_df, latents, _ = export_kanakasabapathy(model, binary_classification=False)
     np.save(f"{model_name}.npy", latents)
     metadata_df.to_csv(f"{model_name}.csv")
 

@@ -171,9 +171,9 @@ class Encoder(nn.Module):
         else:
             self.lstm_enc = None
 
-        self.lin1 = nn.Linear(latent_size,latent_size)
-        self.lin1.weight.data = torch.eye(latent_size)
-        self.lin1.bias.data.fill_(0.0)
+        #self.lin1 = nn.Linear(latent_size,latent_size)
+        #self.lin1.weight.data = torch.eye(latent_size)
+        #self.lin1.bias.data.fill_(0.0)
 
         #self.lin2 = nn.Linear(latent_size*2,latent_size)
 
@@ -207,7 +207,7 @@ class Encoder(nn.Module):
         else:
             z_seq = z_compressed
         #z_seq = self.dropout(z_seq)
-        z_seq = self.lin1(z_seq) # B, T, L
+        #z_seq = self.lin1(z_seq) # B, T, L
         #z_compressed = self.lin2(z_compressed) # B, T, L, no relu so that latent space can be negative
         z_seq = z_seq.view(B, T, self.latent_size)  
 
@@ -269,9 +269,9 @@ class Decoder(nn.Module):
         
         self.initial_resolution = initial_resolution
         
-        self.lin1 = nn.Linear(latent_size,latent_size)
-        self.lin1.weight.data = torch.eye(latent_size)
-        self.lin1.bias.data.fill_(0.0)
+        #self.lin1 = nn.Linear(latent_size,latent_size)
+        #self.lin1.weight.data = torch.eye(latent_size)
+        #self.lin1.bias.data.fill_(0.0)
 
 
 
@@ -283,7 +283,7 @@ class Decoder(nn.Module):
         self.bn = nn.BatchNorm2d(self.hidden_channels)
     def forward(self, z_seq, residual):
         B, T, L = z_seq.shape
-        z_seq = F.relu(self.lin1(z_seq)) # B, T, L
+        #z_seq = F.relu(self.lin1(z_seq)) # B, T, L
         if self.use_lstm:
             z_seq, _ = self.lstm_dec(z_seq)
         z_seq = self.dropout(z_seq) 
