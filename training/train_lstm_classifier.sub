@@ -1,6 +1,6 @@
 # train_classifier.sub
    
-docker_image = jenslundsgaard/ivf-training:v1.7
+docker_image = jenslundsgaard/ivf-training:v3.2
 #docker_image = pytorch/pytorch:2.9.0-cuda12.8-cudnn9-runtime
 #docker_image = pytorch/pytorch:1.1.0-cuda10.0-cudnn7.5-runtime
 universe = docker
@@ -30,9 +30,9 @@ requirements= Machine=="bhaskargpu4000.chtc.wisc.edu"
 +GPUModel = "NVIDIA H200"
 # Requirements (e.g., operating system) your job needs, what amount of
 # compute resources each job will need on the computer where it runs.
-request_cpus = 4
-request_memory = 64GB
-request_disk = 80GB
+request_cpus = 16
+request_memory = 128GB
+request_disk = 128GB
 request_gpus = 1
 
 
