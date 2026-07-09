@@ -1,1 +1,1 @@
-convlstm --name convlstm --ms-ssim-weight 1.0 --rec-weight 0.0 --vgg-weight 0.0 --temporal-weight 0.15 --lr 0.0004 --epochs 100 --size 512 --warm-restarts --no-residual --position-regularization --position-regularization-weight 0.6
+convlstm --name convlstm3 --ms-ssim-weight 1.0 --rec-weight 0.0 --vgg-weight 0.0 --temporal-weight 0.15 --lr 0.0004 --epochs 100 --size 1024 --warm-restarts --no-residual --position-regularization --position-regularization-weight 0.2
