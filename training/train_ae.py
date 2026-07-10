@@ -1674,14 +1674,19 @@ def train_lstm(
                 plt.close(fig)
                 run.log(img_dict) 
             # def reconstruction_loss(x_rec, x_true, ssim_module, ms_ssim_module, l1_weight=1.0, ms_ssim_weight=0.0, vgg_weight=0.0):
-            rec_loss, _ = reconstruction_loss(
-                out_recon, in_vol, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
-            )
+            
             
             position_regularization_loss = torch.tensor(0.0)
             if(position_regularization):
+                rec_loss, _ = reconstruction_loss(
+                    out_recon, in_vol, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
+                )
                 position_regularization_loss = position_regularization_weight * F.mse_loss(embryo_lat[:,:,:POSITION_DIM].detach(), augment_lat[:,:,:POSITION_DIM])
                 rec_loss = rec_loss + position_regularization_loss
+            else:
+                rec_loss, _ = reconstruction_loss(
+                    embryo_vol, embryo_recon, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
+                )
             if temporal_weight > 0:
                 smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
                 loss = rec_loss + smooth_loss
@@ -2057,6 +2062,8 @@ def train_lstm(
     
         pca_df = pd.DataFrame({"embryo_id":all_traj_ids, "pca_0":all_embeddings[:,0], "pca_1":all_embeddings[:,1], "pca_2":all_embeddings[:,2], "stage":all_traj_stages})
         image_dict["pca_val_df"] = wandb.Table(dataframe = pca_df)
+
+        
 
 
         GRADES = ["A","B","C"]; GRADE_COLORS = ["#00FF00", "#FFFF00", "#FF0000"]

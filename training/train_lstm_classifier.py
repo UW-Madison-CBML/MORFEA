@@ -339,7 +339,9 @@ def main(model_name, features):
     pca_df = pd.DataFrame(pca.fit_transform(std_scaler.fit_transform(latents)), columns=[f"pca_{i}" for i in range(8)], index=metadata_df.index)
     #, pd.DataFrame(cebra_latents, columns=["cebra_0", "cebra_1", "cebra_2"], index=metadata_df.index), umap_df, p
     latents_df = pd.concat([metadata_df, pd.DataFrame(latents, columns=lat_cols, index=metadata_df.index), pca_df], axis=1)
-    latents_df = latents_df[latents_df['phase'].isin(["t2","t3","t4","t5","t6","t7","t8","t9+","tM","tSB","tB","tEB"])] # just classify around the blastocyst stage
+    if(not features["all_phases"]):
+        latents_df = latents_df[latents_df['phase'].isin(features["phases"])] # just classify around the blastocyst stage
+
     
     
     te_graded = latents_df.dropna(subset=["TE"])["embryo_id"].unique().tolist()
@@ -386,6 +388,10 @@ if __name__ == "__main__":
 
     parser.add_argument("--te-lr", type=float, default=0.0001, help="TE Learning rate")
     parser.add_argument("--icm-lr", type=float, default=0.0001,help="ICM Learning rate")
+
+    parser.add_argument('--all-phases', action='store_true')
+    parser.add_argument("--phases", action="extend", nargs="+", type=str) 
+
   
     args = parser.parse_args()
  

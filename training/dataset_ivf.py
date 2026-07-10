@@ -8,6 +8,21 @@ from torchvision.transforms import v2
 from torchvision.tv_tensors import Video
 from torchvision.transforms import InterpolationMode 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
+def read_gray(path, resize, crop):
+    img = Image.open(path).convert("L")
+    if img is None:
+        raise FileNotFoundError(path)
+    #Resize if needed
+    if crop > 0:
+        # crop
+        img = img.crop((crop,crop,500-crop,500-crop))
+
+    if resize is not None:
+        img = img.resize((resize, resize), Image.BILINEAR)
+        
+    return np.array(img, dtype="float32")
+
+
 class IVFSequenceDataset(Dataset):
     def __init__(self, df, crop=45, resize=500, norm="minmax01", inference=False, sequences = True):
         self.crop=crop
@@ -17,24 +32,13 @@ class IVFSequenceDataset(Dataset):
         self.norm = norm
         self.inference = inference
         self.augment = v2.Compose([
-            v2.RandomRotation([-180,180], interpolation=InterpolationMode.BILINEAR),
+            v2.RandomHorizontalFlip(p=0.5), #v2.RandomRotation([-180,180], interpolation=InterpolationMode.BILINEAR),
             v2.RandomVerticalFlip(p=0.5),
+            v2.RandomCrop(size=500-(2*self.crop)),
+            v2.Resize(size=self.resize)
         ])
         self.sequences = sequences
 
-
-    def _read_gray(self, path):
-        img = Image.open(path).convert("L")
-        if img is None:
-            raise FileNotFoundError(path)
-        # Resize if needed
-        if self.resize is not None:
-            # crop
-            img = img.crop((self.crop,self.crop,500-self.crop,500-self.crop))
-            #resize
-            img = img.resize((self.resize, self.resize), Image.BILINEAR)
-            
-        return np.array(img, dtype="float32")
 
     def _normalize_video(self, vol):
         if self.norm == "zscore":
@@ -53,20 +57,25 @@ class IVFSequenceDataset(Dataset):
             raise ValueError(f"Row {idx} has missing path data")
 
         embryo_paths = row["embryo_paths"].split("|")
-        embryo_frames = [self._read_gray(p) for p in embryo_paths]
-        embryo_vol = np.stack(embryo_frames, axis=0)  
-        embryo_vol = self._normalize_video(embryo_vol)
-        embryo_vol = embryo_vol[:,None, :, :] 
-        torch_vol = torch.from_numpy(embryo_vol) 
+        embryo_frames1 = [read_gray(p, self.resize, self.crop) for p in embryo_paths]
+        embryo_frames2 = [read_gray(p, None, 0) for p in embryo_paths]
+        embryo_vol1 = np.stack(embryo_frames1, axis=0)  
+        embryo_vol2 = np.stack(embryo_frames2, axis=0)  
+        embryo_vol1 = self._normalize_video(embryo_vol1)
+        embryo_vol2 = self._normalize_video(embryo_vol2)
+        embryo_vol1 = embryo_vol1[:,None, :, :] 
+        embryo_vol2 = embryo_vol2[:,None, :, :] 
+        torch_vol1 = torch.from_numpy(embryo_vol1) 
+        torch_vol2 = torch.from_numpy(embryo_vol2) 
         #if(self.inference):
         #    return torch_vol
         #else:
         #    re
         #return self.augment(Video(torch_vol))
-        return torch_vol, self.augment(Video(torch_vol))
+        return torch_vol1, self.augment(Video(torch_vol2))
 
     def __len__(self):
-        return len(self.df) if self.sequences else len(self.df) * 32
+        return len(self.df)
 
 if __name__ == "__main__":
 
