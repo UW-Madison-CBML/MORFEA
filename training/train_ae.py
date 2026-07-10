@@ -2204,7 +2204,7 @@ def train_lstm(
         kanakasabapathy_df = kanakasabapathy_df[~kanakasabapathy_mask]
 
         # export the actual model latents 
-        grades_df = grades_df.replace("NA",np.NaN)
+        grades_df = grades_df.replace("NA",np.nan)
         ds = IVFEmbryoDataset(full_seq_df[full_seq_df["embryo_id"].isin(grades_df.dropna(subset=["TE"])["embryo_id"].unique())]) # just export TE graded ones, keep_default_na=True
 
 
