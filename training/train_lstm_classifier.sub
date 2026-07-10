@@ -36,5 +36,6 @@ request_disk = 128GB
 request_gpus = 1
 
 
-queue args from train_lstm_classifier.txt
-#queue 1
+#queue args from train_lstm_classifier.txt
+# for DAG use
+queue 1

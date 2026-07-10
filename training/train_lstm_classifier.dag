@@ -1,17 +1,11 @@
 JOB A train_lstm_classifier.sub
-VARS A args = "--name control-2026-03-12 --run-name pcvda2.1 --acceleration --velocity --pca-ps --distance-mat --curvature --icm-lr 0.00005 --te-lr 0.00005"
+VARS A args = "--name convlstm2-2026-07-09 --run-name pb --acceleration --velocity --pca-ps --distance-mat --curvature --icm-lr 0.005 --te-lr 0.005 --phases t9+ tM tSB tB tEB"
 JOB B train_lstm_classifier.sub
-VARS B args = "--name control-2026-03-12 --run-name pcvda2.2 --acceleration --velocity --pca-ps --distance-mat --curvature --icm-lr 0.00006 --te-lr 0.00006"
+VARS B args = "--name convlstm2-2026-07-09 --run-name pn --acceleration --velocity --pca-ps --distance-mat --curvature --icm-lr 0.005 --te-lr 0.005 --phases t2 t3 t4 t5 t6 t7 t8 t9+ tM tSB tB tEB"
 JOB C train_lstm_classifier.sub
-VARS C args = "--name control-2026-03-12 --run-name pcvda2.3 --acceleration --velocity --pca-ps --distance-mat --curvature --icm-lr 0.00008 --te-lr 0.00008"
+VARS C args = "--name convlstm2-2026-07-09 --run-name nn --acceleration --velocity --distance-mat --curvature --icm-lr 0.005 --te-lr 0.005 --phases t9+ tM tSB tB tEB"
 JOB D train_lstm_classifier.sub
-VARS D args = "--name control-2026-03-12 --run-name pcvda2.4 --acceleration --velocity --pca-ps --distance-mat --curvature --icm-lr 0.0001 --te-lr 0.0001"
-JOB E train_lstm_classifier.sub
-VARS E args = "--name control-2026-03-12 --run-name pcvda2.5 --acceleration --velocity --pca-ps --distance-mat --curvature --icm-lr 0.00015 --te-lr 0.00015"
-JOB F train_lstm_classifier.sub
-VARS F args = "--name control-2026-03-12 --run-name pcvda2.6 --acceleration --velocity --pca-ps --distance-mat --curvature --icm-lr 0.0002 --te-lr 0.0002"
+VARS D args = "--name convlstm2-2026-07-09 --run-name nb --acceleration --velocity --distance-mat --curvature --icm-lr 0.005 --te-lr 0.005 --phases t2 t3 t4 t5 t6 t7 t8 t9+ tM tSB tB tEB"
+
 PARENT A CHILD B
 PARENT B CHILD C
-PARENT C CHILD D
-PARENT D CHILD E
-PARENT E CHILD F
