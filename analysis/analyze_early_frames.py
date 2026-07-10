@@ -20,7 +20,10 @@ def main():
     fig.savefig("pca_clusters.png")
     
     plt.close(fig)    
-    print(pca_df[kmeans.labels_ == 5]) 
+    print(pca_df[kmeans.labels_ == 1]) 
+
+    print(pca_df[kmeans.labels_ == 3]) 
+    print(pca_df["embryo_id"].unique())
     
 if __name__ == "__main__":
     main()
