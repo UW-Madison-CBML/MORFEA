@@ -1977,7 +1977,7 @@ def train_lstm(
 
         # do individual pca stuff for time
         for traj, labels in zip(trajs, traj_labels): 
-            embedding = pca.transform(traj) 
+            embedding = pca.transform(scaler.transform(traj))
             embeddings.append(embedding)
             fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
             im = ax.scatter(embedding[:,0], embedding[:,1],embedding[:,2], c=labels, cmap='viridis', vmin=0, vmax=1)
@@ -2061,10 +2061,10 @@ def train_lstm(
         plt.close(fig) 
     
         pca_df = pd.DataFrame({"embryo_id":all_traj_ids, "pca_0":all_embeddings[:,0], "pca_1":all_embeddings[:,1], "pca_2":all_embeddings[:,2], "stage":all_traj_stages})
-        image_dict["pca_val_df"] = wandb.Table(dataframe = pca_df)
+        image_dict["pca_val_df"] = wandb.Table(dataframe=pca_df)
 
+         
         
-
 
         GRADES = ["A","B","C"]; GRADE_COLORS = ["#00FF00", "#FFFF00", "#FF0000"]
         # -------------------------------------------------------- 
@@ -2230,7 +2230,7 @@ def train_lstm(
                 return teb_rows.iloc[0:1]
             tsb_rows = group[group['phase'] == "tSB"]
             if(len(tsb_rows) > 0):
-                return tsb_rows.iloc[-1:0]
+                return tsb_rows.iloc[-1:]
             return pd.DataFrame(columns = group.columns)
 
         single_frame_val_df = metadata_df.groupby("embryo_id").apply(get_tb).reset_index(drop=True)
