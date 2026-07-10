@@ -86,9 +86,9 @@ VAL_EMBRYOS = []#"RS363-7", "CZ594-5","CJ261-10","RL747-8","TM272-9","LFA766-1",
 def temporal_smoothness_loss(z_seq, weight=0.1):
     if z_seq.size(1) < 2:
         return torch.tensor(0.0, device=z_seq.device)
-    diff = z_seq[:,1:,:] - z_seq[:,:-1,:].detach()
+    diff = z_seq[:,1:,:] - z_seq[:,:-1,:]
     # use l1 for the contrastive loss below as it has it's highest gradient magnitude near 0
-    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:]) - F.sigmoid(F.l1_loss(z_seq[:, 1:, :], z_seq[:,:-1,:].detach()))
+    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:]) - F.sigmoid(F.l1_loss(z_seq[:, 1:, :], z_seq[:,:-1,:]))
     
     return weight * output
 
@@ -1681,18 +1681,27 @@ def train_lstm(
                 rec_loss, _ = reconstruction_loss(
                     out_recon, in_vol, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
                 )
-                position_regularization_loss = position_regularization_weight * F.mse_loss(embryo_lat[:,:,:POSITION_DIM].detach(), augment_lat[:,:,:POSITION_DIM])
+                position_regularization_loss = position_regularization_weight * F.mse_loss(embryo_lat[:,:,:POSITION_DIM], augment_lat[:,:,:POSITION_DIM])
                 rec_loss = rec_loss + position_regularization_loss
+                if temporal_weight > 0:
+                    smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight) + temporal_smoothness_loss(augment_lat, weight=temporal_weight)
+
+                    loss = rec_loss + smooth_loss
+                else:
+                    smooth_loss = torch.tensor(0.0, device=DEVICE)
+                    loss = rec_loss
+
+
             else:
                 rec_loss, _ = reconstruction_loss(
                     embryo_vol, embryo_recon, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
                 )
-            if temporal_weight > 0:
-                smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
-                loss = rec_loss + smooth_loss
-            else:
-                smooth_loss = torch.tensor(0.0, device=DEVICE)
-                loss = rec_loss
+                if temporal_weight > 0:
+                    smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight)
+                    loss = rec_loss + smooth_loss
+                else:
+                    smooth_loss = torch.tensor(0.0, device=DEVICE)
+                    loss = rec_loss
 
             if torch.isnan(loss.detach()) or torch.isinf(loss.detach()):
                 print(f"NaN/Inf detected, skipping batch")
