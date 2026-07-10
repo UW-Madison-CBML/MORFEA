@@ -28,8 +28,33 @@ def get_tb(group):
         return out_df
 
     return pd.DataFrame(columns = group.columns)
+def get_early(group):
+    """ 
+    group: group of latents by embryo_id with phase annotations
+        returns:
+        The single frame df from preferrably pre_phase, if if not will try the first frame of tPB2 and then the first frame of tPNa
+    
+    """
+    pre_phase_rows = group[group['phase'] == "pre_phase"]
+    if(len(pre_phase_rows) > 0):
+        out_df = pre_phase_rows.iloc[0: 1] # grab the single frame
+        print("pre_phase: ",len(out_df))
+        return out_df
+    tpb2_rows = group[group['phase'] == "tPB2"]
+    if(len(tpb2_rows) > 0):
+        out_df = tpb2_rows.iloc[0:1]
+        print("tPB2: ",len(out_df))
+        return out_df
+    tpna_rows = group[group['phase'] == "tPNa"]
+    if(len(tpna_rows) > 0):
+        out_df = tpna_rows.iloc[0:1]
+        print("tPNa: ", len(out_df))
+        return out_df
+
+    return pd.DataFrame(columns = group.columns)
 
 
+GRADE_COLORS = {"A":"#00FF00","B":"#FFFF00", "C":"#FF0000"}
 def main(model_name):
     video_latents = np.load(os.path.join("latents",f"{model_name}.npy")) 
     assert not np.isnan(video_latents).any(), "video dataset has nans"
@@ -39,16 +64,18 @@ def main(model_name):
     video_latents_df = pd.DataFrame(video_latents, columns = lat_cols, index=video_metadata.index)
     video_df = pd.concat([video_metadata, video_latents_df], axis=1)
     video_df = video_df[video_df["TE"].isin(["A","B","C"])]
-    tb_frames = video_df.groupby("embryo_id").apply(get_tb).reset_index(drop=True)
+    tb_frames = video_df.groupby("embryo_id").apply(get_early).reset_index(drop=True)
     video_latents = tb_frames[lat_cols].to_numpy()
     
     
   
 
-
+    
 
     # just load this in
     single_frame_latents = np.load(os.path.join("kanakasabapathy_latents",f"{model_name}.npy")) 
+    single_frame_metadata = pd.read_csv(os.path.join("kanakasabapathy_latents",f"{model_name}.csv")) 
+
     assert not np.isnan(single_frame_latents).any(), "single frame nans"
     assert not np.isnan(video_latents).any(), "single frame from video dataset nans"
     
@@ -57,14 +84,28 @@ def main(model_name):
     single_frame_colors = ["#00FF00"] * single_frame_latents.shape[0]
     latents = np.concatenate([video_latents, single_frame_latents], axis=0) 
     colors = video_colors + single_frame_colors
-    
-    embeddings = PCA(n_components=3).fit_transform(StandardScaler().fit_transform(latents))
+    scaler = StandardScaler()
+    pca = PCA(n_components=3)
+    embeddings= pca.fit_transform(scaler.fit_transform(latents))
+ 
     fig, ax = plt.subplots(figsize = (6,8), subplot_kw={"projection":"3d"})
     ax.scatter(embeddings[:, 0], embeddings[:,1], embeddings[:,2], c=colors)
     
     fig.savefig("comparison.png")
      
     plt.close(fig)
+    
+    video_grade_colors = [GRADE_COLORS[g] for g in tb_frames["TE"].to_list()]
+    single_frame_grade_colors = [GRADE_COLORS[g] for g in single_frame_metadata["TE"].to_list()]
+    grade_colors = video_grade_colors + single_frame_grade_colors
+ 
+    fig, ax = plt.subplots(figsize = (6,8), subplot_kw={"projection":"3d"})
+    ax.scatter(embeddings[:, 0], embeddings[:,1], embeddings[:,2], c=grade_colors)
+    
+    fig.savefig("grade_comparison.png")
+     
+    plt.close(fig)
+    
 
     
 

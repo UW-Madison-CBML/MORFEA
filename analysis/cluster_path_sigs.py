@@ -4,6 +4,8 @@ import sys
 sys.path.append("../utils")
 from geometric_features import get_acc, get_vel, calculate_curvatures, get_path_sigs,get_path_sig
 from scipy.spatial import distance_matrix
+from sklearn.cluster import AgglomerativeClustering
+from scipy.spatial.distance import cdist
 import os
 import matplotlib.pyplot as plt
 import umap as UMAP
@@ -12,10 +14,11 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import FastICA 
 from sklearn.cluster import KMeans 
 from visualize_cebra import plot_sequences
-pca_latent_cols =  ["pca_0","pca_1", "pca_2"]
+from scipy.interpolate import make_interp_spline
+import iisignature
 def add_geo_features(group, latent_cols):
     trajectory = group[latent_cols].to_numpy()
-    pca_traj = group[pca_latent_cols].to_numpy()
+    pca_traj = group[[col for col in group.columns if col.startswith("pca_")]].to_numpy()
     path_sigs, basis = get_path_sigs(pca_traj, 2, return_feature_labels = True)
     
     curv_5 = calculate_curvatures(trajectory, offset=5, how="triangle")
@@ -61,6 +64,24 @@ def print_next_to(strings): # strings must be of same # of lines
     print("\n".join([" ".join([line.ljust(padding_len, " ") for line in line_row]) for line_row in line_rows]))
 
 def main(model_name, grade):
+
+    # here I want to check linearity of path sigs 
+    for i in range(20):
+        anchors_x = np.linspace(0,1,10)
+        anchors_y = np.random.randn(10,3)
+        little_steps = np.linspace(0,1,1000)
+         
+        spline = np.stack([make_interp_spline(anchors_x, anchors_y[:,i], k=3)(little_steps) for i in range(3)], axis=-1)
+        scale = 10 * np.random.randn() 
+        scaled_spline = scale * spline 
+        path_sig = get_path_sig(spline, 3) 
+        scaled_path_sig = get_path_sig(scaled_spline, 3) 
+        print(f"similarity: {np.dot(path_sig,scaled_path_sig) / (np.linalg.norm(path_sig) * np.linalg.norm(scaled_path_sig))}, scale: {scale}")
+
+    # now do other path sig stuff
+
+    pca_dim = 10
+    pca_latent_cols =  [f"pca_{i}" for i in range(pca_dim)]
     latent_cols = None
     df = None
     if(not os.path.exists("latent_stats.csv")):
@@ -68,8 +89,8 @@ def main(model_name, grade):
         latents_np = np.load(os.path.join("latents", f"{model_name}.npy"))
         latent_cols = [f"z_{i}" for i in range(latents_np.shape[1])]
         latents_df = pd.DataFrame(latents_np, columns = latent_cols, index=metadata_df.index)
-        pca_np = PCA(n_components=3).fit_transform(StandardScaler().fit_transform(latents_np))
-        pca_df = pd.DataFrame(pca_np, columns=["pca_0", "pca_1", "pca_2"], index=metadata_df.index)
+        pca_np = PCA(n_components=pca_dim).fit_transform(StandardScaler().fit_transform(latents_np))
+        pca_df = pd.DataFrame(pca_np, columns=pca_latent_cols, index=metadata_df.index)
         df = pd.concat([metadata_df, latents_df,pca_df], axis=1)
         df = df.groupby("embryo_id").apply(lambda group:add_geo_features(group,latent_cols), include_groups=False).reset_index()
         df = df[~(df[grade] == "NA")]
@@ -82,36 +103,48 @@ def main(model_name, grade):
     #grade_curv_groups = df.groupby(grade)[["curv_5", "curv_10", "curv_20"]]
     #print(grade_curve_groups.mean(),"\n", grade_curv_groups.std())
     
-    features = [col for col in df.columns if col.startswith("ps")]
+    features = [f"ps_{i}" for i in range(len(iisignature.basis(iisignature.prepare(pca_dim, 3))))]
     
     
     # turn each graded embryo into a single path signature feature, by picking along tSB to tEB (each path sig is from just those latents)
     def group_to_path_sig(group):
-        ps_group = pd.DataFrame([get_path_sig(group[pca_latent_cols],2)], columns=features)
+        ps_group = pd.DataFrame([get_path_sig(group[pca_latent_cols],3, time_offsets=0.2)], columns=features)
         ps_group[grade] = group.iloc[0][grade]
         return ps_group
-    blastocyst_pca_df = df[(df['phase'].str.contains('tEB', regex=True))][pca_latent_cols + [grade, "embryo_id"]]
+    blastocyst_pca_df = df[(df['phase'].isin(["tM","tSB","tB",'tEB']))][pca_latent_cols + [grade, "embryo_id"]]
     
     pca_path_sigs_df = blastocyst_pca_df.groupby("embryo_id").apply(group_to_path_sig).reset_index() #
     
 
     colors = ["#FF0000", "#FFFF00", '#00FF00']
     grades = ["C", "B", "A"]
-    
-    kmeans = KMeans(n_clusters=8, random_state=0, n_init="auto").fit(pca_path_sigs_df[features].to_numpy())
-    pca_path_sigs_df["cluster"] = kmeans.labels_
-    
+    # for euclidean distance 
+    #kmeans = KMeans(n_clusters=8, random_state=0, n_init="auto").fit(pca_path_sigs_df[features].to_numpy())
+    #pca_path_sigs_df["cluster"] = kmeans.labels_
+    # for cosine similarity
+    path_sigs = pca_path_sigs_df[features].to_numpy()
+    distance_mat = cdist(path_sigs, path_sigs, metric="cosine")
+ 
+    clustering = AgglomerativeClustering(
+        n_clusters=8,
+        metric="precomputed", 
+        linkage="complete"   
+    )
+    pca_path_sigs_df["cluster"] = clustering.fit_predict(distance_mat)
+
     print(pca_path_sigs_df)
-    print(pca_path_sigs_df.style.to_latex())
+    #print(pca_path_sigs_df.style.to_latex())
     pca_path_sigs_df.to_csv(os.path.join(os.getcwd(), "path_sigs_by_embryo.csv"))
     blastocyst_pca_df = blastocyst_pca_df.merge(pca_path_sigs_df, how="left", left_on="embryo_id", right_on="embryo_id")
     
     print(pca_path_sigs_df.groupby([grade, 'cluster']).size())
-    
+    if pca_dim > 3:
+        return 
     plot_sequences([group[pca_latent_cols].to_numpy() for _, group in blastocyst_pca_df.groupby("embryo_id")], "path_sig_clusters", cmap="phase", c=[(group["cluster"].to_numpy() * 71) % 17 for _, group in blastocyst_pca_df.groupby("embryo_id")])
     for cluster in range(8):
         cluster_df = blastocyst_pca_df[blastocyst_pca_df["cluster"] == cluster] 
         plot_sequences([group[pca_latent_cols].to_numpy() for _, group in cluster_df.groupby("embryo_id")], f"path_sig_clusters_{cluster}", cmap="phase", c=[(group["cluster"].to_numpy() * 71) % 17 for _, group in cluster_df.groupby("embryo_id")])
+
     #umap = UMAP.UMAP(n_components=3) 
     #embedding = umap.fit_transform(pca_latents_group_df[features].to_numpy())
     #pca = PCA(n_components=3)
