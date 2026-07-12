@@ -162,7 +162,7 @@ class Encoder(nn.Module):
         #self.latent_compress.bias.data.fill_(0.0)
 
         if self.use_lstm:
-            self.lstm_enc = nn.GRU(latent_size, latent_size, batch_first=True)
+            self.lstm_enc = nn.GRU(latent_size, latent_size, batch_first=True, dropout=0.4)#, bidirectional=True)
 
             """self.lstm_enc.weight_ih_l[0].data = torch.eye(latent_size*3)[:3*latent_size, :latent_size]
             self.lstm_enc.weight_hh_l[0].data = torch.eye(latent_size*3)[:3*latent_size, :latent_size]
@@ -171,7 +171,7 @@ class Encoder(nn.Module):
         else:
             self.lstm_enc = None
 
-        #self.lin1 = nn.Linear(latent_size,latent_size)
+        #self.lin1 = nn.Linear(latent_size, latent_size)
         #self.lin1.weight.data = torch.eye(latent_size)
         #self.lin1.bias.data.fill_(0.0)
 
@@ -236,7 +236,7 @@ class Decoder(nn.Module):
                 return_all_layers=False
             )"""
         if self.use_lstm:
-            self.lstm_dec = nn.GRU(latent_size, latent_size, batch_first=True) # bidirectional=True)
+            self.lstm_dec = nn.GRU(latent_size, latent_size, batch_first=True, dropout=0.4) #, bidirectional=True)
             #self.lstm_dec.weight_ih_l[0].data = torch.eye(latent_size*3)[:latent_size, :latent_size*3]
             #self.lstm_dec.weight_hh_l[0].data = torch.eye(latent_size*3)[:latent_size, :latent_size*3]
             #self.lstm_dec.bias_ih_l[0].data.fill_(0.0)
