@@ -403,7 +403,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         x_rec = self.decoder(z_seq, residual if (self.use_residual and not self.decayed) else torch.zeros_like(residual, device=residual.device, dtype=residual.dtype))
 
 
-        return x_rec, z_seq
+        return x_rec, z_seq if self.training else z_seq[:,:,:self.position_reg_size]
 
     def encode(self, x):
         z_seq, z_last = self.encoder(x)
