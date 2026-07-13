@@ -88,7 +88,7 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
         return torch.tensor(0.0, device=z_seq.device)
     diff = z_seq[:,1:,:] - z_seq[:,:-1,:]
     # use l1 for the contrastive loss below as it has it's highest gradient magnitude near 0
-    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:]) - (0.1 * F.sigmoid(F.l1_loss(z_seq[:,:,1:], z_seq[:,:,:-1])))
+    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:]) - F.sigmoid(F.l1_loss(z_seq[:,1:,:], z_seq[:,:-1,:]))
     
     return weight * output
 
