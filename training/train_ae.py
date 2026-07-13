@@ -1523,7 +1523,7 @@ def train_lstm(
         use_lstm=use_lstm,
         use_residual=use_residual,
         use_batchnorm=use_batchnorm,
-        position_reg_size = POSITION_SIZE if position_regularization else None
+        position_reg_size = POSITION_DIM if position_regularization else None
     )
     if(resume_model != ""):
         ConvLSTMAutoencoder.from_pretrained(resume_model)
@@ -2143,17 +2143,27 @@ def train_lstm(
         plt.colorbar(im, ax=ax)
         image_dict[f"kanakasabapathy_gt_grades"] = wandb.Image(fig)
         plt.close(fig) 
+        # plot single frame and video pca together
+        both_embeddings = np.concatenate([all_embeddings, kanakasabapathy_embeddings], axis=0)
+        both_embeddings_colors = (["#FF0000"] * all_embeddings.shape[0]) + (["#00FF00"] * kanakasabapathy_embeddings.shape[0])
+        fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
+        im = ax.scatter(both_embeddings[:,0], both_embeddings[:,1], both_embeddings[:,2], c=both_embeddings_colors)
+        plt.colorbar(im, ax=ax)
+        image_dict[f"pca_dataset_comparison"] = wandb.Image(fig)
+        plt.close(fig) 
+
 
         # load classifier
-        knn = KNeighborsClassifier(n_neighbors=5)
+        stage_knn = KNeighborsClassifier(n_neighbors=5)
+        grade_knn = KNeighborsClassifier(n_neighbors=5)
         # fit on all_trajs_full, concatenated list of latent trajectory points in full latent space, with labels being the G.T. stage for each frame
         #knn.fit(np.concatenate(trajs, axis=0), all_traj_stages) # trajs is a list of latent trajectories, concat to just look at individual frames. all_traj_stages are the stage labels for each frame in np.cat(trajs)
         # alternatively
-        knn.fit(all_embeddings, all_traj_stages)
+        stage_knn.fit(all_embeddings, all_traj_stages)
         # now these are predicted stages for each kanakasabapathy
         #kanakasabapathy_k_nearest = knn.predict(kanakasabapathy_lats)
         # alternatively
-        kanakasabapathy_k_nearest_stages = knn.predict(kanakasabapathy_embeddings)
+        kanakasabapathy_k_nearest_stages = stage_knn.predict(kanakasabapathy_embeddings)
         metadata_df["pred_stages"] = [StageDataset.PHASES[s] for s in kanakasabapathy_k_nearest_stages]
         kanakasabapathy_metadata_df = metadata_df
         
@@ -2169,11 +2179,11 @@ def train_lstm(
         train_features = knn_embeddings[val_size:]
         train_labels = grade_knn_labels[val_size:]
 
-        knn.fit(train_features, train_labels)
+        grade_knn.fit(train_features, train_labels)
         # now these are predicted stages for each kanakasabapathy
         #kanakasabapathy_k_nearest = knn.predict(kanakasabapathy_lats)
         # alternatively
-        kanakasabapathy_pred_grades_knn = knn.predict(val_features)
+        kanakasabapathy_pred_grades_knn = grade_knn.predict(val_features)
         _, cm = prfcm(torch.from_numpy(kanakasabapathy_pred_grades_knn), torch.from_numpy(val_labels), 3) # compare predicted to ground truth
         cm = cm.numpy()
 
@@ -2245,7 +2255,7 @@ def train_lstm(
 
         single_frame_val_df = metadata_df.groupby("embryo_id").apply(get_tb).reset_index(drop=True)
         # since we have the kanaka knn built, let's just try it on the single frame dataset    
-        _, zero_shot_grade_cm = prfcm(torch.from_numpy(knn.predict(pca.transform(scaler.transform(single_frame_val_df[[col for col in single_frame_val_df.columns if col.startswith("z_")]])))),torch.tensor([GRADES.index(g) for g in single_frame_val_df["TE"].to_list()]), 3)
+        _, zero_shot_grade_cm = prfcm(torch.from_numpy(grade_knn.predict(pca.transform(scaler.transform(single_frame_val_df[[col for col in single_frame_val_df.columns if col.startswith("z_")]])))),torch.tensor([GRADES.index(g) for g in single_frame_val_df["TE"].to_list()]), 3)
         image_dict["zero_shot_grade_single_frame"] = disp_cm(zero_shot_grade_cm.numpy(), GRADES)
         
     
