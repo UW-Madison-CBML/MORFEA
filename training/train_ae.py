@@ -88,7 +88,7 @@ def temporal_smoothness_loss(z_seq, weight=0.1):
         return torch.tensor(0.0, device=z_seq.device)
     diff = z_seq[:,1:,:] - z_seq[:,:-1,:].detach()
     # use l1 for the contrastive loss below as it has it's highest gradient magnitude near 0
-    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:])
+    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:]) - (0.1 * F.sigmoid(F.l1_loss(z_seq[:,:,1:], z_seq[:,:,:-1])))
     
     return weight * output
 
@@ -1682,7 +1682,7 @@ def train_lstm(
                 rec_loss, _ = reconstruction_loss(
                     out_recon, in_vol, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
                 )
-                position_regularization_loss = position_regularization_weight * F.mse_loss(embryo_lat[:,:,:POSITION_DIM], augment_lat[:,:,:POSITION_DIM])
+                position_regularization_loss = position_regularization_weight * F.mse_loss(embryo_lat[:,:,:POSITION_DIM].detach(), augment_lat[:,:,:POSITION_DIM])
                 rec_loss = rec_loss + position_regularization_loss
                 if temporal_weight > 0:
                     smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight) + temporal_smoothness_loss(augment_lat, weight=temporal_weight)
@@ -1904,8 +1904,6 @@ def train_lstm(
                 embryo_vol = embryo_vol.to(DEVICE)
                 _, z_seq = model(embryo_vol)
 
-                if(position_regularization):
-                    z_seq = z_seq[:,:,:POSITION_DIM]
                 traj = z_seq.cpu().numpy()[0] # batch size one just use that batch
                 cebra_latents.append(traj)
                 cebra_labels.append((np.arange(len(traj)) + offset ).reshape(-1, 1).astype(np.float32))
@@ -1933,8 +1931,6 @@ def train_lstm(
                 embryo_id = embryo_id[0] # get rid of the batch
                 embryo_vol = embryo_vol.to(DEVICE) 
                 embryo_recon, z_seq = model(embryo_vol)
-                if(position_regularization):
-                    z_seq = z_seq[:,:,:POSITION_DIM]
 
                 traj = z_seq.cpu().numpy()[0] # batch size one just use that batch
                 distance_mat = distance_matrix(traj,traj)
@@ -2131,7 +2127,7 @@ def train_lstm(
 
         # export the kanakasabapathy latents and set colors
 
-        metadata_df, kanakasabapathy_lats, imgs = export_kanakasabapathy(model, position_dim = POSITION_DIM if position_regularization else latent_size, binary_classification=False) # do binary classification later, likely an easy result
+        metadata_df, kanakasabapathy_lats, imgs = export_kanakasabapathy(model, binary_classification=False) # do binary classification later, likely an easy result
 
         kanakasabapathy_embeddings = pca.transform(scaler.transform(kanakasabapathy_lats))
         
@@ -2148,7 +2144,6 @@ def train_lstm(
         both_embeddings_colors = (["#FF0000"] * all_embeddings.shape[0]) + (["#00FF00"] * kanakasabapathy_embeddings.shape[0])
         fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={"projection":"3d"})
         im = ax.scatter(both_embeddings[:,0], both_embeddings[:,1], both_embeddings[:,2], c=both_embeddings_colors)
-        plt.colorbar(im, ax=ax)
         image_dict[f"pca_dataset_comparison"] = wandb.Image(fig)
         plt.close(fig) 
 
@@ -2228,7 +2223,7 @@ def train_lstm(
         ds = IVFEmbryoDataset(full_seq_df[full_seq_df["embryo_id"].isin(grades_df.dropna(subset=["TE"])["embryo_id"].unique())]) # just export TE graded ones, keep_default_na=True
 
 
-        metadata_df, latents = export_video_latents(model, ds, latent_size = POSITION_DIM if position_regularization else model.latent_size)
+        metadata_df, latents = export_video_latents(model, ds)
         
 
         embryo_ids = metadata_df["embryo_id"].unique()
