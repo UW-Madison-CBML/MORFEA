@@ -86,7 +86,7 @@ VAL_EMBRYOS = []#"RS363-7", "CZ594-5","CJ261-10","RL747-8","TM272-9","LFA766-1",
 def temporal_smoothness_loss(z_seq, weight=0.1):
     if z_seq.size(1) < 2:
         return torch.tensor(0.0, device=z_seq.device)
-    diff = z_seq[:,1:,:] - z_seq[:,:-1,:].detach()
+    diff = z_seq[:,1:,:] - z_seq[:,:-1,:]
     # use l1 for the contrastive loss below as it has it's highest gradient magnitude near 0
     output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:]) - (0.1 * F.sigmoid(F.l1_loss(z_seq[:,:,1:], z_seq[:,:,:-1])))
     
@@ -1682,7 +1682,7 @@ def train_lstm(
                 rec_loss, _ = reconstruction_loss(
                     out_recon, in_vol, ssim_module, ms_ssim_module, l1_weight=rec_weight, ms_ssim_weight=ms_ssim_weight, vgg_weight=0.0
                 )
-                position_regularization_loss = position_regularization_weight * F.mse_loss(embryo_lat[:,:,:POSITION_DIM].detach(), augment_lat[:,:,:POSITION_DIM])
+                position_regularization_loss = position_regularization_weight * F.mse_loss(embryo_lat[:,:,:POSITION_DIM], augment_lat[:,:,:POSITION_DIM])
                 rec_loss = rec_loss + position_regularization_loss
                 if temporal_weight > 0:
                     smooth_loss = temporal_smoothness_loss(embryo_lat, weight=temporal_weight) + temporal_smoothness_loss(augment_lat, weight=temporal_weight)
@@ -1833,7 +1833,9 @@ def train_lstm(
             num_classes=2,
             use_latent_split=False,
             dropout_rate=dropout_rate,
-            use_lstm=use_lstm,use_residual=use_residual,use_batchnorm=use_batchnorm)
+            use_lstm=use_lstm,use_residual=use_residual,use_batchnorm=use_batchnorm, 
+            position_reg_size = POSITION_DIM if position_regularization else None
+        ) 
 
         model_clone.load_state_dict(model.state_dict())
         save_and_push_model(model_clone, training_name, required_files, hf_token, model_config=hf_config)
