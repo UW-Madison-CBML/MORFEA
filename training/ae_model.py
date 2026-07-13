@@ -155,7 +155,7 @@ class Encoder(nn.Module):
                 return_all_layers=False
                 )"""
         
-        self.dropout = nn.Dropout(0.1)
+        self.dropout = nn.Dropout(0.3)
 
         self.latent_compress = nn.Linear(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size)
         #self.latent_compress.weight.data = torch.eye(max(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size))[:self.hidden_channels * self.final_resolution * self.final_resolution,:latent_size]
@@ -245,7 +245,7 @@ class Decoder(nn.Module):
         else:
             self.lstm_dec = None
     
-        self.dropout = nn.Dropout(0.1)
+        self.dropout = nn.Dropout(0.3)
         #self.spatial_decoder = nn.Sequential(
             # 8 -> 16
             #ResidualUpBlock(self.hidden_channels, self.hidden_channels),
@@ -326,7 +326,8 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         use_lstm=True,
         use_residual=True,
         use_batchnorm=True,
-        hidden_channels=32
+        hidden_channels=32,
+        position_reg_size=None
         ):
         super(ConvLSTMAutoencoder, self).__init__()
         self.use_classifier = use_classifier
@@ -338,6 +339,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         self.use_residual = use_residual
         self.use_batchnorm = use_batchnorm
         self.hidden_channels = hidden_channels
+        self.position_reg_size = self.latent_size if position_reg_size is None else position_reg_size
         if(config != None):
             if isinstance(config, dict):
                 self.use_classifier = config.get('use_classifier', use_classifier)
@@ -348,6 +350,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
                 self.use_residual = config.get('use_residual', use_residual)
                 self.use_batchnorm = config.get('use_batchnorm', use_batchnorm)
                 self.hidden_channels = config.get('hidden_channels', hidden_channels)
+                self.position_reg_size = config.get('position_reg_size', position_reg_size)
             else:
                 self.use_classifier = config.use_classifier
                 self.latent_size = config.latent_size
@@ -357,6 +360,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
                 self.use_residual = config.use_residual
                 self.use_batchnorm = config.use_batchnorm
                 self.hidden_channels = config.hidden_channels
+                self.position_reg_size = config.position_reg_size
 
         self.encoder = Encoder(
             latent_size=self.latent_size,

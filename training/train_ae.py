@@ -86,9 +86,9 @@ VAL_EMBRYOS = []#"RS363-7", "CZ594-5","CJ261-10","RL747-8","TM272-9","LFA766-1",
 def temporal_smoothness_loss(z_seq, weight=0.1):
     if z_seq.size(1) < 2:
         return torch.tensor(0.0, device=z_seq.device)
-    diff = z_seq[:,1:,:] - z_seq[:,:-1,:]
+    diff = z_seq[:,1:,:] - z_seq[:,:-1,:].detach()
     # use l1 for the contrastive loss below as it has it's highest gradient magnitude near 0
-    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:]) - F.sigmoid(F.l1_loss(z_seq[:, 1:, :], z_seq[:,:-1,:]))
+    output = F.mse_loss(diff[:,1:,:], diff[:,:-1,:])
     
     return weight * output
 
@@ -1522,7 +1522,8 @@ def train_lstm(
         dropout_rate=dropout_rate,
         use_lstm=use_lstm,
         use_residual=use_residual,
-        use_batchnorm=use_batchnorm
+        use_batchnorm=use_batchnorm,
+        position_reg_size = POSITION_SIZE if position_regularization else None
     )
     if(resume_model != ""):
         ConvLSTMAutoencoder.from_pretrained(resume_model)

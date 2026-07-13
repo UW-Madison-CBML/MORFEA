@@ -36,9 +36,8 @@ def addAnnotations(group_name, group, annotations_dir):
     return group
 
 
-def export_video_latents(model, ds, latent_size = None):
-    if(latent_size is None):
-        latent_size = model.latent_size
+def export_video_latents(model, ds):
+    latent_size = model.position_reg_size
         
 
     loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=16, pin_memory=True) 
