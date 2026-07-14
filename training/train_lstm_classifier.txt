@@ -1,1 +1,1 @@
---name convlstm_final-2026-07-13 --run-name convlstm2 --pca-ps --ps-depth 2 --curvature --distance-mat --velocity --icm-lr 0.005 --te-lr 0.005
+--name convlstm_final-2026-07-13 --run-name convlstm_final --pca-ps --ps-depth 2 --curvature --distance-mat --velocity --icm-lr 0.005 --te-lr 0.005 --phases t2 t3 t4 t5 t6 t7 t8 t9+ tM tSB tB tEB
