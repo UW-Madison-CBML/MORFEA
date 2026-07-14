@@ -128,9 +128,9 @@ class StageDataset(Dataset):
             seq_df = group.iloc[:max(16, group_idx + 1)]
 
         if (self.return_embryo_id):
-            return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.phases.index(r) for r in seq_df['phase'].to_list()], dtype = torch.long), row["embryo_id"]
+            return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.__class__.PHASES.index(r) for r in seq_df['phase'].to_list()], dtype = torch.long), row["embryo_id"]
         else:
-            return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.phases.index(r) for r in seq_df['phase'].to_list()], dtype = torch.long)
+            return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.__class__.PHASES.index(r) for r in seq_df['phase'].to_list()], dtype = torch.long)
         
 
     def __len__(self):
