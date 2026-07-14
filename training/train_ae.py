@@ -2184,9 +2184,10 @@ def train_lstm(
         kanakasabapathy_pred_grades_knn = grade_knn.predict(val_features)
         _, cm = prfcm(torch.from_numpy(kanakasabapathy_pred_grades_knn), torch.from_numpy(val_labels), 3) # compare predicted to ground truth
         cm = cm.numpy()
-
-        image_dict["kanakasabapathy_grade_knn_cm"] = disp_cm(cm, GRADES)
-
+        fig, ax = plt.subplots(figsize=(8,6)) 
+        disp_cm(cm, GRADES, fig, ax)
+        image_dict["kanakasabapathy_grade_knn_cm"] = wandb.Image(fig)
+        plt.close(fig)
        
 
 
@@ -2254,7 +2255,12 @@ def train_lstm(
         single_frame_val_df = metadata_df.groupby("embryo_id").apply(get_tb).reset_index(drop=True)
         # since we have the kanaka knn built, let's just try it on the single frame dataset    
         _, zero_shot_grade_cm = prfcm(torch.from_numpy(grade_knn.predict(pca.transform(scaler.transform(single_frame_val_df[[col for col in single_frame_val_df.columns if col.startswith("z_")]])))),torch.tensor([GRADES.index(g) for g in single_frame_val_df["TE"].to_list()]), 3)
-        image_dict["zero_shot_grade_single_frame"] = disp_cm(zero_shot_grade_cm.numpy(), GRADES)
+
+        fig, ax = plt.subplots(figsize=(8,6)) 
+        disp_cm(zero_shot_grade_cm.numpy(), GRADES, fig, ax)
+        image_dict["zero_shot_grade_single_frame"] = wandb.Image(fig)
+        plt.close(fig)
+       
         
     
         # do some more data preparation 

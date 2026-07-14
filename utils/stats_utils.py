@@ -18,15 +18,11 @@ def prfcm(gt_indices:torch.Tensor, pred_indices:torch.Tensor, num_classes):
     f1 = torch.nan_to_num(2 * (precision * recall) / (precision + recall), 0.0)
     return (precision, recall, f1), confusion_mat
 
-def disp_cm(cm:np.ndarray, labels):
+def disp_cm(cm:np.ndarray, labels, fig, ax):
     
-    fig, ax = plt.subplots(figsize=(10, 10))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= labels)
     disp.plot(cmap='Blues', ax=ax, values_format='d')
     plt.setp(ax.get_xticklabels(), rotation=45, ha='right') 
-    img = wandb.Image(fig)
-    plt.close(fig)
-    return img
 
 
 
