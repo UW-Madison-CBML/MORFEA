@@ -60,6 +60,7 @@ from pytorch_msssim import MS_SSIM, SSIM
 from dataset_vit import VITDataset
 from stage_dataset import get_annotations_col, StageDataset
 from geometric_features import get_path_sig
+os.environ["HF_HUB_DISABLE_XET"] = "1"
 class RunningStats:
     def __init__(self):
         self.n = 0
