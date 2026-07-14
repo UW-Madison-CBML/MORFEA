@@ -40,5 +40,5 @@ request_gpus = 1
 
 #queue models from export_kanakasabapathy_latents.txt
 queue model from (
-convlstm2-2026-07-09
+convlstm_final-2026-07-13
 )
