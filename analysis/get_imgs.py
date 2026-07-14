@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(DEVICE)
-torch.backends.cudnn.enabled = False
+
 def main(model_name):
     login(os.getenv("HF_TOKEN"))
     os.makedirs(os.path.join(f"{model_name}_imgs","A"))

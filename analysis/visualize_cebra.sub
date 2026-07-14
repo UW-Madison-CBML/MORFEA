@@ -35,8 +35,9 @@ request_disk = 80GB
 
 #notemp-2026-03-12
 #nolstm-2026-03-12
-
-#queue model from (
-#control-2026-03-12
-#)
-queue 1
+# non-DAG use
+queue args from (
+convlstm_final-2026-07-13 all --all-phases --all-grades
+)
+# for DAG use
+#queue 1
