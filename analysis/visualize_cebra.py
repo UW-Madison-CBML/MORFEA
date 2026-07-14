@@ -75,6 +75,12 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         individ_ax.set_xlabel(f"{axlabel} 1")
         individ_ax.set_ylabel(f"{axlabel} 2")
         individ_ax.set_zlabel(f"{axlabel} 3")
+        if(axis_off):
+            individ_ax.set_xticks([])
+            individ_ax.set_yticks([])
+            individ_ax.set_zticks([])
+
+
         
         plt.tight_layout(rect=[0, 0, 0.85, 1])
         individ_fig.subplots_adjust(right=0.85) 
@@ -100,7 +106,12 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         grid_axes[i].set_xlabel(f"{axlabel} 1")
         grid_axes[i].set_ylabel(f"{axlabel} 2")
         grid_axes[i].set_zlabel(f"{axlabel} 3")
-        
+        if(axis_off):
+            grid_ax[i].set_xticks([])
+            grid_ax[i].set_yticks([])
+            grid_ax[i].set_zticks([])
+
+    
     
     
     plt.tight_layout(rect=[0, 0, 0.85, 1])
@@ -115,6 +126,7 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         cbar_ax = grid_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
         if grid_im is not None:
             grid_fig.colorbar(grid_im, cax=cbar_ax, label=cbar_label)
+    
     grid_fig.savefig(os.path.join(folder,f"grid-{f_name}.png"))
     plt.close(grid_fig)   
     
@@ -138,7 +150,10 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
     
 
     if(axis_off):
-        plt.grid(visible=False)
+        group_ax.set_xticks([])
+        group_ax.set_yticks([])
+        group_ax.set_zticks([])
+
 
     group_fig.savefig(os.path.join(folder,f"group-{f_name}.png"))
     plt.close(group_fig)
