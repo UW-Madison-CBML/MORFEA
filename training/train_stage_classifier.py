@@ -278,7 +278,7 @@ def main(model_name, features, lr=0.001):
                 f"{phase} f1": f1_stats[phase].mean, f"{phase} f1 std": f1_stats[phase].std_dev, 
                 f"{phase} precision": precision_stats[phase].mean, f"{phase} precision std": precision_stats[phase].std_dev})
 
-        sum_confusion_mat = sum_confusion_mat.astype(int)
+        sum_confusion_mat = sum_confusion_mat.astype(int).T
         fig, ax = plt.subplots(figsize=(10, 10))
         disp = ConfusionMatrixDisplay(confusion_matrix=sum_confusion_mat, display_labels=StageDataset.PHASES)
         disp.plot(cmap='Blues', ax=ax, values_format='d')
