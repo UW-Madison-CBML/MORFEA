@@ -89,7 +89,7 @@ def main(model_name, image_name, grade_args, phase_args):
             c.append([GRADE_COLORS[GRADES.index(g)]] * len(group))
             names.append(name)
             
-    plot_sequences(seqs, f"grade_{image_name}", c=c, cmap="grade", cbar_label="Grade", folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=False)
+    plot_sequences(seqs, f"grade_{image_name}", c=c, cmap="grade", cbar_label="Grade", folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=True)
     # do a bunch per grade using diff colormaps
     for g, embryo_groups, names in tqdm(zip(grade_args, embryo_grade_groups, embryo_grade_groups_names)):
         #--------------------------------
@@ -130,7 +130,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(get_acc(seq))
             
-        plot_sequences(seqs, f"acc_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA",axis_off=False, individ_names = names)
+        plot_sequences(seqs, f"acc_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA",axis_off=True, individ_names = names)
 
         #--------------------------------
         # velocity
@@ -141,7 +141,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(get_vel(seq))
             
-        plot_sequences(seqs, f"vel_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA", axis_off=False, individ_names = names)
+        plot_sequences(seqs, f"vel_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA", axis_off=True, individ_names = names)
     # --------------------------------------------
     # --------------------------------------------
     return

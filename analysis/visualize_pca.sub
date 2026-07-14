@@ -37,6 +37,6 @@ request_disk = 40GB
 #nolstm-2026-03-12
 
 queue args from (
-morfea2-2026-06-12 all --all-phases --all-grades
+convlstm_final-2026-07-13 all --all-phases --all-grades
 )
 #queue 1

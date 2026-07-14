@@ -10,6 +10,7 @@ import torch.nn.functional as F
 import os
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from stats_utils import prfcm, disp_cm
 
 class MLP(torch.nn.Module):
     def __init__(self, in_size):
@@ -31,14 +32,26 @@ def main(model_name):
     epochs = 8
     batch_size = 1024
     pca_dim = 8
-    
+    depth = 3
+    time_offsets = 5.0
+    DEVICE = "cuda" if torch.cuda_is_available() else "cpu" 
+    # wandb 
+    wandb.login(key=os.getenv("WANDB_KEY"))
+    run = wandb.init(
+        entity="jenslundsgaard7-uw-madison",
+        project="IVF-Training",
+        name="ps_stage",
+        config={
+            "lr": lr,
+            "batch_size":batch_size
+        },
+    )   
     # load csv 
     metadata_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv"))
     latents = np.load(os.path.join("latents", f"{model_name}.npy"))
 
-    latents_df = pd.DataFrame(latents, columns = [f"z_{i}" for i in range(latents.shape[1])], index=metadata_df.index)
     pca_df = pd.DataFrame(PCA(n_components=pca_dim).fit_transform(StandardScaler().fit_transform(latents)), columns = [f"pca_{i}" for i in range(pca_dim)], index=metadata_df.index)
-    df = pd.concat([metadata_df, latents_df, pca_df], axis=1)
+    df = pd.concat([metadata_df, pca_df], axis=1)
     
     # shuffle df
     df = df.sample(frac=1, replace=False)
@@ -47,7 +60,7 @@ def main(model_name):
     val_df = df.iloc[int(0.8 * len(df)):]
 
     loader = DataLoader(
-        PathSigStageDataset(train_df, ),
+        PathSigStageDataset(train_df, time_offsets, pca_dim=pca_dim, depth=depth)
         batch_size=batch_size,
         shuffle=True,
         num_workers=16,
@@ -55,7 +68,7 @@ def main(model_name):
         drop_last=False,
     )    
     val_loader = DataLoader(
-        PathSigStageDataset(val_df, ),
+        PathSigStageDataset(val_df, time_offsets, pca_dim=pca_dim, depth=depth),
         batch_size=batch_size,
         shuffle=False,
         num_workers=16,
@@ -63,5 +76,30 @@ def main(model_name):
         drop_last=False,
     )
 
+    model = MLP(loader.num_features) 
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    crit = torch.nn.CrossEntropyLoss()
+    for epoch in range(epochs):
+        for features, targets in loader:
+            optimizer.zero_grad()
+            features = features.to(DEVICE)
+            targets = targets.to(DEVICE)
+            logits = model(features)  
+            loss = crit(logits, targets)
+            loss.backward()
+            optimizer.step()
+            run.log({"loss":loss.item()})
+            
+        with torch.no_grad():
+            for features, targets in val_loader:
+                run.log({"loss":loss.item()})
+                features = features.to(DEVICE)
+                targets = targets.to(DEVICE)
+                logits = model(features)  
+                loss = crit(logits, targets)
+                run.log({"val_loss":loss.item()})
+            
 
+            
+        
     

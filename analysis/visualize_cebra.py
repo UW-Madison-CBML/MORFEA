@@ -88,8 +88,6 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
             cbar_ax = individ_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
             if individ_im is not None:
                 individ_fig.colorbar(individ_im, cax=cbar_ax, label=cbar_label)
-        if(axis_off):
-            individ_ax.set_axis_off()
         if individ_names is not None:
             individ_fig.savefig(os.path.join(folder,f"{individ_names[i]}-{f_name}-{i}.png"))
         else:
@@ -103,8 +101,6 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         grid_axes[i].set_ylabel(f"{axlabel} 2")
         grid_axes[i].set_zlabel(f"{axlabel} 3")
         
-        if(axis_off):
-            grid_axes[i].set_axis_off()
     
     
     plt.tight_layout(rect=[0, 0, 0.85, 1])
@@ -142,7 +138,7 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
     
 
     if(axis_off):
-        group_ax.set_axis_off()
+        plt.grid(visible=False)
 
     group_fig.savefig(os.path.join(folder,f"group-{f_name}.png"))
     plt.close(group_fig)
