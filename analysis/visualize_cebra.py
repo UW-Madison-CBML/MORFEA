@@ -1,9 +1,11 @@
 import cebra
+
 import torch
 from cebra import CEBRA
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from mpl_toolkits.mplot3d import Axes3D
 matplotlib.use('Agg') 
 from geometric_features import calculate_curvatures, get_acc, get_vel
 import numpy as np
@@ -37,6 +39,27 @@ def get_phases(embryo_id, seq_len):
     new_column = new_column[:seq_len]
     
     return np.array([PHASES.index(phase) for phase in new_column]) 
+def just_axes(ax, origin, axis_length):
+    ax.set_axis_off()
+    ax.plot(
+        [origin[0], origin[0] + axis_length],
+        [origin[1], origin[1]],
+        [origin[2], origin[2]],
+        'black'
+    )
+    ax.plot(
+        [origin[0], origin[0]],
+        [origin[1], origin[1] + axis_length],
+        [origin[2], origin[2]],
+        'black'
+    )
+    ax.plot(
+        [origin[0], origin[0]],
+        [origin[1], origin[1]],
+        [origin[2], origin[2] + axis_length],
+        'black'
+    )    
+ 
 def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, cbar_label="Time", log_scale=False, folder="cebra_plots", axlabel="Cebra", axis_off = False, individ_names = None):
     GRADES = ["NA", "C", "B", "A"]
     GRADE_COLORS = ["#888888", "#FF0000", "#FFFF00", "#00FF00"]
@@ -72,14 +95,12 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
             individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
             group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
 
-        individ_ax.set_xlabel(f"{axlabel} 1")
-        individ_ax.set_ylabel(f"{axlabel} 2")
-        individ_ax.set_zlabel(f"{axlabel} 3")
         if(axis_off):
-            individ_ax.set_xticks([])
-            individ_ax.set_yticks([])
-            individ_ax.set_zticks([])
-
+            just_axes(individ_ax, [seq[:,0].min(), seq[:,1].min() , seq[:,2].min()], max(seq[:,0].max() - seq[:,0].min(), seq[:,1].max() - seq[:,1].min() , seq[:,2].max() - seq[:,2].min()))
+        else:
+            individ_ax.set_xlabel(f"{axlabel} 1")
+            individ_ax.set_ylabel(f"{axlabel} 2")
+            individ_ax.set_zlabel(f"{axlabel} 3")
 
         
         plt.tight_layout(rect=[0, 0, 0.85, 1])
@@ -99,17 +120,15 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         else:
             individ_fig.savefig(os.path.join(folder,f"individ-{f_name}-{i}.png"))
         plt.close(individ_fig) 
-        if(uniform_bounds):
-            grid_axes[i].set_xlim(x_lim)
-            grid_axes[i].set_ylim(y_lim)
-            grid_axes[i].set_zlim(z_lim) 
-        grid_axes[i].set_xlabel(f"{axlabel} 1")
-        grid_axes[i].set_ylabel(f"{axlabel} 2")
-        grid_axes[i].set_zlabel(f"{axlabel} 3")
+
         if(axis_off):
-            grid_ax[i].set_xticks([])
-            grid_ax[i].set_yticks([])
-            grid_ax[i].set_zticks([])
+            just_axes(grid_axes[i], [seq[:,0].min(), seq[:,1].min() , seq[:,2].min()], max(seq[:,0].max() - seq[:,0].min(), seq[:,1].max() - seq[:,1].min() , seq[:,2].max() - seq[:,2].min()))
+        else:
+            grid_axes[i].set_xlabel(f"{axlabel} 1")
+            grid_axes[i].set_ylabel(f"{axlabel} 2")
+            grid_axes[i].set_zlabel(f"{axlabel} 3")
+
+
 
     
     
@@ -133,9 +152,6 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
     group_ax.set_xlim(x_lim)
     group_ax.set_ylim(y_lim)
     group_ax.set_zlim(z_lim) 
-    group_ax.set_xlabel(f"{axlabel} 1")
-    group_ax.set_ylabel(f"{axlabel} 2")
-    group_ax.set_zlabel(f"{axlabel} 3")
     group_fig.subplots_adjust(right=0.85) 
     if(cmap == "phase"):
         legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(PHASES)]
@@ -150,9 +166,12 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
     
 
     if(axis_off):
-        group_ax.set_xticks([])
-        group_ax.set_yticks([])
-        group_ax.set_zticks([])
+        just_axes(group_ax, [x_lim[0], y_lim[0], z_lim[0]], max(x_lim[1] - x_lim[0], y_lim[1] - y_lim[0], z_lim[1] - z_lim[0]))
+    else:
+        group_ax.set_xlabel(f"{axlabel} 1")
+        group_ax.set_ylabel(f"{axlabel} 2")
+        group_ax.set_zlabel(f"{axlabel} 3")
+
 
 
     group_fig.savefig(os.path.join(folder,f"group-{f_name}.png"))
