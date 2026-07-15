@@ -1,0 +1,35 @@
+# train_ps_grade_classifier.sub
+   
+docker_image = jenslundsgaard/ivf-training:v3.2
+
+universe = docker
+
+shell = ./train_ps_grade_classifier.sh $(model)
+   		
+
+log = train_ps_grade_classifier_$(Cluster)_$(Process).log
+error = train_ps_grade_classifier_$(Cluster)_$(Process).err
+output = train_ps_grade_classifier_$(Cluster)_$(Process).out
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT_OR_EVICT
+Requirements = (Target.HasCHTCStaging == true)
+
+#require_gpus = (DriverVersion >= 10.1)
+
+transfer_input_files = train_ps_grade_classifier.sh, train_ps_grade_classifier.py, ps_grade_datset.py, ../api_keys.txt, dataset_ivf.py, dataset_ivf_embryo.py, ../utils/geometric_features.py, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz, ../utils/stats_utils.py
+
+gpus_minimum_capability = 7.0
+requirements= Machine=="bhaskargpu4000.chtc.wisc.edu"
+
++GPUModel = "NVIDIA H200"
+
+#transfer_output_files = model_weights.pth 
+
+request_cpus = 16
+request_memory = 128GB
+request_disk = 128GB
+request_gpus = 1
+
+queue model in (
+convlstm_final-2026-07-13
+)
