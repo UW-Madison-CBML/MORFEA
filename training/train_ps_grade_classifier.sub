@@ -16,7 +16,7 @@ Requirements = (Target.HasCHTCStaging == true)
 
 #require_gpus = (DriverVersion >= 10.1)
 
-transfer_input_files = train_ps_grade_classifier.sh, train_ps_grade_classifier.py, ps_grade_datset.py, ../api_keys.txt, dataset_ivf.py, dataset_ivf_embryo.py, ../utils/geometric_features.py, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz, ../utils/stats_utils.py
+transfer_input_files = train_ps_grade_classifier.sh, train_ps_grade_classifier.py, ps_grade_dataset.py, ../api_keys.txt, dataset_ivf.py, dataset_ivf_embryo.py, ../utils/geometric_features.py, file:///staging/groups/bhaskar_group/ivf/latents.tar.gz, ../utils/stats_utils.py
 
 gpus_minimum_capability = 7.0
 requirements= Machine=="bhaskargpu4000.chtc.wisc.edu"

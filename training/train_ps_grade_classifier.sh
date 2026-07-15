@@ -11,5 +11,5 @@ export WANDB_KEY=$WANDB_KEY
 
 tar -xvf latents.tar.gz
 
-python train_ps_grade_classifier.py "$@"
+python train_ps_grade_classifier.py "$1"
 
