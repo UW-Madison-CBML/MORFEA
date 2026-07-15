@@ -25,7 +25,7 @@ def main(model_name):
     loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=16, pin_memory=True)
     model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/" + model_name)
     model = model.to(DEVICE)
-    for idx, embryo_vol in enumerate(loader):
+    for idx, (embryo_vol, augment_vol) in enumerate(loader):
         model.eval()
 
         row = ds.df.iloc[idx]
@@ -45,6 +45,9 @@ def main(model_name):
          
         for _,phase_row in annotations_df.iterrows():
             idx = (phase_row["stage_begin"] + phase_row["stage_end"]) // 2
+            if(idx >= vol_img.shape[0]):
+                print(f"idx is {idx}, doesn't fit in {vol_img.shape[0]}")
+                continue
 
             vol = (vol_img[idx] * 255).astype(np.uint8) # don't check idx, it should be fatal if idx isn't in range
             recon = (recon_img[idx]*255).astype(np.uint8)
@@ -52,6 +55,29 @@ def main(model_name):
             plt.imsave(os.path.join(target_dir,str(cell_id)+str(phase_row["stage_id"])+".png"), vol, cmap='gray')
             plt.imsave(os.path.join(target_dir,str(cell_id)+str(phase_row["stage_id"]) + "_recon"+".png"), recon, cmap='gray')
             plt.close()
+        # pass full sequence to model
+        augment_vol = augment_vol.to(DEVICE)
+        with torch.no_grad():
+            recon, _ = model(augment_vol)
+        target_dir = os.path.join(f"{model_name}_imgs", grade)
+
+        os.makedirs(target_dir, exist_ok=True)
+        vol_img = augment_vol[0, :, 0].cpu().detach().numpy()
+        recon_img = recon[0, :, 0].cpu().detach().numpy()
+         
+        for _,phase_row in annotations_df.iterrows():
+            idx = (phase_row["stage_begin"] + phase_row["stage_end"]) // 2
+            if(idx >= vol_img.shape[0]):
+                print(f"idx is {idx}, doesn't fit in {vol_img.shape[0]}")
+                continue
+            vol = (vol_img[idx] * 255).astype(np.uint8) # don't check idx, it should be fatal if idx isn't in range
+            recon = (recon_img[idx]*255).astype(np.uint8)
+
+            plt.imsave(os.path.join(target_dir,str(cell_id)+str(phase_row["stage_id"]) + "_augment.png"), vol, cmap='gray')
+            plt.imsave(os.path.join(target_dir,str(cell_id)+str(phase_row["stage_id"]) + "_recon"+"_augment.png"), recon, cmap='gray')
+            plt.close()
+
+
 
 if __name__ == "__main__":
     import argparse
