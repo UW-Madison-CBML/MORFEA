@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 class PathSigGradeDataset(Dataset):
     PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
     GRADES = ["A", "B", "C"]
-    def __init__(self, df, time_offsets, pca_dim=8, depth=3, grade="TE")
+    def __init__(self, df, time_offsets, pca_dim=8, depth=3, grade="TE"):
         """
         df: the latents df with embryo_id and stage annotations, sorted by embryo_id and time_step
         time_offsets: the offsets for the time correlation

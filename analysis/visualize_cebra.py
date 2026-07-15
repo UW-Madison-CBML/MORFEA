@@ -41,6 +41,9 @@ def get_phases(embryo_id, seq_len):
     return np.array([PHASES.index(phase) for phase in new_column]) 
 def just_axes(ax, origin, axis_length):
     ax.set_axis_off()
+    ax.grid(False)
+    ax.set_box_aspect([1, 1, 1])
+
     ax.plot(
         [origin[0], origin[0] + axis_length],
         [origin[1], origin[1]],
@@ -59,6 +62,10 @@ def just_axes(ax, origin, axis_length):
         [origin[2], origin[2] + axis_length],
         'black'
     )    
+
+    ax.set_xlim(origin[0], origin[0] + axis_length)
+    ax.set_ylim(origin[1], origin[1] + axis_length)
+    ax.set_zlim(origin[2], origin[2] + axis_length)
  
 def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, cbar_label="Time", log_scale=False, folder="cebra_plots", axlabel="Cebra", axis_off = False, individ_names = None):
     GRADES = ["NA", "C", "B", "A"]

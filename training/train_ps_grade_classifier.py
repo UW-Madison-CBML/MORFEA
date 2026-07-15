@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import Dataloader
+from torch.utils.data import DataLoader
 import wandb
 import numpy as np
 import pandas as pd
@@ -75,7 +75,7 @@ def main(model_name):
     val_df = df.iloc[int(0.8 * len(df)):]
 
     loader = DataLoader(
-        PathSigStageDataset(train_df, time_offsets, pca_dim=pca_dim, depth=depth)
+        PathSigGradeDataset(train_df, time_offsets, pca_dim=pca_dim, depth=depth),
         batch_size=batch_size,
         shuffle=True,
         num_workers=16,
@@ -83,7 +83,7 @@ def main(model_name):
         drop_last=False,
     )    
     val_loader = DataLoader(
-        PathSigStageDataset(val_df, time_offsets, pca_dim=pca_dim, depth=depth),
+        PathSigGradeDataset(val_df, time_offsets, pca_dim=pca_dim, depth=depth),
         batch_size=batch_size,
         shuffle=False,
         num_workers=16,
@@ -123,11 +123,13 @@ def main(model_name):
         results_df = pd.concat(dfs, axis=0, ignore_index=True)
         image_dict["all_stage_cm"] = cm_agg_plot(results_df)
         images = results_df.groupby("stage_class").apply(cm_agg_plot).reset_index()
-        for stage, img in images.items()
+        for stage, img in images.items():
             image_dict[f"{stage}_cm"] = img
         run.log(image_dict)
             
 
             
         
-    
+if __name__ == "__main__":
+    import sys
+    main(sys.argv[1]) 

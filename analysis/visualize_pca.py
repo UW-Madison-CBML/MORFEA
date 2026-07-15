@@ -103,6 +103,17 @@ def main(model_name, image_name, grade_args, phase_args):
             
         plot_sequences(seqs, f"time_{g}_{image_name}",c=c, cbar_label="Time", folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=True)
         #--------------------------------
+        # embryo_id
+        seqs = []
+        c = []
+        for i, group in enumerate(embryo_groups):
+            seqs.append(group[PCA_COLS].to_numpy())
+            c.append([i / len(embryo_groups)] * len(group))
+            
+            
+        plot_sequences(seqs, f"embryo_id_{g}_{image_name}", c=c, folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=True)
+
+        #--------------------------------
         # phase
         seqs = []
         c = []
@@ -130,7 +141,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(get_acc(seq))
             
-        plot_sequences(seqs, f"acc_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA",axis_off=True, individ_names = names)
+        plot_sequences(seqs, f"acc_{g}_{image_name}", c=c, cbar_label="Acc", log_scale=True, folder="pca_plots", axlabel="PCA",axis_off=True, individ_names = names)
 
         #--------------------------------
         # velocity
@@ -141,7 +152,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(get_vel(seq))
             
-        plot_sequences(seqs, f"vel_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA", axis_off=True, individ_names = names)
+        plot_sequences(seqs, f"vel_{g}_{image_name}", c=c, cbar_label="Vel", log_scale=True, folder="pca_plots", axlabel="PCA", axis_off=True, individ_names = names)
     # --------------------------------------------
     # --------------------------------------------
     return
