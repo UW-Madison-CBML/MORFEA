@@ -47,7 +47,7 @@ def main(model_name):
     pca_dim = 8
     depth = 3
     time_offsets = 5.0
-    DEVICE = "cuda" if torch.cuda_is_available() else "cpu" 
+    DEVICE = "cuda" if torch.cuda.is_available() else "cpu" 
     # wandb 
     wandb.login(key=os.getenv("WANDB_KEY"))
     run = wandb.init(
@@ -73,9 +73,11 @@ def main(model_name):
     
     train_df = df.iloc[:int(0.8 * len(df))]
     val_df = df.iloc[int(0.8 * len(df)):]
-
+    
+    ds = PathSigGradeDataset(train_df, time_offsets, pca_dim=pca_dim, depth=depth)
+    val_ds = PathSigGradeDataset(val_df, time_offsets, pca_dim=pca_dim, depth=depth)
     loader = DataLoader(
-        PathSigGradeDataset(train_df, time_offsets, pca_dim=pca_dim, depth=depth),
+        ds,
         batch_size=batch_size,
         shuffle=True,
         num_workers=16,
@@ -83,7 +85,7 @@ def main(model_name):
         drop_last=False,
     )    
     val_loader = DataLoader(
-        PathSigGradeDataset(val_df, time_offsets, pca_dim=pca_dim, depth=depth),
+        val_ds,
         batch_size=batch_size,
         shuffle=False,
         num_workers=16,
@@ -91,7 +93,7 @@ def main(model_name):
         drop_last=False,
     )
 
-    model = MLP(loader.num_features) 
+    model = MLP(ds.num_features) 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     crit = torch.nn.CrossEntropyLoss()
     for epoch in range(epochs):

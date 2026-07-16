@@ -109,9 +109,9 @@ def main(model_name, image_name, grade_args, phase_args):
         for i, group in enumerate(embryo_groups):
             seqs.append(group[PCA_COLS].to_numpy())
             c.append([i / len(embryo_groups)] * len(group))
+            print(i," / ", len(embryo_groups), " = ", i / len(embryo_groups))
             
-            
-        plot_sequences(seqs, f"embryo_id_{g}_{image_name}", c=c, folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=True)
+        plot_sequences(seqs, f"embryo_id_{g}_{image_name}", c=c, folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=True, vminmax=[0,1])
 
         #--------------------------------
         # phase
