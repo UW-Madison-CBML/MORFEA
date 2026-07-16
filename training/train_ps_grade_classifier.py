@@ -14,6 +14,7 @@ from stats_utils import prfcm, disp_cm
 
 class MLP(torch.nn.Module):
     def __init__(self, in_size):
+        super().__init__()
         self.stage_embedding = torch.nn.Embedding(len(PathSigGradeDataset.PHASES), 3)
         self.lin1 = torch.nn.Linear(in_size + 3, 128)
         self.lin2 = torch.nn.Linear(128, 128)
@@ -94,6 +95,7 @@ def main(model_name):
     )
 
     model = MLP(ds.num_features) 
+    model = model.to(DEVICE)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     crit = torch.nn.CrossEntropyLoss()
     for epoch in range(epochs):
@@ -119,14 +121,16 @@ def main(model_name):
                 pred = logits.cpu().argmax(dim=1).numpy()
                 gt = targets.cpu().numpy()
                 
-                stage_classes = [PathSigGradeDataset.PHASES.index(s) for s in stage_classes.cpu().numpy()]
+                stage_classes = [PathSigGradeDataset.PHASES[s] for s in stage_classes.cpu().numpy()]
                 dfs.append(pd.DataFrame({"pred": pred, "gt":gt, "stage_class":stage_classes}))
         image_dict = {}
         results_df = pd.concat(dfs, axis=0, ignore_index=True)
         image_dict["all_stage_cm"] = cm_agg_plot(results_df)
         images = results_df.groupby("stage_class").apply(cm_agg_plot).reset_index()
-        for stage, img in images.items():
-            image_dict[f"{stage}_cm"] = img
+        print(images.head())
+        for _, row in images.iterrows():
+
+            image_dict[f"{row['stage_class']}_cm"] = row['0']
         run.log(image_dict)
             
 
