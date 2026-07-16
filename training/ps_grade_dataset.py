@@ -5,6 +5,7 @@ from geometric_features import get_path_sig
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+import numpy as np
 class PathSigGradeDataset(Dataset):
     PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
     GRADES = ["A", "B", "C"]
@@ -27,15 +28,16 @@ class PathSigGradeDataset(Dataset):
             pca_traj = group[self.pca_cols].to_numpy()
             path_sig = get_path_sig(pca_traj, depth, time_offsets=self.time_offsets)
             out_df = pd.DataFrame(path_sig[None, :], columns = self.ps_cols)
-            out_df["phase"] = [group.name[1]] # the second key is 'phase'
-            out_df["grade"] = [group.iloc[0][grade]] 
+            out_df["phase"] = group.name[1] # the second key is 'phase'
+            out_df["grade"] = group.iloc[0][grade]
             return out_df 
 
         self.df = df.groupby(["embryo_id", "phase"]).apply(path_sig_agg).reset_index(drop=True)
+        self.df[self.ps_cols] = self.df[self.ps_cols].astype(np.float32)
         
-    def __get_item__(self, idx):
+    def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        return torch.from_numpy(row[self.ps_cols].to_numpy()), torch.from_numpy(self.__class__.PHASES.index(row["phase"])).to(torch.long), torch.from_numpy(self.__class__.GRADES.index(row["grade"])).to(torch.long)
+        return torch.from_numpy(self.df[self.ps_cols].iloc[idx].to_numpy()), torch.tensor(self.__class__.PHASES.index(row["phase"]), dtype=torch.long), torch.tensor(self.__class__.GRADES.index(row["grade"]), dtype=torch.long)
 
     def __len__(self):
         return len(self.df)
