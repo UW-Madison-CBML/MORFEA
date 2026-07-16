@@ -16,7 +16,7 @@ class PathSigGradeDataset(Dataset):
         depth: the path sig depth
         """
         self.pca_dim = pca_dim
-        self.pca_cols = [f"pca_{i}" for i in range(len(iisignature.basis(iisignature.prepare(pca_dim+1, depth))))] 
+        self.pca_cols = [f"pca_{i}" for i in range(pca_dim)]
         self.time_offsets = time_offsets
         self.depth = depth
         self.num_features = len(iisignature.basis(iisignature.prepare(pca_dim+1, depth)))
@@ -28,7 +28,7 @@ class PathSigGradeDataset(Dataset):
             path_sig = get_path_sig(pca_traj, depth, time_offsets=self.time_offsets)
             out_df = pd.DataFrame(path_sig[None, :], columns = self.ps_cols)
             out_df["phase"] = [group.name[1]] # the second key is 'phase'
-            out_df["grade"] = [group.iloc[0, grade]] 
+            out_df["grade"] = [group.iloc[0][grade]] 
             return out_df 
 
         self.df = df.groupby(["embryo_id", "phase"]).apply(path_sig_agg).reset_index(drop=True)

@@ -67,7 +67,7 @@ def just_axes(ax, origin, axis_length):
     ax.set_ylim(origin[1], origin[1] + axis_length)
     ax.set_zlim(origin[2], origin[2] + axis_length)
  
-def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, cbar_label="Time", log_scale=False, folder="cebra_plots", axlabel="Cebra", axis_off = False, individ_names = None):
+def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, cbar_label="Time", log_scale=False, folder="cebra_plots", axlabel="Cebra", axis_off = False, individ_names = None, vminmax=None):
     GRADES = ["NA", "C", "B", "A"]
     GRADE_COLORS = ["#888888", "#FF0000", "#FFFF00", "#00FF00"]
 
@@ -97,6 +97,11 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
             grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
             individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
             group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
+        else(vminmax is not None):
+            grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1])
+            individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1])
+            group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1])
+
         else:
             grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
             individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
