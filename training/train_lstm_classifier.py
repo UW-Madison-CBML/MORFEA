@@ -281,7 +281,7 @@ def train_on_kanakasabapathy_latents(model_name, run, features):
     mask = df["embryo_id"].isin(VAL_EMBRYOS)
     val_df = df[mask]
     df = df[~mask]
-    train_on(df, val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kanakasabapathy", run, batch_size=128, epochs=25)
+    train_on(df, val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kanakasabapathy", run, batch_size=128, epochs=40)
     
 
 

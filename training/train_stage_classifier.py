@@ -302,8 +302,10 @@ def main(model_name, features, lr=0.001):
             pd.DataFrame(precision_stats.values(), index=precision_stats.keys(), columns=["precision","precision_std"]),    
             pd.DataFrame(recall_stats.values(), index=recall_stats.keys(), columns=["recall","recall_std"])
             ], axis=1)
-        cols = ["f1", "f1_std", "precision", "precision_std", "recall", "recall_std"]
+        
         temp_df = precision_recall_df.copy(deep=True)
+        temp_df['phase'] = temp_df.index
+        
         """fig, ax = plt.subplots()
         f1s = precision_recall_df["f1"]
         f1_errs = precision_recall_df["f1_std"]
