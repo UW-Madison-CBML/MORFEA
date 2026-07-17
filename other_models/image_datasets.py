@@ -1,5 +1,5 @@
 import torch
-from torch.data.utils import Dataset
+from torch.utils.data import Dataset
 import pandas as pd
 from dataset_ivf_embryo import read_gray, normalize_video
 import torch
@@ -11,10 +11,11 @@ class ImageGradeDataset(Dataset):
         # grade_df cols = embryo_id, TE, ICM, keep_default_na=False
         # grade = "TE" or "ICM" 
         index_df = index_df.merge(grade_df, how="left", left_on="embryo_id", right_on="embryo_id")
+        index_df = index_df.dropna(subset=[grade])
         dfs = [] 
         for idx, row in index_df.iterrows():
-            # embryo_id,num_frames,embryo_paths
-            df = pd.DataFrame({"path":row["embryo_paths"].split("|"), "embryo_id": row["embryo_id"], "TE":row["TE"], "ICM":row["ICM"]})
+            # embryo_id, num_frames, embryo_paths
+            df = pd.DataFrame({"path":row["embryo_paths"].split("|"), "embryo_id": row["embryo_id"], grade:row[grade]})
             dfs.append(df)
         self.df = pd.concat(dfs, axis=0, ignore_index=True)
         self.grade = grade
@@ -22,7 +23,7 @@ class ImageGradeDataset(Dataset):
         
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        return torch.tensor(normalize_video([read_gray(row["path"], 128)], "minmax01")[0]), torch.tensor(self.__class__.GRADES.index(row[self.grade]), dtype=torch.long)
+        return torch.tensor(normalize_video([read_gray(row["path"], 128, 50)], "minmax01")[0]), torch.tensor(self.__class__.GRADES.index(row[self.grade]), dtype=torch.long)
         
     def __len__(self):
         return len(self.df)
