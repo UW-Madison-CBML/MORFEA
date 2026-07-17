@@ -170,7 +170,7 @@ def main(model_name, features, lr=0.001, warm_restarts=True):
     )
 
     precision_recall_df = pd.DataFrame()
-    epochs = 8
+    epochs = 20
     scheduler = CosineAnnealingLR(optimizer, len(loader) * epochs) if not warm_restarts else CosineAnnealingWarmRestarts(optimizer, len(loader))
 
     for epoch in range(epochs):
