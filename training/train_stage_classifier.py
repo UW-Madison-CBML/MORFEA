@@ -97,7 +97,7 @@ VAL_EMBRYOS =[
     
     
     
-def main(model_name, features, lr=0.001):
+def main(model_name, features, lr=0.001, warm_restarts=True):
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -107,7 +107,7 @@ def main(model_name, features, lr=0.001):
         entity="jenslundsgaard7-uw-madison",
         project="IVF-Training",
         name=f"{model_name}-phase-{features['run_name']}",
-        config={"lr":lr}
+        config={"lr":lr, "warm_restarts":warm_restarts}
     )
  
     learning_rate = lr
@@ -171,8 +171,8 @@ def main(model_name, features, lr=0.001):
 
     precision_recall_df = pd.DataFrame()
     epochs = 8
-    scheduler = CosineAnnealingLR(optimizer, len(loader) * epochs)
-    print(len(loader))
+    scheduler = CosineAnnealingLR(optimizer, len(loader) * epochs) if not warm_restarts else CosineAnnealingWarmRestarts(optimizer, len(loader))
+
     for epoch in range(epochs):
         print(epoch)
         model.train()

@@ -67,7 +67,7 @@ def just_axes(ax, origin, axis_length):
     ax.set_ylim(origin[1], origin[1] + axis_length)
     ax.set_zlim(origin[2], origin[2] + axis_length)
  
-def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, cbar_label="Time", log_scale=False, folder="cebra_plots", axlabel="Cebra", axis_off = False, individ_names = None, vminmax=None):
+def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, cbar_label="Time", log_scale=False, folder="cebra_plots", axlabel="Cebra", axis_off = False, individ_names = None, vminmax=None, two_d=False):
     GRADES = ["NA", "C", "B", "A"]
     GRADE_COLORS = ["#888888", "#FF0000", "#FFFF00", "#00FF00"]
 
@@ -75,44 +75,67 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         c = [np.linspace(0,1,len(seq)) for seq in seqs]
     x_list = [x for seq in seqs for x in seq[:, 0]]
     y_list = [y for seq in seqs for y in seq[:, 1]]
-    z_list = [z for seq in seqs for z in seq[:, 2]]
+    if(not two_d):
+        z_list = [z for seq in seqs for z in seq[:, 2]]
     x_lim = (min(x_list),max(x_list))
     y_lim = (min(y_list),max(y_list))
-    z_lim = (min(z_list),max(z_list))
+    if(not two_d):
+        z_lim = (min(z_list),max(z_list))
 
     least_greater_square = max(2, int(math.sqrt(len(seqs)) + 1))
-    grid_fig, grid_axes = plt.subplots(least_greater_square, least_greater_square,figsize=(5*least_greater_square, 5*least_greater_square), subplot_kw={'projection': '3d'})
+    grid_fig, grid_axes = plt.subplots(least_greater_square, least_greater_square,figsize=(5*least_greater_square, 5*least_greater_square), subplot_kw={} if two_d else {'projection': '3d'})
     grid_axes = grid_axes.ravel()
     grid_im = None
-    group_fig, group_ax = plt.subplots(subplot_kw={'projection': '3d'})
+    group_fig, group_ax = plt.subplots(subplot_kw={} if two_d else {'projection': '3d'})
     group_im = None
     for i, seq in enumerate(seqs):
-        individ_fig, individ_ax = plt.subplots(subplot_kw={'projection':'3d'})
+        individ_fig, individ_ax = plt.subplots(subplot_kw{} if two_d else ={'projection':'3d'})
         individ_im = None
-        if(cmap =="phase"):
-            grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap='tab20c', vmin=0, vmax=19)
-            individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap='tab20c', vmin=0, vmax=19)
-            group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap='tab20c', vmin=0, vmax=19)
-        elif(log_scale): # discrete colorbar and log colorbar are mutually exclusive
-            grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
-            individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
-            group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
-        elif(vminmax is not None):
-            grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1])
-            individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1])
-            group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1])
+        if(two_d):
+            if(cmap =="phase"):
+                grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], c=c[i], cmap='tab20c', vmin=0, vmax=19)
+                individ_im = individ_ax.scatter(seq[:,0], seq[:,1], c=c[i], cmap='tab20c', vmin=0, vmax=19)
+                group_im = group_ax.scatter(seq[:,0], seq[:,1],  c=c[i], cmap='tab20c', vmin=0, vmax=19)
+            elif(log_scale): # discrete colorbar and log colorbar are mutually exclusive
+                grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1],  c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
+                individ_im = individ_ax.scatter(seq[:,0], seq[:,1],  c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
+                group_im = group_ax.scatter(seq[:,0], seq[:,1],  c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
+            elif(vminmax is not None):
+                grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1],  c=c[i], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1])
+                individ_im = individ_ax.scatter(seq[:,0], seq[:,1],  c=c[i], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1])
+                group_im = group_ax.scatter(seq[:,0], seq[:,1],  c=c[i], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1])
+
+            else:
+                grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1],  c=c[i], cmap=cmap)
+                individ_im = individ_ax.scatter(seq[:,0], seq[:,1],  c=c[i], cmap=cmap)
+                group_im = group_ax.scatter(seq[:,0], seq[:,1],  c=c[i], cmap=cmap)
 
         else:
-            grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
-            individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
-            group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
+            if(cmap =="phase"):
+                grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap='tab20c', vmin=0, vmax=19)
+                individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap='tab20c', vmin=0, vmax=19)
+                group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap='tab20c', vmin=0, vmax=19)
+            elif(log_scale): # discrete colorbar and log colorbar are mutually exclusive
+                grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
+                individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
+                group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, norm=matplotlib.colors.LogNorm())
+            elif(vminmax is not None):
+                grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1])
+                individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1])
+                group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1])
 
-        if(axis_off):
+            else:
+                grid_im = grid_axes[i].scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
+                individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
+                group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
+
+        if(axis_off and not two_d):
             just_axes(individ_ax, [seq[:,0].min(), seq[:,1].min() , seq[:,2].min()], max(seq[:,0].max() - seq[:,0].min(), seq[:,1].max() - seq[:,1].min() , seq[:,2].max() - seq[:,2].min()))
         else:
             individ_ax.set_xlabel(f"{axlabel} 1")
             individ_ax.set_ylabel(f"{axlabel} 2")
-            individ_ax.set_zlabel(f"{axlabel} 3")
+            if(not two_d):
+                individ_ax.set_zlabel(f"{axlabel} 3")
 
         
         plt.tight_layout(rect=[0, 0, 0.85, 1])
@@ -133,12 +156,14 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
             individ_fig.savefig(os.path.join(folder,f"individ-{f_name}-{i}.png"))
         plt.close(individ_fig) 
 
-        if(axis_off):
+        if(axis_off and not two_d):
+        
             just_axes(grid_axes[i], [seq[:,0].min(), seq[:,1].min() , seq[:,2].min()], max(seq[:,0].max() - seq[:,0].min(), seq[:,1].max() - seq[:,1].min() , seq[:,2].max() - seq[:,2].min()))
         else:
             grid_axes[i].set_xlabel(f"{axlabel} 1")
             grid_axes[i].set_ylabel(f"{axlabel} 2")
-            grid_axes[i].set_zlabel(f"{axlabel} 3")
+            if(not two_d):
+                grid_axes[i].set_zlabel(f"{axlabel} 3")
 
 
 
@@ -163,7 +188,9 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
     
     group_ax.set_xlim(x_lim)
     group_ax.set_ylim(y_lim)
-    group_ax.set_zlim(z_lim) 
+
+    if(not two_d):
+        group_ax.set_zlim(z_lim) 
     group_fig.subplots_adjust(right=0.85) 
     if(cmap == "phase"):
         legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(PHASES)]
@@ -177,12 +204,13 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
             group_fig.colorbar(group_im, cax=cbar_ax, label=cbar_label)
     
 
-    if(axis_off):
+    if(axis_off and not two_d):
         just_axes(group_ax, [x_lim[0], y_lim[0], z_lim[0]], max(x_lim[1] - x_lim[0], y_lim[1] - y_lim[0], z_lim[1] - z_lim[0]))
     else:
         group_ax.set_xlabel(f"{axlabel} 1")
         group_ax.set_ylabel(f"{axlabel} 2")
-        group_ax.set_zlabel(f"{axlabel} 3")
+        if(not two_d):
+            group_ax.set_zlabel(f"{axlabel} 3")
 
 
 
