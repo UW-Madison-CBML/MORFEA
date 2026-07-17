@@ -89,7 +89,7 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
     group_fig, group_ax = plt.subplots(subplot_kw={} if two_d else {'projection': '3d'})
     group_im = None
     for i, seq in enumerate(seqs):
-        individ_fig, individ_ax = plt.subplots(subplot_kw{} if two_d else ={'projection':'3d'})
+        individ_fig, individ_ax = plt.subplots(subplot_kw={} if two_d else {'projection':'3d'})
         individ_im = None
         if(two_d):
             if(cmap =="phase"):
@@ -129,15 +129,26 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
                 individ_im = individ_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
                 group_im = group_ax.scatter(seq[:,0], seq[:,1], seq[:,2], c=c[i], cmap=cmap)
 
-        if(axis_off and not two_d):
-            just_axes(individ_ax, [seq[:,0].min(), seq[:,1].min() , seq[:,2].min()], max(seq[:,0].max() - seq[:,0].min(), seq[:,1].max() - seq[:,1].min() , seq[:,2].max() - seq[:,2].min()))
+        if(axis_off):
+            if(two_d):
+                individ_ax.tick_params(
+                    axis="both",
+                    which="both",
+                    bottom=False,
+                    top=False,
+                    left=False,
+                    right=False,
+                    labelbottom=False,
+                    labelleft=False,
+                )
+            else:
+                just_axes(individ_ax, [seq[:,0].min(), seq[:,1].min() , seq[:,2].min()], max(seq[:,0].max() - seq[:,0].min(), seq[:,1].max() - seq[:,1].min() , seq[:,2].max() - seq[:,2].min()))
         else:
             individ_ax.set_xlabel(f"{axlabel} 1")
             individ_ax.set_ylabel(f"{axlabel} 2")
             if(not two_d):
                 individ_ax.set_zlabel(f"{axlabel} 3")
 
-        
         plt.tight_layout(rect=[0, 0, 0.85, 1])
         individ_fig.subplots_adjust(right=0.85) 
         if(cmap == "phase"):
@@ -156,9 +167,21 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
             individ_fig.savefig(os.path.join(folder,f"individ-{f_name}-{i}.png"))
         plt.close(individ_fig) 
 
-        if(axis_off and not two_d):
         
-            just_axes(grid_axes[i], [seq[:,0].min(), seq[:,1].min() , seq[:,2].min()], max(seq[:,0].max() - seq[:,0].min(), seq[:,1].max() - seq[:,1].min() , seq[:,2].max() - seq[:,2].min()))
+        if(axis_off):
+            if(two_d):
+                grid_axes[i].tick_params(
+                    axis="both",
+                    which="both",
+                    bottom=False,
+                    top=False,
+                    left=False,
+                    right=False,
+                    labelbottom=False,
+                    labelleft=False,
+                )
+            else:
+                just_axes(grid_axes[i], [seq[:,0].min(), seq[:,1].min() , seq[:,2].min()], max(seq[:,0].max() - seq[:,0].min(), seq[:,1].max() - seq[:,1].min() , seq[:,2].max() - seq[:,2].min()))
         else:
             grid_axes[i].set_xlabel(f"{axlabel} 1")
             grid_axes[i].set_ylabel(f"{axlabel} 2")
@@ -203,9 +226,20 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         if group_im is not None:
             group_fig.colorbar(group_im, cax=cbar_ax, label=cbar_label)
     
-
-    if(axis_off and not two_d):
-        just_axes(group_ax, [x_lim[0], y_lim[0], z_lim[0]], max(x_lim[1] - x_lim[0], y_lim[1] - y_lim[0], z_lim[1] - z_lim[0]))
+    if(axis_off):
+        if(two_d):
+            group_ax.tick_params(
+                axis="both",
+                which="both",
+                bottom=False,
+                top=False,
+                left=False,
+                right=False,
+                labelbottom=False,
+                labelleft=False,
+            )
+        else:
+            just_axes(group_ax, [x_lim[0], y_lim[0], z_lim[0]], max(x_lim[1] - x_lim[0], y_lim[1] - y_lim[0], z_lim[1] - z_lim[0]))
     else:
         group_ax.set_xlabel(f"{axlabel} 1")
         group_ax.set_ylabel(f"{axlabel} 2")
