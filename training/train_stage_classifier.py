@@ -19,11 +19,11 @@ from sklearn.preprocessing import StandardScaler
 
 from torch.optim.lr_scheduler import CosineAnnealingLR, CosineAnnealingWarmRestarts
 def recall_precision_f1(confusion_mat, i):
-    recall = 0 if confusion_mat[:, i].sum() == 0 else confusion_mat[i,i]/confusion_mat[:, i].sum()
+    recall = torch.tensor(0) if confusion_mat[:, i].sum().item() == 0 else confusion_mat[i,i]/confusion_mat[:, i].sum()
             
-    precision = 0 if confusion_mat[i,:].sum() == 0 else confusion_mat[i,i]/ confusion_mat[i, :].sum()
-    f1 = 0
-    if (precision + recall) > 0:
+    precision = torch.tensor(0) if confusion_mat[i,:].sum().item() == 0 else confusion_mat[i,i]/ confusion_mat[i, :].sum()
+    f1 = torch.tensor(0)
+    if (precision + recall).item() > 0:
         f1 = 2 * (precision * recall) / (precision + recall)
     return recall, precision, f1
 
@@ -270,9 +270,9 @@ def main(model_name, features, lr=0.001):
                 sum_confusion_mat = sum_confusion_mat + confusion_mat.numpy() 
                 for i in range(model.num_classes):
                     recall, precision, f1 = recall_precision_f1(confusion_mat, i) 
-                    f1_stats[StageDataset.PHASES[i]].push(f1)
-                    recall_stats[StageDataset.PHASES[i]].push(recall)
-                    precision_stats[StageDataset.PHASES[i]].push(precision)
+                    f1_stats[StageDataset.PHASES[i]].push(f1.item())
+                    recall_stats[StageDataset.PHASES[i]].push(recall.item())
+                    precision_stats[StageDataset.PHASES[i]].push(precision.item())
         for phase in StageDataset.PHASES:
             run.log({f"{phase} recall": recall_stats[phase].mean, f"{phase} recall std": recall_stats[phase].std_dev, 
                 f"{phase} f1": f1_stats[phase].mean, f"{phase} f1 std": f1_stats[phase].std_dev, 
@@ -302,8 +302,8 @@ def main(model_name, features, lr=0.001):
             pd.DataFrame(precision_stats.values(), index=precision_stats.keys(), columns=["precision","precision_std"]),    
             pd.DataFrame(recall_stats.values(), index=recall_stats.keys(), columns=["recall","recall_std"])
             ], axis=1)
-
-        temp_df = precision_recall_df.copy(deep=False)
+        cols = ["f1", "f1_std", "precision", "precision_std", "recall", "recall_std"]
+        temp_df = precision_recall_df.copy(deep=True)
         """fig, ax = plt.subplots()
         f1s = precision_recall_df["f1"]
         f1_errs = precision_recall_df["f1_std"]
