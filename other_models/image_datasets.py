@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 import pandas as pd
+import numpy as np
 from dataset_ivf_embryo import read_gray, normalize_video
 import torch
 import os
@@ -23,7 +24,7 @@ class ImageGradeDataset(Dataset):
         
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        return torch.tensor(normalize_video([read_gray(row["path"], 128, 50)], "minmax01")[0]), torch.tensor(self.__class__.GRADES.index(row[self.grade]), dtype=torch.long)
+        return torch.tensor(normalize_video([read_gray(row["path"], 128, 50)], "minmax01")[0]).unsqueeze(0), torch.tensor(self.__class__.GRADES.index(row[self.grade]), dtype=torch.long)
         
     def __len__(self):
         return len(self.df)
@@ -33,8 +34,8 @@ class ImageGradeDataset(Dataset):
 class ImageStageDataset(Dataset):
     PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
     @staticmethod
-    def add_group_annotations(group, annotations_dir):
-        annotation_file = os.path.join(annotations_dir, f"{group_name}_phases.csv")
+    def add_group_annotations(group, embryo_id, annotations_dir):
+        annotation_file = os.path.join(annotations_dir, f"{embryo_id}_phases.csv")
         df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
 
         new_column = []
@@ -59,17 +60,18 @@ class ImageStageDataset(Dataset):
         dfs = [] 
         for idx, row in index_df.iterrows():
             # embryo_id,num_frames,embryo_paths
-            df = pd.DataFrame({"path":row["embryo_paths"].split("|"), "embryo_id": row["embryo_id"], "TE":row["TE"], "ICM":row["ICM"]})
+            df = pd.DataFrame({"path":row["embryo_paths"].split("|"), "embryo_id": row["embryo_id"]})
+            df["time_step"] = np.arange(len(df)) + 1
             dfs.append(df)
         expanded_df = pd.concat(dfs, axis=0, ignore_index=True)
-        self.df = expanded_df.groupby("embryo_id", group_keys=False).apply(lambda group: self.__class__.add_group_annotations(group, annotations_dir)).reset_index()
+        self.df = expanded_df.groupby("embryo_id", group_keys=False).apply(lambda group: self.__class__.add_group_annotations(group, group.name, annotations_dir)).reset_index()
         
 
         
         
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        return torch.tensor(normalize_video([read_gray(row["path"], 128)], "minmax01")[0]), torch.tensor(self.__class__.index(row["phase"]), dtype=torch.long)
+        return torch.tensor(normalize_video([read_gray(row["path"], 128, 50)], "minmax01")[0]).unsqueeze(0).repeat(3,1,1), torch.tensor(self.__class__.PHASES.index(row["phase"]), dtype=torch.long)
         
     def __len__(self):
         return len(self.df)

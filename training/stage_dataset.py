@@ -126,7 +126,7 @@ class StageDataset(Dataset):
 
             group_idx = group.index.get_loc(row.name)
     
-            seq_df = group.iloc[:max(16, group_idx + 1)]
+            seq_df = group.iloc[:min(len(group),max(16, group_idx + 200))]
 
         if (self.return_embryo_id):
             return torch.tensor(seq_df[self.lat_cols].to_numpy()), torch.tensor([self.__class__.PHASES.index(r) for r in seq_df['phase'].to_list()], dtype = torch.long), row["embryo_id"]
