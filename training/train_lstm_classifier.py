@@ -219,7 +219,6 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
 
 
             for features, targets, lengths in loader_icm_val:
-                print(len(loader_icm_val))
                 features = features.to(DEVICE)
                 logits = model_icm(features, lengths)
 
@@ -263,6 +262,7 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
 
         gc.collect()
         torch.cuda.empty_cache()
+    run.finish()
 
 
 def train_on_kanakasabapathy_latents(model_name, run, features):
@@ -324,6 +324,7 @@ def main(model_name, features):
 
     if run_kanakasabapathy:
         train_on_kanakasabapathy_latents(model_name, run, features)
+        return
 
     
     metadata_df = pd.read_csv(os.path.abspath(f"latents/{model_name}.csv"), keep_default_na=(not KEEP_NA))
