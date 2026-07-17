@@ -33,6 +33,7 @@ def get_annotations_col(group_name, group_len, annotations_dir):
 def add_annotations(group_name, group, annotations_dir, features):
     cebra_cols = ["cebra_0", "cebra_1", "cebra_2"] 
     lat_cols = cebra_cols if features["cebra"] else [column for column in group.columns if column.startswith("z_")] 
+    print(len(lat_cols))
     new_column = get_annotations_col(group_name, len(group), annotations_dir)
     group["phase"] = new_column
 

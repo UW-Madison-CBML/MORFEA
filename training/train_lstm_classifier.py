@@ -219,6 +219,7 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
 
 
             for features, targets, lengths in loader_icm_val:
+                print(len(loader_icm_val))
                 features = features.to(DEVICE)
                 logits = model_icm(features, lengths)
 
@@ -267,6 +268,8 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
 def train_on_kanakasabapathy_latents(model_name, run, features):
     # just call the image name the embryo id
     kanakasabapathy_metadata_df = pd.read_csv(os.path.join("kanakasabapathy_latents", f"{model_name}.csv")).rename(columns={"Image":"embryo_id"})
+    # spoof 
+    kanakasabapathy_metadata_df["ICM"] = kanakasabapathy_metadata_df["TE"]
     kanakasabapathy_lats = np.load(os.path.join("kanakasabapathy_latents", f"{model_name}.npy"))
     kanakasabapathy_lats_df = pd.DataFrame(kanakasabapathy_lats, index=kanakasabapathy_metadata_df.index, columns=[f"z_{i}" for i in range(kanakasabapathy_lats.shape[1])])
     df = pd.concat([kanakasabapathy_metadata_df, kanakasabapathy_lats_df], axis=1)
@@ -278,7 +281,7 @@ def train_on_kanakasabapathy_latents(model_name, run, features):
     mask = df["embryo_id"].isin(VAL_EMBRYOS)
     val_df = df[mask]
     df = df[~mask]
-    train_on(df, val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kanakasabapathy", run, batch_size=128, epochs=40)
+    train_on(df, val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kanakasabapathy", run, batch_size=128, epochs=25)
     
 
 

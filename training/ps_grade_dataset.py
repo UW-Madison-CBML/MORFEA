@@ -6,6 +6,8 @@ import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import numpy as np
+from tqdm import tqdm 
+tqdm.pandas()
 class PathSigGradeDataset(Dataset):
     PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
     GRADES = ["A", "B", "C"]
@@ -32,7 +34,7 @@ class PathSigGradeDataset(Dataset):
             out_df["grade"] = group.iloc[0][grade]
             return out_df 
 
-        self.df = df.groupby(["embryo_id", "phase"]).apply(path_sig_agg).reset_index(drop=True)
+        self.df = df.groupby(["embryo_id", "phase"]).progress_apply(path_sig_agg).reset_index(drop=True)
         self.df[self.ps_cols] = self.df[self.ps_cols].astype(np.float32)
         
     def __getitem__(self, idx):

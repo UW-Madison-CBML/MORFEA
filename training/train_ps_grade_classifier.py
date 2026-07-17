@@ -11,6 +11,7 @@ import os
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from stats_utils import prfcm, disp_cm
+from tqdm import tqdm
 
 class MLP(torch.nn.Module):
     def __init__(self, in_size):
@@ -42,9 +43,9 @@ def cm_agg_plot(group):
 
 def main(model_name):
     # hyperparameters 
-    lr = 0.0004
+    lr = 0.000004
     epochs = 8
-    batch_size = 1024
+    batch_size = 64
     pca_dim = 8
     depth = 3
     time_offsets = 5.0
@@ -57,23 +58,26 @@ def main(model_name):
         name="ps_stage",
         config={
             "lr": lr,
-            "batch_size":batch_size
+            "batch_size":batch_size,
+            "epochs":epochs
         },
     )   
     # load csv 
     metadata_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv"))
     latents = np.load(os.path.join("latents", f"{model_name}.npy"))
+    print(latents.shape)
 
     pca_df = pd.DataFrame(PCA(n_components=pca_dim).fit_transform(StandardScaler().fit_transform(latents)), columns = [f"pca_{i}" for i in range(pca_dim)], index=metadata_df.index)
     df = pd.concat([metadata_df, pca_df], axis=1)
     # drop na's 
     df = df[df['TE'].isin(["A", "B", "C"])]
+    embryos = df["embryo_id"].unique()
+    np.random.shuffle(embryos)
+    VAL_EMBRYOS = embryos[int(0.8 * len(embryos)):]
+    mask = df["embryo_id"].isin(VAL_EMBRYOS)
     
-    # shuffle df
-    df = df.sample(frac=1, replace=False)
-    
-    train_df = df.iloc[:int(0.8 * len(df))]
-    val_df = df.iloc[int(0.8 * len(df)):]
+    train_df = df[~mask]
+    val_df = df[mask]
     
     ds = PathSigGradeDataset(train_df, time_offsets, pca_dim=pca_dim, depth=depth)
     val_ds = PathSigGradeDataset(val_df, time_offsets, pca_dim=pca_dim, depth=depth)
@@ -99,7 +103,7 @@ def main(model_name):
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     crit = torch.nn.CrossEntropyLoss()
     for epoch in range(epochs):
-        for features, stage_classes, targets in loader:
+        for features, stage_classes, targets in (pbar := tqdm(loader, desc="Train loader")):
             optimizer.zero_grad()
             features = features.to(DEVICE)
             targets = targets.to(DEVICE)
@@ -109,9 +113,10 @@ def main(model_name):
             loss.backward()
             optimizer.step()
             run.log({"loss":loss.item()})
+            pbar.set_postfix({"loss":loss.item()})
         dfs = []    
         with torch.no_grad():
-            for features, stage_classes, targets in val_loader:
+            for features, stage_classes, targets in (pbar := tqdm(val_loader, desc="Val loader")):
                 features = features.to(DEVICE)
                 targets = targets.to(DEVICE)
                 stage_classes = stage_classes.to(DEVICE)
@@ -128,12 +133,13 @@ def main(model_name):
         image_dict["all_stage_cm"] = cm_agg_plot(results_df)
         images = results_df.groupby("stage_class").apply(cm_agg_plot).reset_index()
         print(images.head())
+        print(images.columns)
         for _, row in images.iterrows():
 
-            image_dict[f"{row['stage_class']}_cm"] = row['0']
+            image_dict[f"{row['stage_class']}_cm"] = row[0]
         run.log(image_dict)
             
-
+    run.finish()
             
         
 if __name__ == "__main__":
