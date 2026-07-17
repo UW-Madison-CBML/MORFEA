@@ -43,15 +43,15 @@ def get_phases(embryo_id, seq_len):
     
     return np.array([PHASES.index(phase) for phase in new_column]) 
 
-def main(model_name, image_name, grade_args, phase_args):
+def main(model_name, image_name, grade_args, phase_args, two_d=False):
     rng = np.random.default_rng(seed=42)
     GRADE = "TE"
-    PCA_COLS = ["pca_0","pca_1","pca_2"]
-    UMAP_COLS = ["umap_0", "umap_1", "umap_2"]
+    PCA_COLS = ["pca_0","pca_1"] if two_d else ["pca_0","pca_1","pca_2"]
+    UMAP_COLS = ["umap_0", "umap_1"] if two_d else ["umap_0", "umap_1", "umap_2"]
     # latents df is also metadata for the cebra embeddings
     latents_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv"))
     latents_np = np.load(os.path.join("latents", f"{model_name}.npy"))
-    pca = PCA(n_components=3)
+    pca = PCA(n_components=2 if two_d else 3)
     standard_scaler = StandardScaler()
     pca_lats = pca.fit_transform(standard_scaler.fit_transform(latents_np))
     pca_df = pd.DataFrame(pca_lats, columns = PCA_COLS, index=latents_df.index)
@@ -89,7 +89,7 @@ def main(model_name, image_name, grade_args, phase_args):
             c.append([GRADE_COLORS[GRADES.index(g)]] * len(group))
             names.append(name)
             
-    plot_sequences(seqs, f"grade_{image_name}", c=c, cmap="grade", cbar_label="Grade", folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=True)
+    plot_sequences(seqs, f"grade_{image_name}", c=c, cmap="grade", cbar_label="Grade", folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=True, two_d=two_d)
     # do a bunch per grade using diff colormaps
     for g, embryo_groups, names in tqdm(zip(grade_args, embryo_grade_groups, embryo_grade_groups_names)):
         #--------------------------------
@@ -101,7 +101,7 @@ def main(model_name, image_name, grade_args, phase_args):
             c.append(group['time_step'].to_numpy()/group['time_step'].max()) # since we are removing some phases we need to use ground_truth time not inherent order of df
             
             
-        plot_sequences(seqs, f"time_{g}_{image_name}",c=c, cbar_label="Time", folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=True)
+        plot_sequences(seqs, f"time_{g}_{image_name}",c=c, cbar_label="Time", folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=True, two_d=two_d)
         #--------------------------------
         # embryo_id
         seqs = []
@@ -109,9 +109,8 @@ def main(model_name, image_name, grade_args, phase_args):
         for i, group in enumerate(embryo_groups):
             seqs.append(group[PCA_COLS].to_numpy())
             c.append([i / len(embryo_groups)] * len(group))
-            print(i," / ", len(embryo_groups), " = ", i / len(embryo_groups))
             
-        plot_sequences(seqs, f"embryo_id_{g}_{image_name}", c=c, folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=True, vminmax=[0,1])
+        plot_sequences(seqs, f"embryo_id_{g}_{image_name}", c=c, folder="pca_plots", axlabel="PCA", individ_names=names, axis_off=True, vminmax=[0,1], two_d=two_d)
 
         #--------------------------------
         # phase
@@ -121,7 +120,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(group[PCA_COLS].to_numpy())
             c.append([PHASES.index(p) for p in group['phase']])
             
-        plot_sequences(seqs, f"phase_{g}_{image_name}", c=c, cmap="phase", cbar_label="Phase", folder="pca_plots", axlabel="PCA", axis_off=True, individ_names= names)
+        plot_sequences(seqs, f"phase_{g}_{image_name}", c=c, cmap="phase", cbar_label="Phase", folder="pca_plots", axlabel="PCA", axis_off=True, individ_names= names, two_d=two_d)
         #--------------------------------
         # curvature
         seqs = []
@@ -131,7 +130,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(calculate_curvatures(seq, offset=13))
             
-        plot_sequences(seqs, f"curv_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA",axis_off=True, individ_names=names)
+        plot_sequences(seqs, f"curv_{g}_{image_name}", c=c, cbar_label="Curv", log_scale=True, folder="pca_plots", axlabel="PCA",axis_off=True, individ_names=names, two_d=two_d)
         #--------------------------------
         # acceleration
         seqs = []
@@ -141,7 +140,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(get_acc(seq))
             
-        plot_sequences(seqs, f"acc_{g}_{image_name}", c=c, cbar_label="Acc", log_scale=True, folder="pca_plots", axlabel="PCA",axis_off=True, individ_names = names)
+        plot_sequences(seqs, f"acc_{g}_{image_name}", c=c, cbar_label="Acc", log_scale=True, folder="pca_plots", axlabel="PCA",axis_off=True, individ_names = names, two_d=two_d)
 
         #--------------------------------
         # velocity
@@ -152,7 +151,7 @@ def main(model_name, image_name, grade_args, phase_args):
             seqs.append(seq)
             c.append(get_vel(seq))
             
-        plot_sequences(seqs, f"vel_{g}_{image_name}", c=c, cbar_label="Vel", log_scale=True, folder="pca_plots", axlabel="PCA", axis_off=True, individ_names = names)
+        plot_sequences(seqs, f"vel_{g}_{image_name}", c=c, cbar_label="Vel", log_scale=True, folder="pca_plots", axlabel="PCA", axis_off=True, individ_names = names, two_d=two_d)
     # --------------------------------------------
     # --------------------------------------------
     return
@@ -240,5 +239,6 @@ if __name__ == "__main__":
     parser.add_argument('--all-phases', action='store_true')
     parser.add_argument("--phases", action="extend", nargs="+", type=str) 
     parser.add_argument("--grades", action="extend", nargs="+", type=str) 
+    parser.add_argument("--two-d", action="store_true")
     args = parser.parse_args()
-    main(args.model_name, args.image_name, ["A","B","C"] if args.all_grades else args.grades, PHASES if args.all_phases else args.phases)
+    main(args.model_name, args.image_name, ["A","B","C"] if args.all_grades else args.grades, PHASES if args.all_phases else args.phases, two_d=args.two_d)
