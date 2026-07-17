@@ -302,7 +302,8 @@ def main(model_name, features, lr=0.001):
             pd.DataFrame(precision_stats.values(), index=precision_stats.keys(), columns=["precision","precision_std"]),    
             pd.DataFrame(recall_stats.values(), index=recall_stats.keys(), columns=["recall","recall_std"])
             ], axis=1)
-        
+
+        temp_df = precision_recall_df.copy(deep=False)
         """fig, ax = plt.subplots()
         f1s = precision_recall_df["f1"]
         f1_errs = precision_recall_df["f1_std"]
@@ -319,7 +320,6 @@ def main(model_name, features, lr=0.001):
         fig.tight_layout() # makes it so the figure doesn't cut off the phase labels
         run.log({"f1_bars": wandb.Image(fig)})
         plt.close(fig)"""
-
         for stat in ["precision","recall", "f1"]:
             precision_recall_df[stat] = [f"$\\num{{{mean}}} \\pm \\num{{{std}}}$" for mean, std in zip(precision_recall_df[stat], precision_recall_df[f"{stat}_std"])]
         precision_recall_df = precision_recall_df.drop(columns = [col for col in precision_recall_df.columns if "std" in col])
@@ -328,7 +328,7 @@ def main(model_name, features, lr=0.001):
             
         #print("transition matrix: ", model.crf.transitions.detach().cpu())
  
-        run.log({"val_acc_top_1":acc_top_1_stats.mean, "val_acc_top_1_std":acc_top_1_stats.std_dev, "val_acc_top_5":acc_top_5_stats.mean, "val_acc_top_5_std":acc_top_5_stats.std_dev, "val_acc_top_2":acc_top_2_stats.mean, "val_acc_top_2_std":acc_top_2_stats.std_dev})
+        run.log({"val_acc_top_1":acc_top_1_stats.mean, "val_acc_top_1_std":acc_top_1_stats.std_dev, "val_acc_top_5":acc_top_5_stats.mean, "val_acc_top_5_std":acc_top_5_stats.std_dev, "val_acc_top_2":acc_top_2_stats.mean, "val_acc_top_2_std":acc_top_2_stats.std_dev, "prf_table":wandb.Table(dataframe=temp_df)})
 
 
         # ------------------------------------------------
