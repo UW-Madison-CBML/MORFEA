@@ -51,6 +51,10 @@ def main(model_name, image_name, grade_args, phase_args, two_d=False):
     # latents df is also metadata for the cebra embeddings
     latents_df = pd.read_csv(os.path.join("latents", f"{model_name}.csv"))
     latents_np = np.load(os.path.join("latents", f"{model_name}.npy"))
+    mask = latents_df['phase'].isin(phase_args) & latents_df['TE'].isin(grade_args)
+
+    latents_df = latents_df[mask]
+    latents_np = latents_np[mask]
     pca = PCA(n_components=2 if two_d else 3)
     standard_scaler = StandardScaler()
     pca_lats = pca.fit_transform(standard_scaler.fit_transform(latents_np))
@@ -62,10 +66,7 @@ def main(model_name, image_name, grade_args, phase_args, two_d=False):
     df = pd.concat([latents_df,pca_df], axis=1)
     if("NA" not in grade_args):
         df = df.dropna(subset=[GRADE])
-    else:
-        df = df.fillna("NA")
 
-    df = df[df['phase'].str.contains("|".join(phase_args),regex=True)]
     print(model_name) 
     max_imgs = 20
     # do one colored by grades
