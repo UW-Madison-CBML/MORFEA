@@ -41,8 +41,8 @@ tqdm.pandas()
 # hyperparameters
 PHASES = ["tPB2", "tPNa", "tPNf", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9+", "tM", "tSB", "tB", "tEB"]
 model_name = "convlstm_final-2026-07-13"
-TIME_OFFSET = 5
-PCA_DIM = 8
+TIME_OFFSET = 3
+PCA_DIM = 4
 path_sig_depth = 2
 GRADE_COLORS = {"A":(0,1,0), "B":(1,1,0), "C":(1,0,0), "NA":(0.5,0.5,0.5)}
 grade = "TE" # "TE"
@@ -87,6 +87,19 @@ path_sig_df = df.groupby("embryo_id").progress_apply(path_sig_agg).reset_index()
 print(len(path_sig_df))
 
 
+def test_path_sig_pipeline(trajs, noise_x_axis=np.linspace(0,1,100)):
+    """
+    trajs: list of np.array full trajectories in high dim
+    noise_x_axis: the std_dev of noise that will be added. The y axis is distance in path sig space
+    """
+    trajs_with_noise = [traj + noise_x_axis[:,None,None] for traj in trajs]
+    pca = PCA(n_components=PCA_DIM)
+    catted_trajs = np.concatenate(trajs_with_noise, axis=1)
+    scaler = StandardScaler().fit_transform(latents)
+    pca = pca.fit()
+
+
+
 get_ipython().run_line_magic('matplotlib', 'inline')
 GRADES = ["A","B", "C","NA"]
 path_sig_df["grade_indices"]  = [GRADES.index(p) for p in path_sig_df['grade'].to_list()]
@@ -115,6 +128,17 @@ plt.show()
 plt.close(fig)
 plt.close()
 
+normed_path_sigs = StandardScaler().fit_transform(path_sig_df[ps_cols].to_numpy())
+visual_ps = phate.PHATE(knn=5, decay=15, n_jobs=-2, verbose=True).fit_transform(normed_path_sigs)
+visual_ps_grade_indices = path_sig_df["grade_indices"].to_list()
+visual_ps_grades = [GRADES[g] for g in visual_ps_grade_indices]
+visual_ps_colors = [GRADE_COLORS[g] for g in visual_ps_grades]
+fig, ax = plt.subplots(figsize=(8,6))#, subplot_kw={"projection":"3d"})
+ax.scatter(visual_ps[:,0], visual_ps[:,1], c=visual_ps_colors)#, visual_ps[:,2]
+plt.show()
+plt.close(fig)
+plt.close()
+
 
 def phase_ri(phase_df1, phase_df2, normalize=True):
     phase_df1 = phase_df1[phase_df1["stage"].isin(stripped_phases)] 
@@ -132,6 +156,13 @@ def phase_ri(phase_df1, phase_df2, normalize=True):
     new_column2 = []
     for index, row in phase_df2.iterrows():
         new_column2 += [StageDataset.PHASES.index(row["stage"])] * (row["stage_end"] - row["stage_begin"]+1)
+    # Normalize for whatever reason
+    total = np.concatenate([new_column1, new_column2], axis=0)
+    std_dev = total.std()
+    mean = total.mean()
+    norm_new_column1 = (new_column1 - mean) / (std_dev + 1e-6)
+    norm_new_column2 = (new_column2 - mean) / (std_dev + 1e-6)
+    alignment = dtw(norm_new_column1, norm_new_column2)
 
     new_column1 += [StageDataset.PHASES.index("post_phase")] * (max(len(new_column1),len(new_column2)) - len(new_column1))
     new_column2 += [StageDataset.PHASES.index("post_phase")] * (max(len(new_column1),len(new_column2)) - len(new_column2))
@@ -139,19 +170,13 @@ def phase_ri(phase_df1, phase_df2, normalize=True):
     new_column1 = np.array(new_column1)
     new_column2 = np.array(new_column2)
     r_score = rand_score(new_column1, new_column2)
-    # Normalize for whatever reason
-    total = np.concatenate([new_column1, new_column2], axis=0)
-    std_dev = total.std()
-    mean = total.mean()
-    new_column1 = (new_column1 - mean) / (std_dev + 1e-6)
-    new_column2 = (new_column2 - mean) / (std_dev + 1e-6)
-    alignment = dtw(new_column1, new_column2)
+
     return r_score, alignment
 
 
 
 
-num_nbrs = 200
+num_nbrs = 10
 nbrs = NearestNeighbors(n_neighbors=num_nbrs, algorithm='ball_tree').fit(path_sig_df[ps_cols].to_numpy())
 distances, indices = nbrs.kneighbors(path_sig_df[ps_cols].to_numpy())
 
@@ -163,10 +188,28 @@ limit = 1000
 dists = []
 r_scores = [RunningStats() for _ in range(num_nbrs)]
 dtw_scores = [RunningStats() for _ in range(num_nbrs)]
-for i1 in tqdm(range(path_sig_df[ps_cols].to_numpy().shape[0])):
+for i1 in tqdm(range(len(path_sig_df))):
     for nbr_idx, i2 in enumerate(indices[i1]):
         row1 = path_sig_df.iloc[i1]
         row2 = path_sig_df.iloc[i2]
+
+        traj1 = df[df["embryo_id"] == row1["embryo_id"]][pca_cols[:3]].to_numpy()
+        traj2 = df[df["embryo_id"] == row2["embryo_id"]][pca_cols[:3]].to_numpy()
+        fig, axes = plt.subplots(2,figsize=(8,6))#, subplot_kw={"projection":"3d"})
+        axes[0].scatter(traj1[:,0], traj1[:,1], c=np.stack([np.ones(traj1.shape[0]), np.zeros(traj1.shape[0]), np.linspace(0,1,traj1.shape[0]) ], axis=1))
+        axes[1].scatter(traj2[:,0], traj2[:,1], c=np.stack([np.zeros(traj2.shape[0]), np.zeros(traj2.shape[0]),  np.linspace(0,1, traj2.shape[0])], axis=1))
+        fig.suptitle(f"{row1["embryo_id"]} vs {nbr_idx}-NN")
+        plt.show()
+        plt.close(fig)
+        plt.close()
+
+        fig, ax = plt.subplots(figsize=(8,6))#, subplot_kw={"projection":"3d"})
+        ax.scatter(traj1[:,0], traj1[:,1], c=np.stack([np.ones(traj1.shape[0]), np.zeros(traj1.shape[0]), np.linspace(0,1,traj1.shape[0]) ], axis=1))
+        ax.scatter(traj2[:,0], traj2[:,1], c=np.stack([np.zeros(traj2.shape[0]), np.zeros(traj2.shape[0]),  np.linspace(0,1, traj2.shape[0])], axis=1))
+        fig.suptitle(f"{row1["embryo_id"]} vs {nbr_idx}-NN")
+        plt.show()
+        plt.close(fig)
+        plt.close()
         #print(row1["embryo_id"], f" {row1['grade']}", row2["embryo_id"], f" {row2['grade']}")
 
         phase_df1 = pd.read_csv(os.path.join("embryo_dataset_annotations",f"{row1["embryo_id"]}_phases.csv"), header=0) 
@@ -211,7 +254,7 @@ plt.show()
 
 
 embryos = metadata_df["embryo_id"].unique()
-stats = RunningStats
+stats = RunningStats()
 for _ in range(100):
     np.random.shuffle(embryos)
     embryo1, embryo2 = embryos[:2]
