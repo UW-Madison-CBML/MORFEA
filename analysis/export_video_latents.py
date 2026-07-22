@@ -6,7 +6,7 @@ import pandas as pd
 import os
 from torch.utils.data import DataLoader
 from dataset_ivf_embryo import IVFEmbryoDataset
-from ae_model import ConvLSTMAutoencoder
+from ae_model import ConvGRUAutoencoder
 from huggingface_hub import login, HfApi
 from datetime import datetime, timedelta
 
@@ -154,7 +154,7 @@ def main(model_name,index_csv):
     print("LOADING MODEL")
     print(f"{'='*60}")
     
-    model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/"+model_name)
+    model = ConvGRUAutoencoder.from_pretrained("JensLundsgaard/"+model_name)
 
     model = model.to(DEVICE)
     metadata_df, latents_data = export_video_latents(model, ds)

@@ -1,11 +1,10 @@
 import pandas as pd
 import numpy as np
 import torch
-from ae_model import ConvLSTMAutoencoder
 from PIL import Image
 Image.LOAD_TRUNCATED_IMAGES = True
 from dataset_ivf_embryo import IVFEmbryoDataset
-from ae_model import ConvLSTMAutoencoder
+from ae_model import ConvGRUAutoencoder
 from huggingface_hub import login, HfApi
 from dataset_ivf_embryo import read_gray, normalize_video
 import os
@@ -75,7 +74,7 @@ def export_kanakasabapathy(model, image_size = 128, vitmae=False, binary_classif
         
         
 def main(model_name):
-    model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/"+model_name)
+    model = ConvGRUAutoencoder.from_pretrained("JensLundsgaard/"+model_name)
     
     metadata_df, latents, _ = export_kanakasabapathy(model, binary_classification=False)
     np.save(f"{model_name}.npy", latents)

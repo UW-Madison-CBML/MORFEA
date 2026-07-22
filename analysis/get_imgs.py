@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
-from ae_model import ConvLSTMAutoencoder
+from ae_model import ConvGRUAutoencoder
 from huggingface_hub import HfApi
 from huggingface_hub import login
 from datetime import datetime, timedelta
@@ -23,7 +23,7 @@ def main(model_name):
     df = df.merge(grades_df, left_on="embryo_id", right_on="embryo_id", how='left').dropna(subset=["TE"])
     ds = IVFEmbryoDataset(df, resize=128, norm="minmax01", return_augment=True)
     loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=16, pin_memory=True)
-    model = ConvLSTMAutoencoder.from_pretrained("JensLundsgaard/" + model_name)
+    model = ConvGRUAutoencoder.from_pretrained("JensLundsgaard/" + model_name)
     model = model.to(DEVICE)
     for idx, (embryo_vol, augment_vol) in enumerate(loader):
         model.eval()
