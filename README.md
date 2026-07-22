@@ -1,4 +1,5 @@
-# IVF Morphodynamics: Recurrent encoders can preserve morphodynamic features
+# MORFEA
+Recurrent encoders can preserve morphodynamic features
 ## Introduction
 The goal of this project is to develop a method for studying human in-vitro fertilized embryos using unsupervised deep learning. We use a convolutional recurrent autoencoder to embed embryo image sequences and then study the geometric and morphodynamic features of these *latent trajectories*.
 
@@ -38,7 +39,7 @@ To train the model from scratch, go to the `training/` folder, and run
 ``` 
 python train_ae.py convgru --name NEW_MODEL [--ARGS]
  ```
-For a description of arguments, see the end of `train_ae.py`, and the files `ablation.txt`, `train_ae.sub` and `train_ae.sh`. **Note: ** the code is setup to run on our compute system which grabs all necessary files. You may need to add `sys.path.append("...")` to make sure all necessary files can be seen by the training script. For a list of such files, see the line `transfer_input_files=` in `train_ae.sub`.
+For a description of arguments, see the end of `train_ae.py`, and the files `ablation.txt`, `train_ae.sub` and `train_ae.sh`. **Note**: the code is setup to run on our compute system which grabs all necessary files. You may need to add `sys.path.append("...")` to make sure all necessary files can be seen by the training script. For a list of such files, see the line `transfer_input_files=` in `train_ae.sub`.
 ### WandB and Hugging Face logging
 To log any runs you do with the autoencoder or downstream tasks, set the file `api_keys.txt` to 
 ```
@@ -65,11 +66,11 @@ Once you have exported the model's latents, you can try downstream tasks. These 
 python train_stage_classifier.py --model-name NEW_MODEL-DATE [--ARGS]
 ```   
 ```
-python train_lstm_classifier.py --kanakasabapathy --model-name NEW_MODEL-DATE [--ARGS]
+python train_grade_classifier.py --kanakasabapathy --model-name NEW_MODEL-DATE [--ARGS]
 ```
 or 
 ```
-python train_lstm_classifier.py --model-name NEW_MODEL-DATE [--ARGS]
+python train_grade_classifier.py --model-name NEW_MODEL-DATE [--ARGS]
 ```
 for grade classification. See the respective .py, .sh, .sub, and .txt files for more information on arguments.
 
