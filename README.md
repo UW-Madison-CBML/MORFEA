@@ -1,5 +1,5 @@
 # MORFEA
-Recurrent encoders can preserve morphodynamic features
+Recurrent encoders can preserve morphodynamic features.
 ## Introduction
 The goal of this project is to develop a method for studying human in-vitro fertilized embryos using unsupervised deep learning. We use a convolutional recurrent autoencoder to embed embryo image sequences and then study the geometric and morphodynamic features of these *latent trajectories*.
 
@@ -9,7 +9,7 @@ All core machine learning code is ran in the Docker image `jenslundsgaard/ivf-tr
 ### Download
 Clone the repository with 
 ```
-git clone https://github.com/UW-Madison-CBML/ivf.git
+git clone https://github.com/UW-Madison-CBML/MORFEA.git
 ```
 ### Data Preparation
 We use two datasets: Gomez at al. (also called the video dataset) [here](https://zenodo.org/records/7912264) and Kanakasabapthy et al. (also called the single frame dataset) [here](https://osf.io/3kc2d/overview). From the video dataset you will need to download the files:
