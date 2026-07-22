@@ -2316,8 +2316,8 @@ if __name__ == "__main__":
     parser.add_argument("--position-regularization-weight", type=float, default=1.0, help="use data augmentation to make model equivariant to well position")
     args = parser.parse_args()
 
-    if len(sys.argv) > 1 and sys.argv[1] == "convlstm":
-        train_lstm(
+    if len(sys.argv) > 1 and sys.argv[1] == "convgru":
+        train_gru(
             loss_type=args.loss_type,
             ms_ssim_weight=args.ms_ssim_weight,
             rec_weight=args.rec_weight,
