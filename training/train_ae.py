@@ -52,7 +52,7 @@ import shutil
 import hashlib
 import json
 from torchsummary import summary
-from train_lstm_classifier import train_on as train_lstm_classifier_on
+from train_grade_classifier import train_on as train_grade_classifier_on
 from export_kanakasabapathy_latents import export_kanakasabapathy
 
 from dataset_ivf_embryo import read_gray, normalize_video
@@ -1463,7 +1463,7 @@ def train_gru(
         config={
             "lr": lr,
             "batch_size":batch_size,
-            "architecture": "ConvLSTM Autoencoder",
+            "architecture": "ConvGRU Autoencoder",
             "dataset": "https://zenodo.org/records/7912264",
             "epochs": epochs,
             "train_split": "not ICM graded",
@@ -1773,8 +1773,8 @@ def train_gru(
 
 
         hf_config = {
-            "model_type": "ConvLSTMAutoencoder",
-            "architecture": "ConvLSTM Autoencoder",
+            "model_type": "ConvGRUAutoencoder",
+            "architecture": "ConvGRU Autoencoder",
             "input_channels": 1,
             "encoder_hidden_dim": 256,
             "encoder_layers": 2,
@@ -1805,7 +1805,7 @@ def train_gru(
             "normalization": "minmax01",
             "date": date_label,
         }
-        model_clone = ConvLSTMAutoencoder(None,
+        model_clone = ConvGRUAutoencoder(None,
             input_channels=1,
             encoder_layers=2,
             decoder_layers=2,
@@ -2297,8 +2297,8 @@ if __name__ == "__main__":
     #model layer ablations
     parser.add_argument("--dropout-rate", type=float, default=0.1,
                       help="Dropout rate (default: 0.1, set to 0 to disable)")
-    parser.add_argument("--no-lstm", action="store_true",
-                      help="Disable ConvLSTM (no temporal modeling)")
+    parser.add_argument("--no-gru", action="store_true",
+                      help="Disable ConvGRU (no temporal modeling)")
     parser.add_argument("--no-residual", action="store_true",
                       help="Disable residual connections")
     parser.add_argument("--no-batchnorm", action="store_true",
@@ -2324,7 +2324,7 @@ if __name__ == "__main__":
             vgg_weight = args.vgg_weight,
             temporal_weight=args.temporal_weight,
             dropout_rate=args.dropout_rate,
-            use_lstm=not args.no_lstm,
+            use_gru=not args.no_gru,
             use_residual=not args.no_residual,
             use_batchnorm=not args.no_batchnorm,
             model_name = args.name,

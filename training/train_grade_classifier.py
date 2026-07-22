@@ -1,7 +1,7 @@
 import torch
 from grade_lstm_dataset import GradeLSTMDataset
 from grade_model import GradeClassifier
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 import wandb
 import os
 import pandas as pd
@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import ConfusionMatrixDisplay
 from tqdm import tqdm
 import gc
+from stats_utils import RunningStats
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def collate_padd(batch):
@@ -94,26 +95,6 @@ VAL_EMBRYOS =[
     "RA803-4",
     ]
 
-class RunningStats:
-    def __init__(self):
-        self.n = 0
-        self.mean = 0.0
-        self.m2 = 0.0
-
-    def push(self, x):
-        self.n += 1
-        delta = x - self.mean
-        self.mean += delta / self.n
-        delta2 = x - self.mean
-        self.m2 += delta * delta2
-
-    @property
-    def variance(self):
-        return self.m2 / (self.n - 1) if self.n > 1 else 0.0
-
-    @property
-    def std_dev(self):
-        return math.sqrt(self.variance)
 grade_options = ["A", "B", "C"] 
 class SimpleDataset(Dataset):
     def __init__(self, df, feature_cols, target_col, classes):
@@ -123,15 +104,15 @@ class SimpleDataset(Dataset):
         self.classes = classes
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        features = row[feature_cols].to_numpy()
-        target = row[target_col]
+        features = row[self.feature_cols].to_numpy()
+        target = row[self.target_col]
         return torch.from_numpy(features), torch.from_numpy(self.classes.index(target), dtype=torch.long)
     def __len__(self):
         return len(self.df)
 
 
 def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=[0.3, 0.3,0.3], batch_size=256, epochs=8, use_lstm=True):
-    if(self.use_lstm):
+    if(use_lstm):
         dataset_te = GradeLSTMDataset(latents_df, "TE", features, keep_na=KEEP_NA) 
         dataset_icm = GradeLSTMDataset(latents_df, "ICM", features, keep_na=KEEP_NA)
         dataset_te_val = GradeLSTMDataset(val_df, "TE", features, keep_na=KEEP_NA, return_whole_seqs=True) 
