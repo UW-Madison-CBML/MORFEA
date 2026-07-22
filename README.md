@@ -4,7 +4,7 @@ The goal of this project is to develop a method for studying human in-vitro fert
 
 ## Tutorial
 ### Dependencies 
-All core machine learning code is ran in the Docker image `jenslundsgaard/ivf-training:v3.2`. Some downstream tasks are ran in a venv environment with `requirements.txt` installed with pip.
+All core machine learning code is ran in the Docker image `jenslundsgaard/ivf-training:v3.3`. Some downstream tasks are ran in a venv environment with `requirements.txt` installed with pip.
 ### Download
 Clone the repository with 
 ```
@@ -22,7 +22,7 @@ Unzip these and have the folders in the directory where you are training/ runnin
 ### Use the pretrained model
 To use the model with pretrained weights, simply run
 ```
-model = ConvLSTMAutoencoder.from_pretrained('JensLundsgaard/convlstm_final-2026-07-13')
+model = ConvGRUAutoencoder.from_pretrained('JensLundsgaard/convlstm_final-2026-07-13')
 ```
 ### Build the data indexes
 To build the indexes `utils/index.csv` and `utils/index_embryo.csv`, run
@@ -36,7 +36,7 @@ python build_index_embryo.py
 ### Train a new model 
 To train the model from scratch, go to the `training/` folder, and run 
 ``` 
-python train_ae.py convlstm --name NEW_MODEL [--ARGS]
+python train_ae.py convgru --name NEW_MODEL [--ARGS]
  ```
 For a description of arguments, see the end of `train_ae.py`, and the files `ablation.txt`, `train_ae.sub` and `train_ae.sh`. **Note: ** the code is setup to run on our compute system which grabs all necessary files. You may need to add `sys.path.append("...")` to make sure all necessary files can be seen by the training script. For a list of such files, see the line `transfer_input_files=` in `train_ae.sub`.
 ### WandB and Hugging Face logging
