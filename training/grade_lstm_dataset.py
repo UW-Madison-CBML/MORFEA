@@ -1,4 +1,4 @@
-# grade_lstm_dataset.py - load signatures as well as their grades.
+# grade_dataset.py - load signatures as well as their grades.
 import numpy as np
 import pandas as pd
 import torch
@@ -73,14 +73,7 @@ def add_annotations(group_name, group, features):
 
 
 class GradeLSTMDataset(Dataset):
-    """
-    Dataset that loads complete embryo sequences.
-    Each sample is one full embryo with all its frames.
-    """
     def __init__(self, latents_df, grade, features, keep_na=False, return_whole_seqs=False):
-        """
-        Args: pd.read_csv(grades_csv, keep_default_na=False).
-        """
         self.keep_na = keep_na
         self.return_whole_seqs = return_whole_seqs
         self.grade = grade

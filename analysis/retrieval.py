@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 import numpy as np
@@ -36,25 +36,25 @@ from stats_utils import RunningStats, prfcm, disp_cm
 import torch
 from sklearn.metrics import normalized_mutual_info_score
 from sklearn.metrics import rand_score
-from tslearn.metrics import dtw
+from tslearn.metrics import dtw, dtw_path
 
 tqdm.pandas()
 
 
-# In[2]:
+# In[ ]:
 
 
 # hyperparameters
 PHASES = ["tPB2", "tPNa", "tPNf", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9+", "tM", "tSB", "tB", "tEB"]
 model_name = "convlstm_final-2026-07-13"
 TIME_OFFSET = 0.0
-PCA_DIM = 3
+PCA_DIM = 2
 path_sig_depth = 2
 GRADE_COLORS = {"A":(0,1,0), "B":(1,1,0), "C":(1,0,0), "NA":(0.5,0.5,0.5)}
 grade = "TE" # "TE"
 
 
-# In[3]:
+# In[ ]:
 
 
 # load latents and metadata
@@ -67,8 +67,8 @@ for p in ["tPNf", "tM"]:
     id_set &= set(ids)
     print(p, ": ",len(ids))
 id_list = list(id_set)
-stripped_phases = ["tM", "tSB","tB","tEB"] #"tPNf","t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9+", 
-mask = metadata_df["phase"].isin(stripped_phases)# & metadata_df["embryo_id"].isin(id_list)
+stripped_phases = ["tPNf","t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9+","tM"]  
+mask = metadata_df["phase"].isin(stripped_phases) & metadata_df["embryo_id"].isin(id_list)
 #"tPB2", "tPNa",  "tSB", "tB"
 # only graded 
 latents = latents[mask]
@@ -84,7 +84,7 @@ df = pd.concat([metadata_df, latents_df, pca_latents_df], axis=1)
 
 
 
-# In[4]:
+# In[ ]:
 
 
 def align_trajectories_tslearn(traj_a, traj_b):
@@ -130,7 +130,7 @@ def align_trajectories_tslearn(traj_a, traj_b):
     return R, t, traj_b_aligned
 
 
-# In[5]:
+# In[ ]:
 
 
 ps_cols = [f"path_sig_{i}" for i in range(len(iisignature.basis(iisignature.prepare(PCA_DIM+1, path_sig_depth))))]
@@ -146,7 +146,7 @@ path_sig_df = df.groupby("embryo_id").progress_apply(path_sig_agg).reset_index()
 print(len(path_sig_df))
 
 
-# In[10]:
+# In[ ]:
 
 
 data = path_sig_df[ps_cols].to_numpy()
@@ -172,7 +172,7 @@ for idx, row in enumerate(Z):
     leaves = tree_node.pre_order()
 
 
-    if row[3] > 4:
+    if row[3] == 4:
         recent_ancestors.append((row[2], leaves))
 
 
@@ -181,12 +181,17 @@ sample_recent_leaves = sorted(recent_ancestors, key=lambda x: x[0])
 
 
 for _,leaf_group in sample_recent_leaves:
-    fig, ax = plt.subplots(figsize=(8,6))#, subplot_kw={"projection":"3d"})
-    for leaf in leaf_group:
+    fig, axes = plt.subplots(2,2,figsize=(8,6))#, subplot_kw={"projection":"3d"})
+    for i, leaf in enumerate(leaf_group):
         row = path_sig_df.iloc[leaf]
 
         traj = df[df["embryo_id"] == row["embryo_id"]][pca_cols[:2]].to_numpy()
-        ax.scatter(traj[:,0], traj[:,1], c=np.linspace(0,1,traj.shape[0]))#, visual_ps[:,2]
+        axes[i//2][i & 1].scatter(traj[:,0], traj[:,1], c=np.linspace(0,1,traj.shape[0]))#, visual_ps[:,2]
+        axes[i//2][i & 1].set_title(row["embryo_id"])
+        phase_df = pd.read_csv(os.path.join("embryo_dataset_annotations",f"{row["embryo_id"]}_phases.csv"), header=0) 
+        phase_df.columns = ["stage", "stage_begin","stage_end"]
+        print(phase_df)
+    plt.tight_layout()
     plt.show()
     plt.close(fig)
     plt.close()
@@ -293,8 +298,8 @@ for i1 in tqdm(range(path_sig_df[ps_cols].to_numpy().shape[0])):
         row1 = path_sig_df.iloc[i1]
         row2 = path_sig_df.iloc[i2]
         #print(row1["embryo_id"], f" {row1['grade']}", row2["embryo_id"], f" {row2['grade']}")
-        traj1 = df[df["embryo_id"] == row1["embryo_id"]][pca_cols[:3]].to_numpy()
-        traj2 = df[df["embryo_id"] == row2["embryo_id"]][pca_cols[:3]].to_numpy()
+        traj1 = df[df["embryo_id"] == row1["embryo_id"]][pca_cols[:2]].to_numpy()
+        traj2 = df[df["embryo_id"] == row2["embryo_id"]][pca_cols[:2]].to_numpy()
         _,_,traj2 = align_trajectories_tslearn(traj1, traj2)
         fig, axes = plt.subplots(2,figsize=(8,6))#, subplot_kw={"projection":"3d"})
         axes[0].scatter(traj1[:,0], traj1[:,1], c=np.stack([np.ones(traj1.shape[0]), np.zeros(traj1.shape[0]), np.linspace(0,1,traj1.shape[0]) ], axis=1))

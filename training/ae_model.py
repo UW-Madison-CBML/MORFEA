@@ -4,55 +4,6 @@ from huggingface_hub import PyTorchModelHubMixin
 import torch.nn.functional as F
 
 
-class CellLSTM(nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super(CellLSTM, self).__init__()
-        self.hidden_size = hidden_size
-        
-        self.cell_forward = nn.LSTMCell(input_size, hidden_size)
-        self.cell_backward = nn.LSTMCell(input_size, hidden_size)
-        
-    def forward(self, x, hx=None):
-        x_seq = x.transpose(0, 1)
-        seq_len, batch_size, _ = x_seq.size()
-        
-        if hx is None:
-            h_f = torch.zeros(batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
-            c_f = torch.zeros(batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
-            h_b = torch.zeros(batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
-            c_b = torch.zeros(batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
-        else:
-            h_f, c_f, h_b, c_b = hx
-
-        forward_h, forward_c = [None] * seq_len, [None] * seq_len
-        backward_h, backward_c = [None] * seq_len, [None] * seq_len
-
-        for t in range(seq_len):
-            h_f, c_f = self.cell_forward(x_seq[t], (h_f, c_f))
-            forward_h[t] = h_f
-            forward_c[t] = c_f
-            
-        for t in reversed(range(seq_len)):
-            h_b, c_b = self.cell_backward(x_seq[t], (h_b, c_b))
-            backward_h[t] = h_b
-            backward_c[t] = c_b
-
-        f_h_seq = torch.stack(forward_h, dim=0)
-        f_c_seq = torch.stack(forward_c, dim=0)
-        b_h_seq = torch.stack(backward_h, dim=0)
-        b_c_seq = torch.stack(backward_c, dim=0)
-
-        f_h_seq = f_h_seq.transpose(0, 1)
-        f_c_seq = f_c_seq.transpose(0, 1)
-        b_h_seq = b_h_seq.transpose(0, 1)
-        b_c_seq = b_c_seq.transpose(0, 1)
-
-        out_seq = torch.cat([f_h_seq, b_h_seq,f_c_seq, b_c_seq], dim=-1)
-
-        return out_seq # B, T, 4 * hidden_size
-
-         
-
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(ResidualBlock, self).__init__()
@@ -118,7 +69,7 @@ class ResidualUpBlock(nn.Module):
 
 class Encoder(nn.Module):
 
-    def __init__(self, input_channels=1, num_layers=2, latent_size=4096, hidden_channels=32, use_lstm=True, use_residual=True):
+    def __init__(self, input_channels=1, num_layers=2, latent_size=4096, hidden_channels=32, use_gru=True, use_residual=True):
         super(Encoder, self).__init__()
         self.use_residual = use_residual
         self.latent_size = latent_size
@@ -142,7 +93,7 @@ class Encoder(nn.Module):
 
         #)
         self.final_resolution = 16 #2 ** (8 - len([module for module in self.spatial_cnn.modules() if not isinstance(self.spatial_cnn, nn.Sequential)]))
-        self.use_lstm = use_lstm
+        self.use_gru = use_gru
         """if not self.use_convlstm:
             self.convlstm = None 
         else:
@@ -161,15 +112,15 @@ class Encoder(nn.Module):
         #self.latent_compress.weight.data = torch.eye(max(self.hidden_channels * self.final_resolution * self.final_resolution, latent_size))[:self.hidden_channels * self.final_resolution * self.final_resolution,:latent_size]
         #self.latent_compress.bias.data.fill_(0.0)
 
-        if self.use_lstm:
-            self.lstm_enc = nn.GRU(latent_size, latent_size, batch_first=True, dropout=0.4)#, bidirectional=True)
+        if self.use_gru:
+            self.gru_enc = nn.GRU(latent_size, latent_size, batch_first=True, dropout=0.4)#, bidirectional=True)
 
-            """self.lstm_enc.weight_ih_l[0].data = torch.eye(latent_size*3)[:3*latent_size, :latent_size]
-            self.lstm_enc.weight_hh_l[0].data = torch.eye(latent_size*3)[:3*latent_size, :latent_size]
-            self.lstm_enc.bias_ih_l[0].data.fill_(0.0)
-            self.lstm_enc.bias_hh_l[0].data.fill_(0.0)"""
+            """self.gru_enc.weight_ih_l[0].data = torch.eye(latent_size*3)[:3*latent_size, :latent_size]
+            self.gru_enc.weight_hh_l[0].data = torch.eye(latent_size*3)[:3*latent_size, :latent_size]
+            self.gru_enc.bias_ih_l[0].data.fill_(0.0)
+            self.gru_enc.bias_hh_l[0].data.fill_(0.0)"""
         else:
-            self.lstm_enc = None
+            self.gru_enc = None
 
         #self.lin1 = nn.Linear(latent_size, latent_size)
         #self.lin1.weight.data = torch.eye(latent_size)
@@ -202,8 +153,8 @@ class Encoder(nn.Module):
         B, T, C, H, W = h_seq.shape
         h_flat = h_seq.view(B, T, C * H * W)  # Linear just works on bottom most dim
         z_compressed = F.relu(self.latent_compress(h_flat))
-        if self.use_lstm:
-            z_seq, _ = self.lstm_enc(z_compressed)
+        if self.use_gru:
+            z_seq, _ = self.gru_enc(z_compressed)
         else:
             z_seq = z_compressed
         #z_seq = self.dropout(z_seq)
@@ -216,14 +167,14 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
 
-    def __init__(self, latent_size=4096, num_layers=2, hidden_channels=32, initial_resolution=16,final_size=128, use_lstm=True, use_residual=True):
+    def __init__(self, latent_size=4096, num_layers=2, hidden_channels=32, initial_resolution=16,final_size=128, use_gru=True, use_residual=True):
         super(Decoder, self).__init__()
         self.latent_size = latent_size
         self.hidden_channels = hidden_channels
 
         #self.latent_expand = nn.Linear(latent_size, self.hidden_channels * 16 * 16)
 
-        self.use_lstm = use_lstm
+        self.use_gru = use_gru
         """if not self.use_convlstm:
             self.convlstm = None 
         else:
@@ -235,15 +186,15 @@ class Decoder(nn.Module):
                 batch_first=True,
                 return_all_layers=False
             )"""
-        if self.use_lstm:
-            self.lstm_dec = nn.GRU(latent_size, latent_size, batch_first=True, dropout=0.4) #, bidirectional=True)
-            #self.lstm_dec.weight_ih_l[0].data = torch.eye(latent_size*3)[:latent_size, :latent_size*3]
-            #self.lstm_dec.weight_hh_l[0].data = torch.eye(latent_size*3)[:latent_size, :latent_size*3]
-            #self.lstm_dec.bias_ih_l[0].data.fill_(0.0)
-            #self.lstm_dec.bias_hh_l[0].data.fill_(0.0)
+        if self.use_gru:
+            self.gru_dec = nn.GRU(latent_size, latent_size, batch_first=True, dropout=0.4) #, bidirectional=True)
+            #self.gru_dec.weight_ih_l[0].data = torch.eye(latent_size*3)[:latent_size, :latent_size*3]
+            #self.gru_dec.weight_hh_l[0].data = torch.eye(latent_size*3)[:latent_size, :latent_size*3]
+            #self.gru_dec.bias_ih_l[0].data.fill_(0.0)
+            #self.gru_dec.bias_hh_l[0].data.fill_(0.0)
 
         else:
-            self.lstm_dec = None
+            self.gru_dec = None
     
         self.dropout = nn.Dropout(0.3)
         #self.spatial_decoder = nn.Sequential(
@@ -284,8 +235,8 @@ class Decoder(nn.Module):
     def forward(self, z_seq, residual):
         B, T, L = z_seq.shape
         #z_seq = F.relu(self.lin1(z_seq)) # B, T, L
-        if self.use_lstm:
-            z_seq, _ = self.lstm_dec(z_seq)
+        if self.use_gru:
+            z_seq, _ = self.gru_dec(z_seq)
         z_seq = self.dropout(z_seq) 
         z_expanded = F.relu(self.latent_expand(z_seq)) # + z))
         assert z_expanded.shape == (B, T, self.hidden_channels * (self.initial_resolution ** 2)), f"BAD z_expanded shape: {z_expanded.shape}"
@@ -310,7 +261,7 @@ class Decoder(nn.Module):
 
 
 
-class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
+class ConvGRUAutoencoder(nn.Module, PyTorchModelHubMixin):
     def __init__(
         self,
         config=None,
@@ -323,19 +274,19 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
         use_latent_split=False,
         # Ablation parameters
         dropout_rate=0.1,
-        use_lstm=True,
+        use_gru=True,
         use_residual=True,
         use_batchnorm=True,
         hidden_channels=32,
         position_reg_size=None
         ):
-        super(ConvLSTMAutoencoder, self).__init__()
+        super(ConvGRUAutoencoder, self).__init__()
         self.use_classifier = use_classifier
         self.latent_size = latent_size
         self.use_latent_split = use_latent_split
         # Store ablation settings for reproducibility
         self.dropout_rate = dropout_rate
-        self.use_lstm = use_lstm
+        self.use_gru = use_gru
         self.use_residual = use_residual
         self.use_batchnorm = use_batchnorm
         self.hidden_channels = hidden_channels
@@ -346,7 +297,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
                 self.latent_size = config.get('latent_size', latent_size)
                 self.use_latent_split = config.get('use_latent_split', use_latent_split)
                 self.dropout_rate = config.get('dropout_rate', dropout_rate)
-                self.use_lstm = config.get('use_lstm', use_lstm)
+                self.use_gru = config.get('use_gru', use_gru)
                 self.use_residual = config.get('use_residual', use_residual)
                 self.use_batchnorm = config.get('use_batchnorm', use_batchnorm)
                 self.hidden_channels = config.get('hidden_channels', hidden_channels)
@@ -356,7 +307,7 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
                 self.latent_size = config.latent_size
                 self.use_latent_split = config.use_latent_split
                 self.dropout_rate = config.dropout_rate
-                self.use_lstm = config.use_lstm
+                self.use_gru = config.use_gru
                 self.use_residual = config.use_residual
                 self.use_batchnorm = config.use_batchnorm
                 self.hidden_channels = config.hidden_channels
@@ -364,14 +315,14 @@ class ConvLSTMAutoencoder(nn.Module, PyTorchModelHubMixin):
 
         self.encoder = Encoder(
             latent_size=self.latent_size,
-            use_lstm=self.use_lstm,
+            use_gru=self.use_gru,
             hidden_channels = self.hidden_channels,
             use_residual = self.use_residual
         )
 
         self.decoder = Decoder(
             latent_size=self.latent_size,
-            use_lstm=self.use_lstm,
+            use_gru=self.use_gru,
             hidden_channels = self.hidden_channels,
             use_residual = self.use_residual
         )

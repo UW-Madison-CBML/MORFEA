@@ -15,7 +15,7 @@ from PIL import Image
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 import os
-from ae_model import ConvLSTMAutoencoder
+from ae_model import ConvGRUAutoencoder
 from export_video_latents import export_video_latents
 import sys
 import matplotlib.pyplot as plt
@@ -1415,13 +1415,13 @@ def train_vitmae(
 
 
 
-def train_lstm(
+def train_gru(
     loss_type="l1",
     ms_ssim_weight=0.5,
     rec_weight=0.5,
     temporal_weight=0.1,
     dropout_rate=0.1,
-    use_lstm=True,
+    use_gru=True,
     use_residual=True,
     use_batchnorm=True,
     model_name="", 
@@ -1472,7 +1472,7 @@ def train_lstm(
             "rec_weight": rec_weight,
             "temporal_weight": temporal_weight,
             "dropout_rate": dropout_rate,
-            "use_lstm": use_lstm,
+            "use_gru": use_gru,
             "use_residual": use_residual,
             "use_batchnorm": use_batchnorm,
             "latent_size": latent_size,
@@ -1490,7 +1490,7 @@ def train_lstm(
         print(f"{e}: bad login")
 
     torch.cuda.init()
-    model = ConvLSTMAutoencoder(
+    model = ConvGRUAutoencoder(
         None,
         input_channels=1,
         encoder_layers=2,
@@ -1501,13 +1501,13 @@ def train_lstm(
         use_latent_split=False,
         # Ablation parameters
         dropout_rate=dropout_rate,
-        use_lstm=use_lstm,
+        use_gru=use_gru,
         use_residual=use_residual,
         use_batchnorm=use_batchnorm,
         position_reg_size = POSITION_DIM if position_regularization else None
     )
     if(resume_model != ""):
-        ConvLSTMAutoencoder.from_pretrained(resume_model)
+        ConvGRUAutoencoder.from_pretrained(resume_model)
     artifact = wandb.Artifact(name="scripts", type="model_file")
     artifact.add_file(os.path.abspath("train_ae.py"))
     artifact.add_file(os.path.abspath("ae_model.py"))
@@ -1587,9 +1587,9 @@ def train_lstm(
         torch.cuda.empty_cache()
 
         model.train()
-        if hasattr(model, 'decoder') and hasattr(model,'encoder') and hasattr(model.encoder, 'lstm_enc') and hasattr(model.decoder,'lstm_dec') and model.decoder.lstm_dec is not None and model.encoder.lstm_enc is not None:
-            model.encoder.lstm_enc.flatten_parameters()
-            model.decoder.lstm_dec.flatten_parameters()
+        if hasattr(model, 'decoder') and hasattr(model,'encoder') and hasattr(model.encoder, 'gru_enc') and hasattr(model.decoder,'gru_dec') and model.decoder.gru_dec is not None and model.encoder.gru_enc is not None:
+            model.encoder.gru_enc.flatten_parameters()
+            model.decoder.gru_dec.flatten_parameters()
 
         pbar = tqdm(loader, desc=f"epoch {epoch}")
         total = 0.0
@@ -1786,7 +1786,7 @@ def train_lstm(
             "use_latent_split": False,
             "image_size": 128,
             "dropout_rate": dropout_rate,
-            "use_lstm": use_lstm,
+            "use_gru": use_gru,
             "use_residual": use_residual,
             "use_batchnorm": use_batchnorm,
             "loss_type": loss_type,
@@ -1814,7 +1814,7 @@ def train_lstm(
             num_classes=2,
             use_latent_split=False,
             dropout_rate=dropout_rate,
-            use_lstm=use_lstm,use_residual=use_residual,use_batchnorm=use_batchnorm, 
+            use_gru=use_gru,use_residual=use_residual,use_batchnorm=use_batchnorm, 
             position_reg_size = POSITION_DIM if position_regularization else None
         ) 
 
@@ -2188,7 +2188,7 @@ def train_lstm(
             if(test_val):
                 break
 
-        # train the lstm model on the kanakasabapathy latents and log the loss to wandb
+        # train the model on the kanakasabapathy latents and log the loss to wandb
         kanakasabapathy_lats_df = pd.DataFrame(kanakasabapathy_lats, index=metadata_df.index, columns=[f"z_{i}" for i in range(kanakasabapathy_lats.shape[1])])
         
             
@@ -2248,8 +2248,8 @@ def train_lstm(
         metadata_df = metadata_df[metadata_df['phase'].isin(["tPB2", "tPNf","tPNa", "t2", "t3", "t4","t5","t6","t7","t8","t9+","tM", "tSB","tB","tEB"])] # clear out noisy phases, TODO try varying this
         
         # now that we have single frames, add the single frames to the val_df for the single frame dataset to try
-        train_lstm_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "kanakasabapathy", run, batch_size=256, epochs=30)
-        train_lstm_classifier_on(pd.concat([kanakasabapathy_df, kanakasabapathy_val_df], axis=0, ignore_index=True), single_frame_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "single_frame_validation", run, batch_size=256, epochs=30)
+        train_grade_classifier_on(kanakasabapathy_df, kanakasabapathy_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "kanakasabapathy", run, batch_size=256, epochs=30)
+        train_grade_classifier_on(pd.concat([kanakasabapathy_df, kanakasabapathy_val_df], axis=0, ignore_index=True), single_frame_val_df, {"latents":True, "te_lr":0.005, "icm_lr":0.005}, False, "single_frame_validation", run, batch_size=256, epochs=30)
 
         run.log(image_dict | {"kanakasabapathy_grade_sizes": wandb.Table(dataframe=kanakasabapathy_metadata_df.groupby("TE",as_index=False).size()), "kanakasabapathy_knn_top_stages": wandb.Table(dataframe=pd.DataFrame({"size":kanakasabapathy_metadata_df.groupby("pred_stages").size().reindex(StageDataset.PHASES), "stage":StageDataset.PHASES}, index=StageDataset.PHASES)), "kanakasabapathy_df":wandb.Table(dataframe=kanakasabapathy_metadata_df)})
         
@@ -2260,7 +2260,7 @@ def train_lstm(
         grade_train_df = metadata_df[~grade_val_mask]
 
         try:
-            train_lstm_classifier_on(grade_train_df, grade_val_df, {"latents":True, "pca_ps":True, "distance_mat":True, "curvature":True, "acceleration":True, "velocity":True, "te_lr":0.005, "icm_lr":0.005, "ps_depth":3}, False, "latents_grade", run, batch_size=32, epochs=30)
+            train_grade_classifier_on(grade_train_df, grade_val_df, {"latents":True, "pca_ps":True, "distance_mat":True, "curvature":True, "acceleration":True, "velocity":True, "te_lr":0.005, "icm_lr":0.005, "ps_depth":3}, False, "latents_grade", run, batch_size=32, epochs=30)
         except Exception as e:
             print(f"error running grade classifier {e}")
 

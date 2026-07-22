@@ -1,6 +1,6 @@
 import torch
 from grade_lstm_dataset import GradeLSTMDataset
-from grade_lstm_model import GradeLSTMClassifier
+from grade_model import GradeClassifier
 from torch.utils.data import DataLoader
 import wandb
 import os
@@ -115,17 +115,40 @@ class RunningStats:
     def std_dev(self):
         return math.sqrt(self.variance)
 grade_options = ["A", "B", "C"] 
+class SimpleDataset(Dataset):
+    def __init__(self, df, feature_cols, target_col, classes):
+        self.df = df
+        self.feature_cols = feature_cols
+        self.target_col = target_col
+        self.classes = classes
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+        features = row[feature_cols].to_numpy()
+        target = row[target_col]
+        return torch.from_numpy(features), torch.from_numpy(self.classes.index(target), dtype=torch.long)
+    def __len__(self):
+        return len(self.df)
 
-def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=[0.3, 0.3,0.3], batch_size=256, epochs=8):
-    dataset_te = GradeLSTMDataset(latents_df, "TE", features, keep_na=KEEP_NA) 
-    dataset_icm = GradeLSTMDataset(latents_df, "ICM", features, keep_na=KEEP_NA)
-    dataset_te_val = GradeLSTMDataset(val_df, "TE", features, keep_na=KEEP_NA, return_whole_seqs=True) 
-    dataset_icm_val = GradeLSTMDataset(val_df, "ICM", features, keep_na=KEEP_NA, return_whole_seqs=True)
+
+def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=[0.3, 0.3,0.3], batch_size=256, epochs=8, use_lstm=True):
+    if(self.use_lstm):
+        dataset_te = GradeLSTMDataset(latents_df, "TE", features, keep_na=KEEP_NA) 
+        dataset_icm = GradeLSTMDataset(latents_df, "ICM", features, keep_na=KEEP_NA)
+        dataset_te_val = GradeLSTMDataset(val_df, "TE", features, keep_na=KEEP_NA, return_whole_seqs=True) 
+        dataset_icm_val = GradeLSTMDataset(val_df, "ICM", features, keep_na=KEEP_NA, return_whole_seqs=True)
+    else:
+        lat_cols = [col for col in latents_df.columns if col.startswith("z_")]
+        GRADES = ["A", "B", "C"]
+        dataset_te = SimpleDataset(latents_df, lat_cols, "TE", GRADES) 
+        dataset_icm = GradeLSTMDataset(latents_df, lat_cols, "ICM", GRADES)
+        dataset_te_val = GradeLSTMDataset(val_df, lat_cols, "TE",GRADES)
+        dataset_icm_val = GradeLSTMDataset(val_df, lat_cols, "ICM", GRADES)
+
     crit_te = torch.nn.CrossEntropyLoss(weight= torch.tensor(weights, device=DEVICE))
     crit_icm = torch.nn.CrossEntropyLoss(weight= torch.tensor(weights, device=DEVICE))
-    model_te = GradeLSTMClassifier(len(dataset_te.lat_cols), keep_na=KEEP_NA)
+    model_te = GradeClassifier(len(dataset_te.lat_cols), keep_na=KEEP_NA, use_lstm=use_lstm)
     model_te = model_te.to(DEVICE)
-    model_icm = GradeLSTMClassifier(len(dataset_icm.lat_cols), keep_na=KEEP_NA)
+    model_icm = GradeClassifier(len(dataset_icm.lat_cols), keep_na=KEEP_NA, use_lstm=use_lstm)
     model_icm = model_icm.to(DEVICE)
     optimizer_te = torch.optim.Adam(model_te.parameters(), lr=features["te_lr"], weight_decay=1e-5)
     optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=features["te_lr"], weight_decay=1e-5)
@@ -138,7 +161,7 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         num_workers=16,
         pin_memory=True,
         drop_last=True,
-        collate_fn=collate_padd)
+        collate_fn=collate_padd if use_lstm else None)
     loader_icm = DataLoader(
         dataset_icm,
         batch_size=batch_size,
@@ -146,7 +169,7 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         num_workers=16,
         pin_memory=True,
         drop_last=True, 
-        collate_fn=collate_padd)
+        collate_fn=collate_padd if use_lstm else None)
     loader_te_val = DataLoader(
         dataset_te_val,
         batch_size=4,
@@ -154,7 +177,7 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         num_workers=4,
         pin_memory=True,
         drop_last=False,
-        collate_fn=collate_padd)
+        collate_fn=collate_padd if use_lstm else None)
     loader_icm_val = DataLoader(
         dataset_icm_val,
         batch_size=4,
@@ -162,39 +185,67 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         num_workers=4,
         pin_memory=True,
         drop_last=False,
-        collate_fn=collate_padd)
+        collate_fn=collate_padd if use_lstm else None)
     scheduler_te = CosineAnnealingLR(optimizer_te, len(loader_te) * epochs)
     scheduler_icm = CosineAnnealingLR(optimizer_icm, len(loader_icm) * epochs)
 
     for epoch in tqdm(range(epochs)):
         model_te.train(); model_icm.train()
         # TE grades
-        for features, targets, lengths in loader_te:
-            features = features.to(DEVICE)
-            targets = targets.to(DEVICE).long()
-            label = model_te(features, lengths)
-            loss = crit_te(label, targets)
+        if use_lstm:
+            for features, targets, lengths in loader_te:
+                features = features.to(DEVICE)
+                targets = targets.to(DEVICE).long()
+                label = model_te(features, lengths)
+                loss = crit_te(label, targets)
 
-            optimizer_te.zero_grad() 
-            loss.backward() 
-            optimizer_te.step()
+                optimizer_te.zero_grad() 
+                loss.backward() 
+                optimizer_te.step()
 
-            scheduler_te.step()
-            run.log({f"{training_name}_te": loss.item()})
-        # ICM grades
-        for features, targets, lengths in loader_icm:
-            features = features.to(DEVICE)
-            targets = targets.to(DEVICE).long()
-            
-            label = model_icm(features, lengths)
-            loss = crit_icm(label, targets)
+                scheduler_te.step()
+                run.log({f"{training_name}_te": loss.item()})
+            # ICM grades
+            for features, targets, lengths in loader_icm:
+                features = features.to(DEVICE)
+                targets = targets.to(DEVICE).long()
+                
+                label = model_icm(features, lengths)
+                loss = crit_icm(label, targets)
 
-            optimizer_icm.zero_grad() 
-            loss.backward() 
-            optimizer_icm.step()
-            scheduler_icm.step()
-            run.log({f"{training_name}_icm": loss.item()})
+                optimizer_icm.zero_grad() 
+                loss.backward() 
+                optimizer_icm.step()
+                scheduler_icm.step()
+                run.log({f"{training_name}_icm": loss.item()})
+        else:
+            for features, targets in loader_te:
+                features = features.to(DEVICE)
+                targets = targets.to(DEVICE).long()
+                label = model_te(features)
+                loss = crit_te(label, targets)
+
+                optimizer_te.zero_grad() 
+                loss.backward() 
+                optimizer_te.step()
+
+                scheduler_te.step()
+                run.log({f"{training_name}_te": loss.item()})
+            # ICM grades
+            for features, targets in loader_icm:
+                features = features.to(DEVICE)
+                targets = targets.to(DEVICE).long()
+                
+                label = model_icm(features)
+                loss = crit_icm(label, targets)
+
+                optimizer_icm.zero_grad() 
+                loss.backward() 
+                optimizer_icm.step()
+                scheduler_icm.step()
+                run.log({f"{training_name}_icm": loss.item()})
     
+
         te_acc_stats = RunningStats()
         icm_acc_stats = RunningStats()
 
@@ -202,34 +253,64 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         te_confusion_mat = torch.zeros((3,3))
         icm_confusion_mat = torch.zeros((3,3))
         with torch.no_grad():
-            for features, targets, lengths in loader_te_val:
+            if use_lstm:
+                for features, targets, lengths in loader_te_val:
 
-                features = features.to(DEVICE)
-                logits = model_te(features, lengths)
+                    features = features.to(DEVICE)
+                    logits = model_te(features, lengths)
+                    
+                    preds = logits.cpu().argmax(dim=-1)
+                    
+                    te_acc_stats.push((preds == targets).sum().item()/targets.shape[0]) 
+                    
+                    targets = F.one_hot(targets, num_classes=3)
+                    preds = F.one_hot(preds, num_classes=3)
+
+
+                    te_confusion_mat += torch.einsum('ti,tj->ij', preds, targets) # this einsum calculates confusion mats
+
+
+                for features, targets, lengths in loader_icm_val:
+                    features = features.to(DEVICE)
+                    logits = model_icm(features, lengths)
+
+                    preds = logits.cpu().argmax(dim=-1) 
+
+                    icm_acc_stats.push((preds == targets).sum().item()/targets.shape[0])
+                    targets = F.one_hot(targets, num_classes=3)
+                    preds = F.one_hot(preds, num_classes=3)
+
+                    icm_confusion_mat += torch.einsum('ti,tj->ij', preds, targets)
+            else:
+                for features, targets in loader_te_val:
+
+                    features = features.to(DEVICE)
+                    logits = model_te(features)
+                    
+                    preds = logits.cpu().argmax(dim=-1)
+                    
+                    te_acc_stats.push((preds == targets).sum().item()/targets.shape[0]) 
+                    
+                    targets = F.one_hot(targets, num_classes=3)
+                    preds = F.one_hot(preds, num_classes=3)
+
+
+                    te_confusion_mat += torch.einsum('ti,tj->ij', preds, targets) # this einsum calculates confusion mats
+
+
+                for features, targets in loader_icm_val:
+                    features = features.to(DEVICE)
+                    logits = model_icm(features)
+
+                    preds = logits.cpu().argmax(dim=-1) 
+
+                    icm_acc_stats.push((preds == targets).sum().item()/targets.shape[0])
+                    targets = F.one_hot(targets, num_classes=3)
+                    preds = F.one_hot(preds, num_classes=3)
+
+                    icm_confusion_mat += torch.einsum('ti,tj->ij', preds, targets)
                 
-                preds = logits.cpu().argmax(dim=-1)
-                
-                te_acc_stats.push((preds == targets).sum().item()/targets.shape[0]) 
-                
-                targets = F.one_hot(targets, num_classes=3)
-                preds = F.one_hot(preds, num_classes=3)
 
-
-                te_confusion_mat += torch.einsum('ti,tj->ij', preds, targets) # this einsum calculates confusion mats
-
-
-            for features, targets, lengths in loader_icm_val:
-                features = features.to(DEVICE)
-                logits = model_icm(features, lengths)
-
-                preds = logits.cpu().argmax(dim=-1) 
-
-                icm_acc_stats.push((preds == targets).sum().item()/targets.shape[0])
-                targets = F.one_hot(targets, num_classes=3)
-                preds = F.one_hot(preds, num_classes=3)
-
-                icm_confusion_mat += torch.einsum('ti,tj->ij', preds, targets)
-                
         rpf_dict = {}
         for i, g in enumerate(grade_options):
             recall, precision, f1 = recall_precision_f1(te_confusion_mat, i)
@@ -281,7 +362,7 @@ def train_on_kanakasabapathy_latents(model_name, run, features):
     mask = df["embryo_id"].isin(VAL_EMBRYOS)
     val_df = df[mask]
     df = df[~mask]
-    train_on(df, val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kanakasabapathy", run, batch_size=128, epochs=40)
+    train_on(df, val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kanakasabapathy", run, batch_size=128, epochs=40, use_lstm=False)
     
 
 
