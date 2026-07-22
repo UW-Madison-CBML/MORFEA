@@ -63,6 +63,7 @@ def main(model_name, image_name, grade_args, phase_args, two_d=False):
     umap_lats = umap.fit_transform(latents_np)
     umap_df = pd.DataFrame(umap_lats, columns = UMAP_COLS, index=latents_df.index)
     df = pd.concat([latents_df,pca_df, umap_df], axis=1)
+    df = pd.concat([latents_df,pca_df], axis=1)
     if("NA" not in grade_args):
         df = df.dropna(subset=[GRADE])
 
