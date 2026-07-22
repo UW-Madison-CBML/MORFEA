@@ -1,6 +1,6 @@
 # train_ae.sub
    
-docker_image = jenslundsgaard/ivf-training:v3.2
+docker_image = jenslundsgaard/ivf-training:v3.3
 
 universe = docker
 

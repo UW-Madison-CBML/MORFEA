@@ -24,7 +24,7 @@ import iisignature
 from stage_dataset import StageDataset
 from tqdm.auto import tqdm
 from umap import UMAP
-
+from scipy.cluster.hierarchy import linkage, to_tree
 
 from scipy.spatial.distance import cdist
 from sklearn.feature_selection import SelectKBest
@@ -48,7 +48,7 @@ tqdm.pandas()
 PHASES = ["tPB2", "tPNa", "tPNf", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9+", "tM", "tSB", "tB", "tEB"]
 model_name = "convlstm_final-2026-07-13"
 TIME_OFFSET = 0.0
-PCA_DIM = 8
+PCA_DIM = 3
 path_sig_depth = 2
 GRADE_COLORS = {"A":(0,1,0), "B":(1,1,0), "C":(1,0,0), "NA":(0.5,0.5,0.5)}
 grade = "TE" # "TE"
@@ -67,13 +67,14 @@ for p in ["tPNf", "tM"]:
     id_set &= set(ids)
     print(p, ": ",len(ids))
 id_list = list(id_set)
-stripped_phases = ["tPNf","t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9+", "tM", ]
-mask = metadata_df["phase"].isin(stripped_phases) & metadata_df["embryo_id"].isin(id_list)
+stripped_phases = ["tM", "tSB","tB","tEB"] #"tPNf","t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9+", 
+mask = metadata_df["phase"].isin(stripped_phases)# & metadata_df["embryo_id"].isin(id_list)
 #"tPB2", "tPNa",  "tSB", "tB"
 # only graded 
 latents = latents[mask]
 metadata_df = metadata_df[mask]
-latents_df = pd.DataFrame(latents, columns=[f"z_{i}" for i in range(latents.shape[1])], index=metadata_df.index)
+lat_cols = [f"z_{i}" for i in range(latents.shape[1])]
+latents_df = pd.DataFrame(latents, columns=lat_cols, index=metadata_df.index)
 pca_cols = [f"pca_{i}" for i in range(PCA_DIM)]
 pca = PCA(n_components=PCA_DIM)
 pca_latents = pca.fit_transform(StandardScaler().fit_transform(latents))
@@ -84,6 +85,52 @@ df = pd.concat([metadata_df, latents_df, pca_latents_df], axis=1)
 
 
 # In[4]:
+
+
+def align_trajectories_tslearn(traj_a, traj_b):
+
+
+    path, sim = dtw_path(traj_a, traj_b)
+
+
+    idx_a = [p[0] for p in path]
+    idx_b = [p[1] for p in path]
+
+
+    paired_a = traj_a[idx_a]
+    paired_b = traj_b[idx_b]
+
+
+    centroid_a = np.mean(paired_a, axis=0)
+    centroid_b = np.mean(paired_b, axis=0)
+
+
+    a_centered = paired_a - centroid_a
+    b_centered = paired_b - centroid_b
+
+
+    H = np.dot(b_centered.T, a_centered)
+
+
+    U, S, Vt = np.linalg.svd(H)
+    R = np.dot(Vt.T, U.T)
+
+
+    if np.linalg.det(R) < 0:
+        last_row_idx = Vt.shape[0] - 1
+        Vt[last_row_idx, :] *= -1
+        R = np.dot(Vt.T, U.T)
+
+
+    t = centroid_a - np.dot(R, centroid_b)
+
+
+    traj_b_aligned = np.dot(traj_b, R.T) + t
+
+    return R, t, traj_b_aligned
+
+
+# In[5]:
 
 
 ps_cols = [f"path_sig_{i}" for i in range(len(iisignature.basis(iisignature.prepare(PCA_DIM+1, path_sig_depth))))]
@@ -99,7 +146,53 @@ path_sig_df = df.groupby("embryo_id").progress_apply(path_sig_agg).reset_index()
 print(len(path_sig_df))
 
 
-# In[5]:
+# In[10]:
+
+
+data = path_sig_df[ps_cols].to_numpy()
+Z = linkage(data, method='ward')
+# 
+
+root_node, node_list = to_tree(Z, rd=True)
+
+
+heights = Z[:, 2]
+median_height = np.median(heights)
+
+recent_ancestors = []
+
+
+
+num_leaves = len(data)
+for idx, row in enumerate(Z):
+    node_id = idx + num_leaves
+    tree_node = node_list[node_id]
+
+
+    leaves = tree_node.pre_order()
+
+
+    if row[3] > 4:
+        recent_ancestors.append((row[2], leaves))
+
+
+
+sample_recent_leaves = sorted(recent_ancestors, key=lambda x: x[0])
+
+
+for _,leaf_group in sample_recent_leaves:
+    fig, ax = plt.subplots(figsize=(8,6))#, subplot_kw={"projection":"3d"})
+    for leaf in leaf_group:
+        row = path_sig_df.iloc[leaf]
+
+        traj = df[df["embryo_id"] == row["embryo_id"]][pca_cols[:2]].to_numpy()
+        ax.scatter(traj[:,0], traj[:,1], c=np.linspace(0,1,traj.shape[0]))#, visual_ps[:,2]
+    plt.show()
+    plt.close(fig)
+    plt.close()
+
+
+# In[ ]:
 
 
 get_ipython().run_line_magic('matplotlib', 'inline')
@@ -142,7 +235,7 @@ plt.close(fig)
 plt.close()
 
 
-# In[6]:
+# In[ ]:
 
 
 def phase_ri(phase_df1, phase_df2, normalize=True):
@@ -180,7 +273,7 @@ def phase_ri(phase_df1, phase_df2, normalize=True):
 
 
 
-# In[7]:
+# In[ ]:
 
 
 num_nbrs = 100
@@ -200,7 +293,24 @@ for i1 in tqdm(range(path_sig_df[ps_cols].to_numpy().shape[0])):
         row1 = path_sig_df.iloc[i1]
         row2 = path_sig_df.iloc[i2]
         #print(row1["embryo_id"], f" {row1['grade']}", row2["embryo_id"], f" {row2['grade']}")
+        traj1 = df[df["embryo_id"] == row1["embryo_id"]][pca_cols[:3]].to_numpy()
+        traj2 = df[df["embryo_id"] == row2["embryo_id"]][pca_cols[:3]].to_numpy()
+        _,_,traj2 = align_trajectories_tslearn(traj1, traj2)
+        fig, axes = plt.subplots(2,figsize=(8,6))#, subplot_kw={"projection":"3d"})
+        axes[0].scatter(traj1[:,0], traj1[:,1], c=np.stack([np.ones(traj1.shape[0]), np.zeros(traj1.shape[0]), np.linspace(0,1,traj1.shape[0]) ], axis=1))
+        axes[1].scatter(traj2[:,0], traj2[:,1], c=np.stack([np.zeros(traj2.shape[0]), np.zeros(traj2.shape[0]),  np.linspace(0,1, traj2.shape[0])], axis=1))
+        fig.suptitle(f"{row1["embryo_id"]} vs {nbr_idx}-NN")
+        plt.show()
+        plt.close(fig)
+        plt.close()
 
+        fig, ax = plt.subplots(figsize=(8,6))#, subplot_kw={"projection":"3d"})
+        ax.scatter(traj1[:,0], traj1[:,1], c=np.stack([np.ones(traj1.shape[0]), np.zeros(traj1.shape[0]), np.linspace(0,1,traj1.shape[0]) ], axis=1))
+        ax.scatter(traj2[:,0], traj2[:,1], c=np.stack([np.zeros(traj2.shape[0]), np.zeros(traj2.shape[0]),  np.linspace(0,1, traj2.shape[0])], axis=1))
+        fig.suptitle(f"{row1["embryo_id"]} vs {nbr_idx}-NN")
+        plt.show()
+        plt.close(fig)
+        plt.close()
         phase_df1 = pd.read_csv(os.path.join("embryo_dataset_annotations",f"{row1["embryo_id"]}_phases.csv"), header=0) 
         phase_df1.columns = ["stage", "stage_begin","stage_end"]
         #print(phase_df1[phase_df1["stage"].isin(stripped_phases)])
@@ -223,7 +333,7 @@ scores_df = pd.DataFrame(np.concatenate([r_scores, dtw_scores],axis=1), columns 
 
 
 
-# In[8]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('matplotlib', 'inline')
@@ -245,11 +355,11 @@ ax.set_ylabel('Avg. DTW')
 plt.show()
 
 
-# In[9]:
+# In[ ]:
 
 
 embryos = metadata_df["embryo_id"].unique()
-stats = RunningStats
+stats = RunningStats()
 for _ in range(100):
     np.random.shuffle(embryos)
     embryo1, embryo2 = embryos[:2]

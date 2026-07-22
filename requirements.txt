@@ -37,4 +37,3 @@ iisignature
 pytorch-msssim
 phate
 tslearn
-dtw-python==1.7.5
