@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 import numpy as np
@@ -41,11 +41,11 @@ from tslearn.metrics import dtw, dtw_path
 tqdm.pandas()
 
 
-# In[ ]:
+# In[2]:
 
 
 # hyperparameters
-PHASES = ["tPB2", "tPNa", "tPNf", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9+", "tM", "tSB", "tB", "tEB"]
+
 model_name = "convlstm_final-2026-07-13"
 TIME_OFFSET = 0.0
 PCA_DIM = 2
@@ -54,7 +54,7 @@ GRADE_COLORS = {"A":(0,1,0), "B":(1,1,0), "C":(1,0,0), "NA":(0.5,0.5,0.5)}
 grade = "TE" # "TE"
 
 
-# In[ ]:
+# In[3]:
 
 
 # load latents and metadata
@@ -84,7 +84,7 @@ df = pd.concat([metadata_df, latents_df, pca_latents_df], axis=1)
 
 
 
-# In[ ]:
+# In[4]:
 
 
 def align_trajectories_tslearn(traj_a, traj_b):
@@ -130,7 +130,7 @@ def align_trajectories_tslearn(traj_a, traj_b):
     return R, t, traj_b_aligned
 
 
-# In[ ]:
+# In[5]:
 
 
 ps_cols = [f"path_sig_{i}" for i in range(len(iisignature.basis(iisignature.prepare(PCA_DIM+1, path_sig_depth))))]
@@ -150,6 +150,7 @@ print(len(path_sig_df))
 
 
 data = path_sig_df[ps_cols].to_numpy()
+from matplotlib.patches import Patch
 Z = linkage(data, method='ward')
 # 
 
@@ -182,22 +183,61 @@ sample_recent_leaves = sorted(recent_ancestors, key=lambda x: x[0])
 
 for _,leaf_group in sample_recent_leaves:
     fig, axes = plt.subplots(2,2,figsize=(8,6))#, subplot_kw={"projection":"3d"})
+    embryo_phase_dfs = {}
     for i, leaf in enumerate(leaf_group):
         row = path_sig_df.iloc[leaf]
+
+        phase_df = pd.read_csv(os.path.join("embryo_dataset_annotations",f"{row["embryo_id"]}_phases.csv"), header=0) 
+        phase_df.columns = ["stage", "stage_begin","stage_end"]
+        phase_df = phase_df[phase_df["stage"].isin(stripped_phases)]
+        phase_df.loc[:,["stage_begin", "stage_end"]] -= phase_df.iloc[0]["stage_begin"]# first row is tPB2
+        embryo_phase_dfs[row["embryo_id"]] = phase_df
+
 
         traj = df[df["embryo_id"] == row["embryo_id"]][pca_cols[:2]].to_numpy()
         axes[i//2][i & 1].scatter(traj[:,0], traj[:,1], c=np.linspace(0,1,traj.shape[0]))#, visual_ps[:,2]
         axes[i//2][i & 1].set_title(row["embryo_id"])
-        phase_df = pd.read_csv(os.path.join("embryo_dataset_annotations",f"{row["embryo_id"]}_phases.csv"), header=0) 
-        phase_df.columns = ["stage", "stage_begin","stage_end"]
-        print(phase_df)
+        axes[i//2][i & 1].tick_params(
+                axis="both",
+                which="both",
+                bottom=False,
+                top=False,
+                left=False,
+                right=False,
+                labelbottom=False,
+                labelleft=False,
+        )
+
+
+    plt.tight_layout()
+    plt.show()
+    plt.close(fig)
+    plt.close()
+
+    fig, ax = plt.subplots(figsize=(8,6))#, subplot_kw={"projection":"3d"})
+    legend = []
+    for i, phase in list(enumerate(StageDataset.PHASES))[::-1]:
+        legend.append(Patch(facecolor=plt.cm.tab20c(i), label=phase))
+        x = []
+        heights = []
+        for embryo_id, phase_df in embryo_phase_dfs.items(): 
+            x.append(embryo_id)
+            phase_rows = phase_df[phase_df["stage"] == phase]
+            heights.append(phase_rows.iloc[0]["stage_end"] if len(phase_rows) >= 1 else 0)
+
+
+        ax.bar(x, heights, color = plt.cm.tab20c(i))
+
+
+
+    fig.legend(handles=legend[::-1], title="Phases")
     plt.tight_layout()
     plt.show()
     plt.close(fig)
     plt.close()
 
 
-# In[ ]:
+# In[7]:
 
 
 get_ipython().run_line_magic('matplotlib', 'inline')

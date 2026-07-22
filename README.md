@@ -74,4 +74,5 @@ python train_grade_classifier.py --model-name NEW_MODEL-DATE [--ARGS]
 ```
 for grade classification. See the respective .py, .sh, .sub, and .txt files for more information on arguments.
 
-
+## Correspondence
+For any questions about the project or code, please contact *jlundsgaard@wisc.edu*.

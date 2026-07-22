@@ -20,28 +20,10 @@ from sklearn.preprocessing import StandardScaler
 import math
 from visualize_cebra import plot_sequences
 from tqdm import tqdm
+from stage_dataset import StageDataset
 
-PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
 GRADES = ["NA", "C", "B", "A"]
 GRADE_COLORS = ["#888888", "#FF0000", "#FFFF00", "#00FF00"]
-
-def get_phases(embryo_id, seq_len):
-    annotation_file = os.path.join("embryo_dataset_annotations", f"{embryo_id}_phases.csv")
-    df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
-
-    new_column = []
-    
-    new_column += ["pre_phase"] * (df.iloc[0]["stage_begin"] - 1)
-    col_len_seq = []
-    for index, row in df.iterrows():
-        new_column += [row["stage_id"]] * (row["stage_end"] - row["stage_begin"]+1)
-        col_len_seq.append(len(new_column))
-
-    
-    new_column += ["post_phase"] * (seq_len - len(new_column))
-    new_column = new_column[:seq_len]
-    
-    return np.array([PHASES.index(phase) for phase in new_column]) 
 
 def main(model_name, image_name, grade_args, phase_args, two_d=False):
     rng = np.random.default_rng(seed=42)
@@ -119,7 +101,7 @@ def main(model_name, image_name, grade_args, phase_args, two_d=False):
         c = []
         for group in embryo_groups:
             seqs.append(group[PCA_COLS].to_numpy())
-            c.append([PHASES.index(p) for p in group['phase']])
+            c.append([StageDataset.PHASES.index(p) for p in group['phase']])
             
         plot_sequences(seqs, f"phase_{g}_{image_name}", c=c, cmap="phase", cbar_label="Phase", folder="pca_plots", axlabel="PCA", axis_off=True, individ_names= names, two_d=two_d)
         #--------------------------------

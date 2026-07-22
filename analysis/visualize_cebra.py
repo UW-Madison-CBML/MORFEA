@@ -17,6 +17,7 @@ from matplotlib.patches import Patch
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import math
+from stage_dataset import StageDataset
 
 PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
 GRADES = ["NA", "C", "B", "A"]
@@ -196,7 +197,7 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
     plt.tight_layout(rect=[0, 0, 0.85, 1])
     grid_fig.subplots_adjust(right=0.85) 
     if(cmap == "phase"):
-        legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(PHASES)]
+        legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(StageDataset.PHASES)]
         grid_fig.legend(handles=legend_elements, title="Phases") 
     elif(cmap == "grade"):
         legend_elements = [Patch(facecolor=gc, label=g) for gc, g in zip(GRADE_COLORS, GRADES)]
