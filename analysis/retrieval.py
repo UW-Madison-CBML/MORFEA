@@ -42,7 +42,7 @@ from matplotlib.patches import Patch
 tqdm.pandas()
 
 
-# In[2]:
+# In[9]:
 
 
 # hyperparameters
@@ -51,11 +51,11 @@ model_name = "convlstm_final-2026-07-13"
 TIME_OFFSET = 0.0
 PCA_DIM = 2
 path_sig_depth = 2
-GRADE_COLORS = {"A":(0,1,0), "B":(1,1,0), "C":(1,0,0), "NA":(0.5,0.5,0.5)}
+GRADE_COLORS = {"A":(0.6,1,0.6), "B":(1,1,0.6), "C":(1,0.6,0.6), "NA":(0.5,0.5,0.5)}
 grade = "TE" # "TE"
 
 
-# In[32]:
+# In[3]:
 
 
 # load latents and metadata
@@ -128,7 +128,7 @@ def align_trajectories_tslearn(traj_a, traj_b):
     return R, t, traj_b_aligned
 
 
-# In[33]:
+# In[5]:
 
 
 ps_cols = [f"path_sig_{i}" for i in range(len(iisignature.basis(iisignature.prepare(PCA_DIM+1, path_sig_depth))))]
@@ -144,7 +144,7 @@ path_sig_df = df.groupby("embryo_id").progress_apply(path_sig_agg).reset_index()
 print(len(path_sig_df))
 
 
-# In[35]:
+# In[6]:
 
 
 data = path_sig_df[ps_cols].to_numpy()
@@ -239,7 +239,7 @@ for _,leaf_group in sample_recent_leaves:
     plt.close()
 
 
-# In[36]:
+# In[10]:
 
 
 get_ipython().run_line_magic('matplotlib', 'inline')
