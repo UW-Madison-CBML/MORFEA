@@ -15,10 +15,6 @@ class StageModel(Module):
        
         self.dropout = torch.nn.Dropout(0.3)
         self.crf = CRF(num_classes, batch_first=True)
-        with torch.no_grad():
-            self.crf.start_transitions.fill_(-10000.0)
-            self.crf.start_transitions[0] = 0.0 
-        self.register_buffer("mask", torch.triu(torch.ones(num_classes, num_classes)))
 
         
     def forward(self, x, mask, tags=None):

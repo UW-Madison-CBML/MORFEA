@@ -37,6 +37,7 @@ import torch
 from sklearn.metrics import normalized_mutual_info_score
 from sklearn.metrics import rand_score
 from tslearn.metrics import dtw, dtw_path
+from matplotlib.patches import Patch
 
 tqdm.pandas()
 
@@ -146,11 +147,11 @@ path_sig_df = df.groupby("embryo_id").progress_apply(path_sig_agg).reset_index()
 print(len(path_sig_df))
 
 
-# In[ ]:
+# In[17]:
 
 
 data = path_sig_df[ps_cols].to_numpy()
-from matplotlib.patches import Patch
+
 Z = linkage(data, method='ward')
 # 
 
@@ -230,7 +231,7 @@ for _,leaf_group in sample_recent_leaves:
 
 
 
-    fig.legend(handles=legend[::-1], title="Phases")
+    fig.legend(handles=legend[::-1], title="Phases", bbox_to_anchor=(1.16, 1))
     plt.tight_layout()
     plt.show()
     plt.close(fig)

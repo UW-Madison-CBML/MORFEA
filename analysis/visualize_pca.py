@@ -167,7 +167,7 @@ def main(model_name, image_name, grade_args, phase_args, two_d=False):
         c = []
         for group in embryo_groups:
             seqs.append(group[UMAP_COLS].to_numpy())
-            c.append([PHASES.index(p) for p in group['phase']])
+            c.append([StageDataset.PHASES.index(p) for p in group['phase']])
             
         plot_sequences(seqs, f"umap_phase_{g}_{image_name}", c=c, cmap="phase", cbar_label="Phase", folder="pca_plots", axlabel="UMAP", axis_off=True, individ_names = names, two_d=two_d)
         #--------------------------------
