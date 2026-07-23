@@ -121,15 +121,15 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         lat_cols = [col for col in latents_df.columns if col.startswith("z_")]
         GRADES = ["A", "B", "C"]
         dataset_te = SimpleDataset(latents_df, lat_cols, "TE", GRADES) 
-        dataset_icm = GradeLSTMDataset(latents_df, lat_cols, "ICM", GRADES)
-        dataset_te_val = GradeLSTMDataset(val_df, lat_cols, "TE",GRADES)
-        dataset_icm_val = GradeLSTMDataset(val_df, lat_cols, "ICM", GRADES)
+        dataset_icm = SimpleDataset(latents_df, lat_cols, "ICM", GRADES)
+        dataset_te_val = SimpleDataset(val_df, lat_cols, "TE",GRADES)
+        dataset_icm_val = SimpleDataset(val_df, lat_cols, "ICM", GRADES)
 
     crit_te = torch.nn.CrossEntropyLoss(weight= torch.tensor(weights, device=DEVICE))
     crit_icm = torch.nn.CrossEntropyLoss(weight= torch.tensor(weights, device=DEVICE))
-    model_te = GradeClassifier(len(dataset_te.lat_cols), keep_na=KEEP_NA, use_lstm=use_lstm)
+    model_te = GradeClassifier(len(dataset_te.lat_cols if use_lstm else dataset_te.feature_cols), keep_na=KEEP_NA, use_lstm=use_lstm)
     model_te = model_te.to(DEVICE)
-    model_icm = GradeClassifier(len(dataset_icm.lat_cols), keep_na=KEEP_NA, use_lstm=use_lstm)
+    model_icm = GradeClassifier(len(dataset_icm.lat_cols if use_lstm else dataset_te.feature_cols), keep_na=KEEP_NA, use_lstm=use_lstm)
     model_icm = model_icm.to(DEVICE)
     optimizer_te = torch.optim.Adam(model_te.parameters(), lr=features["te_lr"], weight_decay=1e-5)
     optimizer_icm = torch.optim.Adam(model_icm.parameters(), lr=features["te_lr"], weight_decay=1e-5)
