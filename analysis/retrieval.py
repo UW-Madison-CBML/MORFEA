@@ -55,21 +55,18 @@ GRADE_COLORS = {"A":(0,1,0), "B":(1,1,0), "C":(1,0,0), "NA":(0.5,0.5,0.5)}
 grade = "TE" # "TE"
 
 
-# In[3]:
+# In[32]:
 
 
 # load latents and metadata
 metadata_df = pd.read_csv(os.path.join("latents",f"{model_name}.csv"))
+print(metadata_df[metadata_df["embryo_id"] == "ZL1077-1"].iloc[35:45])
 latents = np.load(os.path.join("latents",f"{model_name}.npy"))
 metadata_df = metadata_df.fillna('NA')
-id_set = set(metadata_df["embryo_id"].unique())
-for p in ["tPNf", "tM"]:
-    ids = metadata_df[metadata_df["phase"]==p]["embryo_id"].unique()
-    id_set &= set(ids)
-    print(p, ": ",len(ids))
+id_set = set(metadata_df[metadata_df["phase"] == "tPNf"]["embryo_id"].unique()) & set(metadata_df[metadata_df["phase"] == "tM"]["embryo_id"].unique())
 id_list = list(id_set)
 stripped_phases = ["tPNf","t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9+","tM"]  
-mask = metadata_df["phase"].isin(stripped_phases) & metadata_df["embryo_id"].isin(id_list)
+mask = (metadata_df["embryo_id"].isin(id_list)) & (metadata_df["phase"].isin(stripped_phases))
 #"tPB2", "tPNa",  "tSB", "tB"
 # only graded 
 latents = latents[mask]
@@ -131,7 +128,7 @@ def align_trajectories_tslearn(traj_a, traj_b):
     return R, t, traj_b_aligned
 
 
-# In[5]:
+# In[33]:
 
 
 ps_cols = [f"path_sig_{i}" for i in range(len(iisignature.basis(iisignature.prepare(PCA_DIM+1, path_sig_depth))))]
@@ -147,7 +144,7 @@ path_sig_df = df.groupby("embryo_id").progress_apply(path_sig_agg).reset_index()
 print(len(path_sig_df))
 
 
-# In[17]:
+# In[35]:
 
 
 data = path_sig_df[ps_cols].to_numpy()
@@ -188,11 +185,15 @@ for _,leaf_group in sample_recent_leaves:
     for i, leaf in enumerate(leaf_group):
         row = path_sig_df.iloc[leaf]
 
-        phase_df = pd.read_csv(os.path.join("embryo_dataset_annotations",f"{row["embryo_id"]}_phases.csv"), header=0) 
+        phase_df = pd.read_csv(os.path.join("embryo_dataset_annotations",f"{row["embryo_id"]}_phases.csv"), header=None) 
+
         phase_df.columns = ["stage", "stage_begin","stage_end"]
-        phase_df = phase_df[phase_df["stage"].isin(stripped_phases)]
-        phase_df.loc[:,["stage_begin", "stage_end"]] -= phase_df.iloc[0]["stage_begin"]# first row is tPB2
-        embryo_phase_dfs[row["embryo_id"]] = phase_df
+        norm_phase_df = phase_df[phase_df["stage"].isin(stripped_phases)]
+        norm_phase_df.loc[:,["stage_begin", "stage_end"]] -= norm_phase_df.iloc[0]["stage_begin"]# first row is tPB2
+        if(norm_phase_df.iloc[0]["stage"] != "tPNf"):
+            print(phase_df)
+            print(row["embryo_id"], row["embryo_id"] in id_set)
+        embryo_phase_dfs[row["embryo_id"]] = norm_phase_df
 
 
         traj = df[df["embryo_id"] == row["embryo_id"]][pca_cols[:2]].to_numpy()
@@ -238,7 +239,7 @@ for _,leaf_group in sample_recent_leaves:
     plt.close()
 
 
-# In[7]:
+# In[36]:
 
 
 get_ipython().run_line_magic('matplotlib', 'inline')
@@ -253,6 +254,16 @@ visual_ps_grades = [GRADES[g] for g in visual_ps_grade_indices]
 visual_ps_colors = [GRADE_COLORS[g] for g in visual_ps_grades]
 fig, ax = plt.subplots(figsize=(8,6))#, subplot_kw={"projection":"3d"})
 ax.scatter(visual_ps[:,0], visual_ps[:,1], c=visual_ps_colors)#, visual_ps[:,2]
+ax.tick_params(
+    axis="both",
+    which="both",
+    bottom=False,
+    top=False,
+    left=False,
+    right=False,
+    labelbottom=False,
+    labelleft=False,
+)
 plt.show()
 plt.close(fig)
 plt.close()
@@ -265,6 +276,16 @@ visual_ps_grades = [GRADES[g] for g in visual_ps_grade_indices]
 visual_ps_colors = [GRADE_COLORS[g] for g in visual_ps_grades]
 fig, ax = plt.subplots(figsize=(8,6))#, subplot_kw={"projection":"3d"})
 ax.scatter(visual_ps[:,0], visual_ps[:,1], c=visual_ps_colors)#, visual_ps[:,2]
+ax.tick_params(
+    axis="both",
+    which="both",
+    bottom=False,
+    top=False,
+    left=False,
+    right=False,
+    labelbottom=False,
+    labelleft=False,
+)
 plt.show()
 plt.close(fig)
 plt.close()
@@ -276,6 +297,16 @@ visual_ps_grades = [GRADES[g] for g in visual_ps_grade_indices]
 visual_ps_colors = [GRADE_COLORS[g] for g in visual_ps_grades]
 fig, ax = plt.subplots(figsize=(8,6))#, subplot_kw={"projection":"3d"})
 ax.scatter(visual_ps[:,0], visual_ps[:,1], c=visual_ps_colors)#, visual_ps[:,2]
+ax.tick_params(
+    axis="both",
+    which="both",
+    bottom=False,
+    top=False,
+    left=False,
+    right=False,
+    labelbottom=False,
+    labelleft=False,
+)
 plt.show()
 plt.close(fig)
 plt.close()
@@ -357,11 +388,11 @@ for i1 in tqdm(range(path_sig_df[ps_cols].to_numpy().shape[0])):
         plt.show()
         plt.close(fig)
         plt.close()
-        phase_df1 = pd.read_csv(os.path.join("embryo_dataset_annotations",f"{row1["embryo_id"]}_phases.csv"), header=0) 
+        phase_df1 = pd.read_csv(os.path.join("embryo_dataset_annotations",f"{row1["embryo_id"]}_phases.csv"), header=None) 
         phase_df1.columns = ["stage", "stage_begin","stage_end"]
         #print(phase_df1[phase_df1["stage"].isin(stripped_phases)])
 
-        phase_df2 = pd.read_csv(os.path.join("embryo_dataset_annotations",f"{row2["embryo_id"]}_phases.csv"), header=0)
+        phase_df2 = pd.read_csv(os.path.join("embryo_dataset_annotations",f"{row2["embryo_id"]}_phases.csv"), header=None)
         phase_df2.columns = ["stage", "stage_begin","stage_end"]
         #print(phase_df2[phase_df2["stage"].isin(stripped_phases)])
 
