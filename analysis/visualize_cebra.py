@@ -19,27 +19,9 @@ from sklearn.preprocessing import StandardScaler
 import math
 from stage_dataset import StageDataset
 
-PHASES = ['pre_phase', 'tPB2', 'tPNa', 'tPNf', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9+', 'tM','tSB','tB', 'tEB', 'tHB', 'post_phase']
 GRADES = ["NA", "C", "B", "A"]
 GRADE_COLORS = ["#888888", "#FF0000", "#FFFF00", "#00FF00"]
 
-def get_phases(embryo_id, seq_len):
-    annotation_file = os.path.join("embryo_dataset_annotations", f"{embryo_id}_phases.csv")
-    df = pd.read_csv(annotation_file, names=['stage_id', 'stage_begin', 'stage_end'])
-
-    new_column = []
-    
-    new_column += ["pre_phase"] * (df.iloc[0]["stage_begin"] - 1)
-    col_len_seq = []
-    for index, row in df.iterrows():
-        new_column += [row["stage_id"]] * (row["stage_end"] - row["stage_begin"]+1)
-        col_len_seq.append(len(new_column))
-
-    
-    new_column += ["post_phase"] * (seq_len - len(new_column))
-    new_column = new_column[:seq_len]
-    
-    return np.array([PHASES.index(phase) for phase in new_column]) 
 def just_axes(ax, origin, axis_length):
     ax.set_axis_off()
     ax.grid(False)
@@ -153,11 +135,11 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         plt.tight_layout(rect=[0, 0, 0.85, 1])
         individ_fig.subplots_adjust(right=0.85) 
         if(cmap == "phase"):
-            legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(PHASES)]
-            individ_fig.legend(handles=legend_elements, title="Phases") 
+            legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(StageDataset.PHASES)]
+            individ_fig.legend(handles=legend_elements, title="Phases", bbox_to_anchor=(1.2, 1.1)) 
         elif(cmap == "grade"):
             legend_elements = [Patch(facecolor=gc, label=g) for gc, g in zip(GRADE_COLORS, GRADES)]
-            individ_fig.legend(handles=legend_elements, title="Grades") 
+            individ_fig.legend(handles=legend_elements, title="Grades", bbox_to_anchor=(1.2, 1.1)) 
         else:
             cbar_ax = individ_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
             if individ_im is not None:
@@ -198,10 +180,10 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
     grid_fig.subplots_adjust(right=0.85) 
     if(cmap == "phase"):
         legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(StageDataset.PHASES)]
-        grid_fig.legend(handles=legend_elements, title="Phases") 
+        grid_fig.legend(handles=legend_elements, title="Phases", bbox_to_anchor=(1.2, 1.1)) 
     elif(cmap == "grade"):
         legend_elements = [Patch(facecolor=gc, label=g) for gc, g in zip(GRADE_COLORS, GRADES)]
-        grid_fig.legend(handles=legend_elements, title="Grades") 
+        grid_fig.legend(handles=legend_elements, title="Grades", bbox_to_anchor=(1.2, 1.1)) 
     else:
         cbar_ax = grid_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
         if grid_im is not None:
@@ -217,11 +199,11 @@ def plot_sequences(seqs, f_name, c=None, cmap='viridis', uniform_bounds=False, c
         group_ax.set_zlim(z_lim) 
     group_fig.subplots_adjust(right=0.85) 
     if(cmap == "phase"):
-        legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(PHASES)]
-        group_fig.legend(handles=legend_elements, title="Phases") 
+        legend_elements = [Patch(facecolor=plt.cm.tab20c(i), label=phase) for i, phase in enumerate(StageDataset.PHASES)]
+        group_fig.legend(handles=legend_elements, title="Phases", bbox_to_anchor=(1.2, 1.1)) 
     elif(cmap == "grade"):
         legend_elements = [Patch(facecolor=gc, label=g) for gc, g in zip(GRADE_COLORS, GRADES)]
-        group_fig.legend(handles=legend_elements, title="Grades") 
+        group_fig.legend(handles=legend_elements, title="Grades", bbox_to_anchor=(1.2, 1.1)) 
     else:
         cbar_ax = group_fig.add_axes([0.88, 0.15, 0.03, 0.7]) 
         if group_im is not None:
@@ -355,4 +337,4 @@ if __name__ == "__main__":
     parser.add_argument("--phases", action="extend", nargs="+", type=str) 
     parser.add_argument("--grades", action="extend", nargs="+", type=str) 
     args = parser.parse_args()
-    main(args.model_name, args.image_name, ["A","B","C"] if args.all_grades else args.grades, PHASES if args.all_phases else args.phases)
+    main(args.model_name, args.image_name, ["A","B","C"] if args.all_grades else args.grades, StageDataset.PHASES if args.all_phases else args.phases)

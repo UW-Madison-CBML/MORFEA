@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import sys
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../utils")) # for non-CHTC use
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../training")) # for non-CHTC use
 matplotlib.use('Agg') 
 from geometric_features import calculate_curvatures, get_acc, get_vel
 import numpy as np
@@ -45,7 +46,6 @@ def main(model_name, image_name, grade_args, phase_args, two_d=False):
     umap_lats = umap.fit_transform(latents_np)
     umap_df = pd.DataFrame(umap_lats, columns = UMAP_COLS, index=latents_df.index)
     df = pd.concat([latents_df,pca_df, umap_df], axis=1)
-    df = pd.concat([latents_df,pca_df], axis=1)
     if("NA" not in grade_args):
         df = df.dropna(subset=[GRADE])
 
@@ -223,4 +223,4 @@ if __name__ == "__main__":
     parser.add_argument("--grades", action="extend", nargs="+", type=str) 
     parser.add_argument("--two-d", action="store_true")
     args = parser.parse_args()
-    main(args.model_name, args.image_name, ["A","B","C"] if args.all_grades else args.grades, PHASES if args.all_phases else args.phases, two_d=args.two_d)
+    main(args.model_name, args.image_name, ["A","B","C"] if args.all_grades else args.grades, StageDataset.PHASES if args.all_phases else args.phases, two_d=args.two_d)
