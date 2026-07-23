@@ -324,7 +324,6 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
 
         gc.collect()
         torch.cuda.empty_cache()
-    run.finish()
 
 
 def train_on_kanakasabapathy_latents(model_name, run, features):
@@ -386,6 +385,7 @@ def main(model_name, features):
 
     if run_kanakasabapathy:
         train_on_kanakasabapathy_latents(model_name, run, features)
+        run.finish()
         return
 
     
@@ -427,6 +427,7 @@ def main(model_name, features):
     # latents df will have the grade columns already
 
     train_on(latents_df, val_df, features, KEEP_NA, "latents", run)
+    run.finish()
 
 if __name__ == "__main__":
     import argparse
