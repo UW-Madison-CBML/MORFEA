@@ -39,4 +39,4 @@ request_gpus = 1
 
 
 #queue models from get_latents.txt
-queue model from (convlstm_final-2026-07-13)
+queue model from (convgru_final-2026-07-23)

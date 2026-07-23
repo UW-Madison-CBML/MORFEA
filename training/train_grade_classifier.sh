@@ -12,5 +12,5 @@ if [ -f "api_keys.txt" ]; then
 fi
 ls -lh
 
-python train_lstm_classifier.py "$@"
+python train_grade_classifier.py "$@"
 

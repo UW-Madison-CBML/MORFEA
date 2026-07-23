@@ -1,1 +1,1 @@
---model-name convlstm_final-2026-07-13 --run-name cvda --curvature --acceleration --velocity --distance-mat
+--model-name convgru_final-2026-07-23 --run-name cvda --curvature --acceleration --velocity --distance-mat

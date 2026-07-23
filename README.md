@@ -21,9 +21,9 @@ embryo_dataset_annotation.tar.gz
 Unzip these and have the folders in the directory where you are training/ running scripts. From the single frame dataset download `ed4.zip` from the Embryo dataset, and pull out `alldata`. The directories inside this folder should have the names 1,2,3,4,5. Rename the folder to `kanakasabapathy/` and move it to the directory where you are running scripts.
 
 ### Use the pretrained model
-To use the model with pretrained weights, simply run
+To use the model with pretrained weights, import `ConvGRUAutoencoder` from `training/ae_model.py` simply run
 ```
-model = ConvGRUAutoencoder.from_pretrained('JensLundsgaard/convlstm_final-2026-07-13')
+model = ConvGRUAutoencoder.from_pretrained('JensLundsgaard/convgru_final-2026-07-23')
 ```
 ### Build the data indexes
 To build the indexes `utils/index.csv` and `utils/index_embryo.csv`, run
@@ -56,6 +56,7 @@ then run
 ```
 python export_kanakasabapthy_latents.py --name NEW_MODEL-DATE
 ``` 
+and finally, once both of the above have run, run:
 ```
 python export_cebra.py --name NEW_MODEL-DATE
 ``` 
