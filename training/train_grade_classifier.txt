@@ -1,1 +1,4 @@
---kanakasabapathy --name nogru-2026-07-23 --run-name nogru --icm-lr 0.005 --te-lr 0.005 --all-phases
+--kanakasabapathy --name convgru_final-2026-07-23 --run-name convgru --icm-lr 0.005 --te-lr 0.005 --all-phases --binary-classification
+--kanakasabapathy --name nogru-2026-07-23 --run-name nogru --icm-lr 0.005 --te-lr 0.005 --all-phases --binary-classification
+--kanakasabapathy --name notemp-2026-07-23 --run-name notemp --icm-lr 0.005 --te-lr 0.005 --all-phases --binary-classification
+--kanakasabapathy --name noauginv-2026-07-24 --run-name noauginv --icm-lr 0.005 --te-lr 0.005 --all-phases --binary-classification

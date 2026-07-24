@@ -463,7 +463,7 @@ if __name__ == "__main__":
     parser.add_argument('--all-phases', action='store_true')
     parser.add_argument("--phases", action="extend", nargs="+", type=str) 
 
-    parser.add_arguments("--binary_classification", action="store_true")  
+    parser.add_arguments("--binary-classification", action="store_true")  
     args = parser.parse_args()
  
     main(args.name, vars(args))
