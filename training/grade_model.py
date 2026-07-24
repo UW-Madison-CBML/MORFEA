@@ -14,7 +14,7 @@ class GradeClassifier(torch.nn.Module):
             self.lin3point5 = torch.nn.Linear(256,256)
         self.lin4 = torch.nn.Linear(256, 4 if keep_na else 3)
         self.dropout = torch.nn.Dropout(0.2)
-    def forward(self, x, lengths):
+    def forward(self, x, lengths=None):
         if self.use_lstm:
             B,T,L = x.shape 
             x = x.view(B*T,L)

@@ -104,9 +104,10 @@ class SimpleDataset(Dataset):
         self.classes = classes
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        features = row[self.feature_cols].to_numpy()
+        feature_rows = self.df[self.feature_cols]
+        features = feature_rows.iloc[idx].to_numpy()
         target = row[self.target_col]
-        return torch.from_numpy(features), torch.from_numpy(self.classes.index(target), dtype=torch.long)
+        return torch.from_numpy(features), torch.tensor(self.classes.index(target), dtype=torch.long)
     def __len__(self):
         return len(self.df)
 
@@ -177,7 +178,7 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
             for features, targets, lengths in loader_te:
                 features = features.to(DEVICE)
                 targets = targets.to(DEVICE).long()
-                label = model_te(features, lengths)
+                label = model_te(features, lengths=lengths)
                 loss = crit_te(label, targets)
 
                 optimizer_te.zero_grad() 
@@ -191,7 +192,7 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
                 features = features.to(DEVICE)
                 targets = targets.to(DEVICE).long()
                 
-                label = model_icm(features, lengths)
+                label = model_icm(features, lengths=lengths)
                 loss = crit_icm(label, targets)
 
                 optimizer_icm.zero_grad() 
@@ -238,7 +239,7 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
                 for features, targets, lengths in loader_te_val:
 
                     features = features.to(DEVICE)
-                    logits = model_te(features, lengths)
+                    logits = model_te(features, lengths=lengths)
                     
                     preds = logits.cpu().argmax(dim=-1)
                     
@@ -253,7 +254,7 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
 
                 for features, targets, lengths in loader_icm_val:
                     features = features.to(DEVICE)
-                    logits = model_icm(features, lengths)
+                    logits = model_icm(features, lengths=lengths)
 
                     preds = logits.cpu().argmax(dim=-1) 
 
@@ -342,7 +343,7 @@ def train_on_kanakasabapathy_latents(model_name, run, features):
     mask = df["embryo_id"].isin(VAL_EMBRYOS)
     val_df = df[mask]
     df = df[~mask]
-    train_on(df, val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kanakasabapathy", run, batch_size=128, epochs=40, use_lstm=False)
+    train_on(df, val_df, {"latents":True, "te_lr":features['te_lr'], "icm_lr":features['icm_lr']}, False, "kanakasabapathy", run, batch_size=128, epochs=10, use_lstm=False)
     
 
 
