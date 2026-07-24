@@ -1,1 +1,2 @@
---model-name convgru_final-2026-07-23 --run-name cvda --curvature --acceleration --velocity --distance-mat
+--model-name notemp-2026-07-23 --run-name notemp --curvature --acceleration --velocity --distance-mat
+--model-name nogru-2026-07-23 --run-name nogru --curvature --acceleration --velocity --distance-mat
