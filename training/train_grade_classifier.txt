@@ -1,1 +1,1 @@
---kanakasabapathy --name convgru_final-2026-07-23 --run-name convgru_final --icm-lr 0.005 --te-lr 0.005 --all-phases
+--kanakasabapathy --name nogru-2026-07-23 --run-name nogru --icm-lr 0.005 --te-lr 0.005 --all-phases

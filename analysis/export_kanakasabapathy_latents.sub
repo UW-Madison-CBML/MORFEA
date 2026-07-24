@@ -38,7 +38,7 @@ request_disk = 80GB
 request_gpus = 1
 
 
-#queue model from (
-#convgru_final-2026-07-23
-#)
-queue 1
+queue model from (
+convgru_final-2026-07-23
+)
+#queue 1
