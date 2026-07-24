@@ -9,6 +9,7 @@ def main(model_name):
 
     metadata_df = pd.read_csv(os.path.join("kanakasabapathy_latents",f"{model_name}.csv"))
     latents = np.load(os.path.join("kanakasabapathy_latents",f"{model_name}.npy"))
+    mask = metadata_df["TE"].isin(["A","C"])
     pca_latents = PCA(n_components=2).fit_transform(StandardScaler().fit_transform(latents))
     colors = [GRADE_COLORS[g] for g in metadata_df["TE"].to_list()]
     fig, ax = plt.subplots(figsize=(8,6))

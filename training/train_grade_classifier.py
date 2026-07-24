@@ -95,7 +95,6 @@ VAL_EMBRYOS =[
     "RA803-4",
     ]
 
-grade_options = ["A", "B", "C"] 
 class SimpleDataset(Dataset):
     def __init__(self, df, feature_cols, target_col, classes):
         self.df = df
@@ -112,7 +111,11 @@ class SimpleDataset(Dataset):
         return len(self.df)
 
 
-def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=[0.3, 0.3,0.3], batch_size=256, epochs=8, use_lstm=True):
+def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, binary_classification, weights=[0.3, 0.3,0.3], batch_size=256, epochs=8, use_lstm=True):
+    
+    grade_options = ["A", "C"] if binary_classification else ["A", "B", "C"] 
+    latents_df = latents_df[latents_df["TE"] != "B"]
+    val_df = val_df[val_df["TE"] != "B"]
     if(use_lstm):
         dataset_te = GradeLSTMDataset(latents_df, "TE", features, keep_na=KEEP_NA) 
         dataset_icm = GradeLSTMDataset(latents_df, "ICM", features, keep_na=KEEP_NA)
@@ -120,11 +123,10 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         dataset_icm_val = GradeLSTMDataset(val_df, "ICM", features, keep_na=KEEP_NA, return_whole_seqs=True)
     else:
         lat_cols = [col for col in latents_df.columns if col.startswith("z_")]
-        GRADES = ["A", "B", "C"]
-        dataset_te = SimpleDataset(latents_df, lat_cols, "TE", GRADES) 
-        dataset_icm = SimpleDataset(latents_df, lat_cols, "ICM", GRADES)
-        dataset_te_val = SimpleDataset(val_df, lat_cols, "TE",GRADES)
-        dataset_icm_val = SimpleDataset(val_df, lat_cols, "ICM", GRADES)
+        dataset_te = SimpleDataset(latents_df, lat_cols, "TE", grade_options)
+        dataset_icm = SimpleDataset(latents_df, lat_cols, "ICM", grades_options)
+        dataset_te_val = SimpleDataset(val_df, lat_cols, "TE", grades_options)
+        dataset_icm_val = SimpleDataset(val_df, lat_cols, "ICM", grades_options)
 
     crit_te = torch.nn.CrossEntropyLoss(weight= torch.tensor(weights, device=DEVICE))
     crit_icm = torch.nn.CrossEntropyLoss(weight= torch.tensor(weights, device=DEVICE))
@@ -232,8 +234,8 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         icm_acc_stats = RunningStats()
 
         model_te.eval(); model_icm.eval()
-        te_confusion_mat = torch.zeros((3,3))
-        icm_confusion_mat = torch.zeros((3,3))
+        te_confusion_mat = torch.zeros((2,2) if binary_classification else (3,3))
+        icm_confusion_mat = torch.zeros((2,2) if binary_classification else (3,3))
         with torch.no_grad():
             if use_lstm:
                 for features, targets, lengths in loader_te_val:
@@ -245,8 +247,8 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
                     
                     te_acc_stats.push((preds == targets).sum().item()/targets.shape[0]) 
                     
-                    targets = F.one_hot(targets, num_classes=3)
-                    preds = F.one_hot(preds, num_classes=3)
+                    targets = F.one_hot(targets, num_classes=len(grade_options))
+                    preds = F.one_hot(preds, num_classes=len(grade_options))
 
 
                     te_confusion_mat += torch.einsum('ti,tj->ij', preds, targets) # this einsum calculates confusion mats
@@ -259,8 +261,8 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
                     preds = logits.cpu().argmax(dim=-1) 
 
                     icm_acc_stats.push((preds == targets).sum().item()/targets.shape[0])
-                    targets = F.one_hot(targets, num_classes=3)
-                    preds = F.one_hot(preds, num_classes=3)
+                    targets = F.one_hot(targets, num_classes=len(grade_options))
+                    preds = F.one_hot(preds, num_classes=len(grade_options))
 
                     icm_confusion_mat += torch.einsum('ti,tj->ij', preds, targets)
             else:
@@ -273,8 +275,8 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
                     
                     te_acc_stats.push((preds == targets).sum().item()/targets.shape[0]) 
                     
-                    targets = F.one_hot(targets, num_classes=3)
-                    preds = F.one_hot(preds, num_classes=3)
+                    targets = F.one_hot(targets, num_classes=len(grade_options))
+                    preds = F.one_hot(preds, num_classes=len(grade_options))
 
 
                     te_confusion_mat += torch.einsum('ti,tj->ij', preds, targets) # this einsum calculates confusion mats
@@ -287,8 +289,8 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
                     preds = logits.cpu().argmax(dim=-1) 
 
                     icm_acc_stats.push((preds == targets).sum().item()/targets.shape[0])
-                    targets = F.one_hot(targets, num_classes=3)
-                    preds = F.one_hot(preds, num_classes=3)
+                    targets = F.one_hot(targets, num_classes=len(grade_options))
+                    preds = F.one_hot(preds, num_classes=len(grade_options))
 
                     icm_confusion_mat += torch.einsum('ti,tj->ij', preds, targets)
                 
@@ -327,7 +329,7 @@ def train_on(latents_df, val_df, features, KEEP_NA, training_name, run, weights=
         torch.cuda.empty_cache()
 
 
-def train_on_kanakasabapathy_latents(model_name, run, features):
+def train_on_kanakasabapathy_latents(model_name, run, features, binary_classification):
     # just call the image name the embryo id
     kanakasabapathy_metadata_df = pd.read_csv(os.path.join("kanakasabapathy_latents", f"{model_name}.csv")).rename(columns={"Image":"embryo_id"})
     # spoof 
@@ -358,6 +360,7 @@ def main(model_name, features):
     run_name = features['run_name']
     run_kanakasabapathy = features['kanakasabapathy']
     weights = [0.4,0.4,0.2]
+    binary_classification = features['binary_classification']
     torch.cuda.empty_cache()
     torch.autograd.detect_anomaly(True)
 
@@ -385,7 +388,7 @@ def main(model_name, features):
     learning_rate = 0.0001
 
     if run_kanakasabapathy:
-        train_on_kanakasabapathy_latents(model_name, run, features)
+        train_on_kanakasabapathy_latents(model_name, run, features, binary_classification)
         run.finish()
         return
 
@@ -427,7 +430,7 @@ def main(model_name, features):
     latents_df = latents_df[~mask]
     # latents df will have the grade columns already
 
-    train_on(latents_df, val_df, features, KEEP_NA, "latents", run)
+    train_on(latents_df, val_df, features, KEEP_NA, "latents", run, binary_classification)
     run.finish()
 
 if __name__ == "__main__":
@@ -460,7 +463,7 @@ if __name__ == "__main__":
     parser.add_argument('--all-phases', action='store_true')
     parser.add_argument("--phases", action="extend", nargs="+", type=str) 
 
-  
+    parser.add_arguments("--binary_classification", action="store_true")  
     args = parser.parse_args()
  
     main(args.name, vars(args))

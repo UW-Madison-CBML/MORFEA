@@ -2,6 +2,14 @@ JOB A export_kanakasabapathy_latents.sub
 VARS A model="nogru-2026-07-23"
 JOB B export_kanakasabapathy_latents.sub
 VARS B model="notemp-2026-07-23"
+JOB C export_kanakasabapathy_latents.sub
+VARS C model="convgru_final-2026-07-23"
+JOB D export_kanakasabapathy_latents.sub
+VARS D model="noauginv-2026-07-24"
+
+
 
 
 PARENT A CHILD B
+PARENT B CHILD C
+PARENT C CHILD D

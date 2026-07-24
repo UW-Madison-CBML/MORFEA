@@ -2,8 +2,7 @@
 
 tar -xvf kanakasabapathy.tar.gz
 mv alldata/ kanakasabapathy/
-mkdir -p kanakasabapathy_latents
-
+tar -xvf kanakasabapathy_latents.tar.gz
 if [ -f "api_keys.txt" ]; then
     HF_KEY=$(head -n 1 api_keys.txt)
     export HF_TOKEN=$HF_KEY

@@ -20,7 +20,7 @@ Requirements = (Target.HasCHTCStaging == true)
 #require_gpus = (DriverVersion >= 10.1)
 # Transfer our executable script
 transfer_output_remaps = "kanakasabapathy_latents.tar.gz =  file:///staging/groups/bhaskar_group/ivf/kanakasabapathy_latents.tar.gz;"
-transfer_input_files = export_kanakasabapathy_latents.sh, export_kanakasabapathy_latents.py, ../training/ae_model.py, ../training/dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/kanakasabapathy.tar.gz, ../api_keys.txt
+transfer_input_files = export_kanakasabapathy_latents.sh, export_kanakasabapathy_latents.py, ../training/ae_model.py, ../training/dataset_ivf_embryo.py, file:///staging/groups/bhaskar_group/ivf/kanakasabapathy.tar.gz, ../api_keys.txt,file:///staging/groups/bhaskar_group/ivf/kanakasabapathy_latents.tar.gz
 
 
 +WantGPULab = true
