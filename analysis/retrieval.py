@@ -42,12 +42,12 @@ from matplotlib.patches import Patch
 tqdm.pandas()
 
 
-# In[9]:
+# In[2]:
 
 
 # hyperparameters
 
-model_name = "convlstm_final-2026-07-13"
+model_name = "convgru_final-2026-07-23"
 TIME_OFFSET = 0.0
 PCA_DIM = 2
 path_sig_depth = 2
@@ -239,7 +239,7 @@ for _,leaf_group in sample_recent_leaves:
     plt.close()
 
 
-# In[10]:
+# In[7]:
 
 
 get_ipython().run_line_magic('matplotlib', 'inline')
@@ -310,6 +310,69 @@ ax.tick_params(
 plt.show()
 plt.close(fig)
 plt.close()
+
+
+# In[22]:
+
+
+def get_len_phase(embryo_id, phase):
+
+    phase_df = pd.read_csv(os.path.join("embryo_dataset_annotations",f"{embryo_id}_phases.csv"), header=None) 
+    phase_df.columns = ["stage", "stage_begin","stage_end"]
+    rows = phase_df[phase_df["stage"] == phase.strip()]
+
+    if len(rows) == 0:
+        return 0
+    else:
+        return rows.iloc[0]["stage_end"] - rows.iloc[0]["stage_begin"] + 1
+
+for p in stripped_phases:
+    print(f"{p}")
+    normed_path_sigs = StandardScaler().fit_transform(path_sig_df[ps_cols].to_numpy())
+    visual_ps = PCA(n_components=2).fit_transform(normed_path_sigs)
+    path_sig_df[f"{p}_length"] = path_sig_df["embryo_id"].map(lambda x:get_len_phase(x,p))
+    colors = path_sig_df[f"{p}_length"].to_numpy()
+    visual_ps = visual_ps[colors > 0]
+    c = colors[colors > 0]
+    print(colors)
+    fig, ax = plt.subplots(figsize=(8,6))#, subplot_kw={"projection":"3d"})
+    ax.scatter(visual_ps[:,0], visual_ps[:,1], c=c, cmap="viridis")#, visual_ps[:,2]
+    ax.tick_params(
+        axis="both",
+        which="both",
+        bottom=False,
+        top=False,
+        left=False,
+        right=False,
+        labelbottom=False,
+        labelleft=False,
+    )
+    fig.suptitle(p)
+    plt.show()
+    plt.close(fig)
+    plt.close()
+
+
+    normed_path_sigs = StandardScaler().fit_transform(path_sig_df[ps_cols].to_numpy())
+    visual_ps = UMAP(n_components=2).fit_transform(normed_path_sigs)
+    visual_ps = visual_ps[colors > 0]
+    c = colors[colors > 0]
+    fig, ax = plt.subplots(figsize=(8,6))#, subplot_kw={"projection":"3d"})
+    ax.scatter(visual_ps[:,0], visual_ps[:,1], c=c, cmap="viridis")#, visual_ps[:,2]
+    ax.tick_params(
+        axis="both",
+        which="both",
+        bottom=False,
+        top=False,
+        left=False,
+        right=False,
+        labelbottom=False,
+        labelleft=False,
+    )
+    fig.suptitle(p)
+    plt.show()
+    plt.close(fig)
+    plt.close()
 
 
 # In[ ]:
