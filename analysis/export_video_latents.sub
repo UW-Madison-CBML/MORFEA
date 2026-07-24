@@ -37,6 +37,7 @@ request_memory = 64GB
 request_disk = 80GB
 request_gpus = 1
 
-
-queue model from export_video_latents.txt
-#queue 1
+# for non-DAG use
+#queue model from export_video_latents.txt
+# for DAG use
+queue 1

@@ -1,4 +1,1 @@
-convgru --name convgru_final --ms-ssim-weight 1.0 --rec-weight 0.0 --vgg-weight 0.0 --temporal-weight 0.1 --lr 0.0004 --epochs 18 --size 512 --warm-restarts --position-regularization --position-regularization-weight 0.2 --no-residual
-convgru --name nogru --ms-ssim-weight 1.0 --rec-weight 0.0 --vgg-weight 0.0 --temporal-weight 0.1 --lr 0.0004 --epochs 18 --size 512 --warm-restarts --position-regularization --position-regularization-weight 0.2 --no-residual --no-gru
-convgru --name noauginv --ms-ssim-weight 1.0 --rec-weight 0.0 --vgg-weight 0.0 --temporal-weight 0.1 --lr 0.0004 --epochs 18 --size 512 --warm-restarts --no-residual 
-convgru --name notemp --ms-ssim-weight 1.0 --rec-weight 0.0 --vgg-weight 0.0 --temporal-weight 0.0 --lr 0.0004 --epochs 18 --size 512 --warm-restarts --position-regularization --position-regularization-weight 0.2 --no-residual 
+convgru --name noauginv --ms-ssim-weight 1.0 --rec-weight 0.0 --vgg-weight 0.0 --temporal-weight 0.1 --lr 0.0004 --epochs 20 --size 512 --warm-restarts --no-residual 

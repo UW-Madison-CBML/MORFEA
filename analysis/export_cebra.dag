@@ -1,6 +1,6 @@
-JOB A export_video_latents.sub
+JOB A export_cebra.sub
 VARS A model="nogru-2026-07-23"
-JOB B export_video_latents.sub
+JOB B export_cebra.sub
 VARS B model="notemp-2026-07-23"
 
 
